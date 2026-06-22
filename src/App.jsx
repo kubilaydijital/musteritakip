@@ -74,17 +74,24 @@ function Login({ onLogin }) {
   )
 }
 
-const emptyForm = { name: '', phone: '', channel: 'Instagram', service: SERVICES[0], note: '', result: 'Görüşülüyor', saleAmount: '' }
+const emptyForm = { name: '', phone: '', channel: 'Instagram', service: SERVICES[0], note: '', result: 'Görüşülüyor', saleAmount: '', appointmentAt: '' }
+
+function toLocalInputValue(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
-  const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? String(editing.sale_amount) : '' } : emptyForm)
+  const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? String(editing.sale_amount) : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    setForm(editing ? { ...editing, saleAmount: editing.sale_amount != null ? String(editing.sale_amount) : '' } : emptyForm)
+    setForm(editing ? { ...editing, saleAmount: editing.sale_amount != null ? String(editing.sale_amount) : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
     setPhoneErr(''); setNoteErr('')
   }, [editing])
 
@@ -102,18 +109,19 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
 
     setSubmitting(true)
     const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount) : null
+    const appointmentAt = form.result === 'Randevu aldı' && form.appointmentAt ? new Date(form.appointmentAt).toISOString() : null
 
     if (editing) {
       await onUpdate({
         id: editing.id, name: form.name, phone: form.phone, channel: form.channel,
         service: form.service, note: form.note, result: form.result, sale_amount: saleAmount,
-        edited_at: new Date().toISOString()
+        appointment_at: appointmentAt, edited_at: new Date().toISOString()
       })
     } else {
       await onAdd({
         id: uid(), branch_id: currentUser.branch_id, name: form.name, phone: form.phone,
         channel: form.channel, service: form.service, note: form.note, result: form.result,
-        sale_amount: saleAmount, entered_by: currentUser.username, date: new Date().toISOString()
+        sale_amount: saleAmount, appointment_at: appointmentAt, entered_by: currentUser.username, date: new Date().toISOString()
       })
     }
     setSubmitting(false)
@@ -146,6 +154,12 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
       <select value={form.service} onChange={e => set('service', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
+      {form.result === 'Randevu aldı' && (
+        <div style={{ marginBottom: 10 }}>
+          <input type="datetime-local" value={form.appointmentAt} onChange={e => set('appointmentAt', e.target.value)} style={{ ...inputStyle, width: '100%' }} />
+          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Randevu tarihi ve saati — "Yaklaşan randevular" listesinde görünür.</p>
+        </div>
+      )}
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
           <input placeholder="Satış tutarı (TL) — isteğe bağlı" value={form.saleAmount} onChange={e => set('saleAmount', e.target.value)} type="number" min="0" style={{ ...inputStyle, width: '100%' }} />
@@ -168,6 +182,46 @@ function StatCard({ label, value }) {
     <div style={{ background: '#f4f5f7', borderRadius: 10, padding: '1rem' }}>
       <p style={{ fontSize: 13, color: '#666', margin: '0 0 4px' }}>{label}</p>
       <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{value}</p>
+    </div>
+  )
+}
+
+function fmtAppointment(iso) {
+  const d = new Date(iso)
+  const today = new Date()
+  const isToday = d.toDateString() === today.toDateString()
+  const dateStr = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })
+  const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+  return (isToday ? 'Bugün' : dateStr) + ' · ' + timeStr
+}
+
+function UpcomingAppointments({ leads, canSeePhone, currentUserName, isStaff, showBranch, branchNameFn }) {
+  const upcoming = useMemo(() => {
+    const now = Date.now()
+    return leads
+      .filter(l => isStaff ? l.entered_by === currentUserName : true)
+      .filter(l => l.result === 'Randevu aldı' && l.appointment_at)
+      .filter(l => new Date(l.appointment_at).getTime() >= now - 3600000)
+      .sort((a, b) => new Date(a.appointment_at) - new Date(b.appointment_at))
+  }, [leads, currentUserName, isStaff])
+
+  if (upcoming.length === 0) return null
+
+  return (
+    <div style={{ background: '#eaf3ec', border: '1px solid #b9ddc3', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '1.5rem' }}>
+      <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 10px', color: '#1f6b3a' }}>📅 {upcoming.length} yaklaşan randevu</p>
+      {upcoming.slice(0, 10).map(lead => (
+        <div key={lead.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 13, borderTop: '1px solid #b9ddc3' }}>
+          <span>
+            <span style={{ fontWeight: 600 }}>{lead.name}</span>
+            <span style={{ color: '#555', marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
+            {showBranch && <span style={{ color: '#555', marginLeft: 8, fontSize: 12 }}>· {branchNameFn(lead.branch_id)}</span>}
+            <span style={{ color: '#555', marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#1f6b3a' }}>{fmtAppointment(lead.appointment_at)}</span>
+        </div>
+      ))}
+      {upcoming.length > 10 && <p style={{ fontSize: 12, color: '#555', margin: '8px 0 0' }}>+ {upcoming.length - 10} randevu daha</p>}
     </div>
   )
 }
@@ -494,7 +548,8 @@ export default function App() {
             {currentUser.username} · {isAdmin ? 'tüm şubeler' : isManager ? `şube yöneticisi · ${branchName(currentUser.branch_id)}` : `personel · ${branchName(currentUser.branch_id)}`}
           </p>
         </div>
-<button onClick={() => setCurrentUser(null)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>Çıkış yap</button>      </div>
+        <button onClick={() => setCurrentUser(null)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>Çıkış yap</button>
+      </div>
 
       {isAdmin && (
         <div style={{ marginBottom: '1.5rem' }}>
@@ -504,6 +559,8 @@ export default function App() {
           </select>
         </div>
       )}
+
+      <UpcomingAppointments leads={visibleLeads} canSeePhone={isAdmin || isManager} currentUserName={currentUser.username} isStaff={isStaff} showBranch={isAdmin && filterBranch === 'all'} branchNameFn={branchName} />
 
       <StaleAlerts leads={visibleLeads} canSeePhone={isAdmin || isManager} currentUserName={currentUser.username} isStaff={isStaff} />
 
