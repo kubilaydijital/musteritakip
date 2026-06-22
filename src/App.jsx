@@ -494,8 +494,7 @@ export default function App() {
             {currentUser.username} · {isAdmin ? 'tüm şubeler' : isManager ? `şube yöneticisi · ${branchName(currentUser.branch_id)}` : `personel · ${branchName(currentUser.branch_id)}`}
           </p>
         </div>
-        <button onClick={() => setCurrentUser(null)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}>Çıkış yap</button>
-      </div>
+<button onClick={() => setCurrentUser(null)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>Çıkış yap</button>      </div>
 
       {isAdmin && (
         <div style={{ marginBottom: '1.5rem' }}>
