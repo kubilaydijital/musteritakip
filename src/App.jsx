@@ -124,11 +124,12 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
+  const [appointmentErr, setAppointmentErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     setForm(editing ? { ...editing, saleAmount: editing.sale_amount != null ? String(editing.sale_amount) : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
-    setPhoneErr(''); setNoteErr('')
+    setPhoneErr(''); setNoteErr(''); setAppointmentErr('')
   }, [editing])
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
@@ -140,6 +141,8 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
     else setPhoneErr('')
     if (!form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
     else setNoteErr('')
+    if (form.result === 'Randevu aldı' && !form.appointmentAt) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
+    else setAppointmentErr('')
     if (!form.name.trim()) ok = false
     if (!ok) return
 
@@ -191,8 +194,11 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
         {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
       <div style={{ marginBottom: 10 }}>
-        <input type="datetime-local" value={form.appointmentAt} onChange={e => set('appointmentAt', e.target.value)} style={{ ...inputStyle, width: '100%' }} />
-        <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Randevu tarihi/saati — varsa girin, takvimde görünür. Boş bırakılabilir.</p>
+        <input type="datetime-local" value={form.appointmentAt} onChange={e => { set('appointmentAt', e.target.value); if (e.target.value) setAppointmentErr('') }} style={{ ...inputStyle, width: '100%' }} />
+        <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>
+          {form.result === 'Randevu aldı' ? 'Randevu tarihi ve saati zorunludur.' : 'Randevu tarihi/saati — varsa girin, takvimde görünür. Boş bırakılabilir.'}
+        </p>
+        {appointmentErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{appointmentErr}</p>}
       </div>
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
