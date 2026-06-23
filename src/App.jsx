@@ -109,7 +109,7 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
 
     setSubmitting(true)
     const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount) : null
-    const appointmentAt = form.result === 'Randevu aldı' && form.appointmentAt ? new Date(form.appointmentAt).toISOString() : null
+    const appointmentAt = form.appointmentAt ? new Date(form.appointmentAt).toISOString() : null
 
     if (editing) {
       await onUpdate({
@@ -154,12 +154,10 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
       <select value={form.service} onChange={e => set('service', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
-      {form.result === 'Randevu aldı' && (
-        <div style={{ marginBottom: 10 }}>
-          <input type="datetime-local" value={form.appointmentAt} onChange={e => set('appointmentAt', e.target.value)} style={{ ...inputStyle, width: '100%' }} />
-          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Randevu tarihi ve saati — "Yaklaşan randevular" listesinde görünür.</p>
-        </div>
-      )}
+      <div style={{ marginBottom: 10 }}>
+        <input type="datetime-local" value={form.appointmentAt} onChange={e => set('appointmentAt', e.target.value)} style={{ ...inputStyle, width: '100%' }} />
+        <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Randevu tarihi/saati — varsa girin, takvimde görünür. Boş bırakılabilir.</p>
+      </div>
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
           <input placeholder="Satış tutarı (TL) — isteğe bağlı" value={form.saleAmount} onChange={e => set('saleAmount', e.target.value)} type="number" min="0" style={{ ...inputStyle, width: '100%' }} />
@@ -186,42 +184,115 @@ function StatCard({ label, value }) {
   )
 }
 
-function fmtAppointment(iso) {
-  const d = new Date(iso)
-  const today = new Date()
-  const isToday = d.toDateString() === today.toDateString()
-  const dateStr = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })
-  const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-  return (isToday ? 'Bugün' : dateStr) + ' · ' + timeStr
+const MONTH_NAMES = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+const WEEKDAY_NAMES = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+
+function dateKey(d) {
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-function UpcomingAppointments({ leads, canSeePhone, currentUserName, isStaff, showBranch, branchNameFn }) {
-  const upcoming = useMemo(() => {
-    const now = Date.now()
-    return leads
-      .filter(l => isStaff ? l.entered_by === currentUserName : true)
-      .filter(l => l.result === 'Randevu aldı' && l.appointment_at)
-      .filter(l => new Date(l.appointment_at).getTime() >= now - 3600000)
-      .sort((a, b) => new Date(a.appointment_at) - new Date(b.appointment_at))
-  }, [leads, currentUserName, isStaff])
+function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, showBranch, branchNameFn }) {
+  const [viewDate, setViewDate] = useState(new Date())
+  const [selectedDay, setSelectedDay] = useState(null)
 
-  if (upcoming.length === 0) return null
+  const scopedLeads = useMemo(() =>
+    leads.filter(l => isStaff ? l.entered_by === currentUserName : true).filter(l => l.appointment_at),
+    [leads, currentUserName, isStaff])
+
+  const leadsByDay = useMemo(() => {
+    const map = {}
+    scopedLeads.forEach(l => {
+      const key = dateKey(new Date(l.appointment_at))
+      if (!map[key]) map[key] = []
+      map[key].push(l)
+    })
+    Object.values(map).forEach(arr => arr.sort((a, b) => new Date(a.appointment_at) - new Date(b.appointment_at)))
+    return map
+  }, [scopedLeads])
+
+  const year = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+  const firstOfMonth = new Date(year, month, 1)
+  const startOffset = (firstOfMonth.getDay() + 6) % 7 // Monday = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const todayKey = dateKey(new Date())
+
+  const cells = []
+  for (let i = 0; i < startOffset; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  function changeMonth(delta) {
+    setViewDate(new Date(year, month + delta, 1))
+    setSelectedDay(null)
+  }
+
+  const selectedKey = selectedDay ? dateKey(new Date(year, month, selectedDay)) : null
+  const selectedLeads = selectedKey ? (leadsByDay[selectedKey] || []) : []
 
   return (
-    <div style={{ background: '#eaf3ec', border: '1px solid #b9ddc3', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '1.5rem' }}>
-      <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 10px', color: '#1f6b3a' }}>📅 {upcoming.length} yaklaşan randevu</p>
-      {upcoming.slice(0, 10).map(lead => (
-        <div key={lead.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 13, borderTop: '1px solid #b9ddc3' }}>
-          <span>
-            <span style={{ fontWeight: 600 }}>{lead.name}</span>
-            <span style={{ color: '#555', marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
-            {showBranch && <span style={{ color: '#555', marginLeft: 8, fontSize: 12 }}>· {branchNameFn(lead.branch_id)}</span>}
-            <span style={{ color: '#555', marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#1f6b3a' }}>{fmtAppointment(lead.appointment_at)}</span>
+    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <button type="button" onClick={() => changeMonth(-1)} style={{ padding: '4px 10px', borderRadius: 8 }}>‹</button>
+        <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>{MONTH_NAMES[month]} {year}</p>
+        <button type="button" onClick={() => changeMonth(1)} style={{ padding: '4px 10px', borderRadius: 8 }}>›</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
+        {WEEKDAY_NAMES.map(w => <div key={w} style={{ textAlign: 'center', fontSize: 11, color: '#888', fontWeight: 600 }}>{w}</div>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {cells.map((d, i) => {
+          if (d === null) return <div key={'e' + i} />
+          const key = dateKey(new Date(year, month, d))
+          const dayLeads = leadsByDay[key] || []
+          const isToday = key === todayKey
+          const isSelected = key === selectedKey
+          return (
+            <button key={d} type="button" onClick={() => setSelectedDay(d)}
+              style={{
+                position: 'relative', padding: '8px 4px', minHeight: 44, borderRadius: 8, textAlign: 'left',
+                background: isSelected ? '#1a2744' : (isToday ? '#eef2f8' : '#fafafa'),
+                color: isSelected ? '#fff' : '#222',
+                border: isToday && !isSelected ? '1px solid #1a2744' : '1px solid #eee',
+                cursor: 'pointer', fontSize: 13
+              }}>
+              <span>{d}</span>
+              {dayLeads.length > 0 && (
+                <span style={{
+                  display: 'block', marginTop: 4, fontSize: 10, fontWeight: 700,
+                  color: isSelected ? '#fff' : '#1a2744'
+                }}>
+                  {dayLeads.length} randevu
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {selectedDay && (
+        <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 14 }}>
+          <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>
+            {selectedDay} {MONTH_NAMES[month]} {year} — {selectedLeads.length} randevu
+          </p>
+          {selectedLeads.length === 0 ? (
+            <p style={{ fontSize: 13, color: '#888' }}>Bu günde randevu yok.</p>
+          ) : selectedLeads.map(lead => (
+            <div key={lead.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', fontSize: 13, borderBottom: '1px solid #f0f0f0' }}>
+              <span>
+                <span style={{ fontWeight: 600 }}>{lead.name}</span>
+                <span style={{ color: '#777', marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
+                {showBranch && <span style={{ color: '#777', marginLeft: 8, fontSize: 12 }}>· {branchNameFn(lead.branch_id)}</span>}
+                <span style={{ color: '#777', marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
+                {lead.note && <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>· {lead.note.slice(0, 40)}</span>}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a2744' }}>
+                {new Date(lead.appointment_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          ))}
         </div>
-      ))}
-      {upcoming.length > 10 && <p style={{ fontSize: 12, color: '#555', margin: '8px 0 0' }}>+ {upcoming.length - 10} randevu daha</p>}
+      )}
     </div>
   )
 }
@@ -560,7 +631,7 @@ export default function App() {
         </div>
       )}
 
-      <UpcomingAppointments leads={visibleLeads} canSeePhone={isAdmin || isManager} currentUserName={currentUser.username} isStaff={isStaff} showBranch={isAdmin && filterBranch === 'all'} branchNameFn={branchName} />
+      <AppointmentCalendar leads={visibleLeads} canSeePhone={isAdmin || isManager} currentUserName={currentUser.username} isStaff={isStaff} showBranch={isAdmin && filterBranch === 'all'} branchNameFn={branchName} />
 
       <StaleAlerts leads={visibleLeads} canSeePhone={isAdmin || isManager} currentUserName={currentUser.username} isStaff={isStaff} />
 
