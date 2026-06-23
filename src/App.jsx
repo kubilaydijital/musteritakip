@@ -558,7 +558,12 @@ function SecurityNotice({ isAdmin }) {
 }
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null)
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mt_current_user')
+      return saved ? JSON.parse(saved) : null
+    } catch (e) { return null }
+  })
   const [branches, setBranches] = useState([])
   const [users, setUsers] = useState([])
   const [leads, setLeads] = useState([])
@@ -567,6 +572,15 @@ export default function App() {
   const [editingLead, setEditingLead] = useState(null)
   const [adsSelectedBranch, setAdsSelectedBranch] = useState('')
   const [filterBranch, setFilterBranch] = useState('all')
+
+  function loginAndPersist(user) {
+    try { localStorage.setItem('mt_current_user', JSON.stringify(user)) } catch (e) {}
+    setCurrentUser(user)
+  }
+  function logoutAndClear() {
+    try { localStorage.removeItem('mt_current_user') } catch (e) {}
+    setCurrentUser(null)
+  }
 
   useEffect(() => {
     if (!currentUser) return
@@ -588,6 +602,14 @@ export default function App() {
     setAdsData(a.data || [])
     if (b.data && b.data.length > 0) setAdsSelectedBranch(b.data[0].id)
     setLoaded(true)
+
+    // Hesap sonradan askıya alınmışsa otomatik çıkış yap
+    if (currentUser) {
+      const stillActive = (u.data || []).find(usr => usr.username === currentUser.username)
+      if (stillActive && stillActive.active === false) {
+        logoutAndClear()
+      }
+    }
   }
 
   async function addLead(lead) {
@@ -613,7 +635,7 @@ export default function App() {
     if (data) setBranches(prev => [...prev, data[0]])
   }
 
-  if (!currentUser) return <Login onLogin={setCurrentUser} />
+  if (!currentUser) return <Login onLogin={loginAndPersist} />
   if (!loaded) return <p style={{ padding: 40, fontFamily: 'system-ui' }}>Yükleniyor...</p>
 
   const isAdmin = currentUser.role === 'admin'
@@ -655,7 +677,7 @@ export default function App() {
             {currentUser.username} · {isAdmin ? 'tüm şubeler' : isManager ? `şube yöneticisi · ${branchName(currentUser.branch_id)}` : `personel · ${branchName(currentUser.branch_id)}`}
           </p>
         </div>
-        <button onClick={() => setCurrentUser(null)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>Çıkış yap</button>
+        <button onClick={logoutAndClear} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>Çıkış yap</button>
       </div>
 
       {isAdmin && (
