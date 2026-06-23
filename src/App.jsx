@@ -478,10 +478,8 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
   )
 }
 
-function BranchManagement({ branches, onAdd, onDelete, leads, users }) {
+function BranchManagement({ branches, onAdd, onToggleActive }) {
   const [name, setName] = useState('')
-  const [confirmingId, setConfirmingId] = useState(null)
-  const [err, setErr] = useState('')
 
   async function submit(e) {
     e.preventDefault()
@@ -490,39 +488,25 @@ function BranchManagement({ branches, onAdd, onDelete, leads, users }) {
     setName('')
   }
 
-  async function handleDelete(branch) {
-    setErr('')
-    const hasLeads = leads.some(l => l.branch_id === branch.id)
-    const hasUsers = users.some(u => u.branch_id === branch.id)
-    if (hasLeads || hasUsers) {
-      setErr(`"${branch.name}" silinemez: bu şubeye bağlı ${hasLeads ? 'kayıtlar' : ''}${hasLeads && hasUsers ? ' ve ' : ''}${hasUsers ? 'kullanıcılar' : ''} var. Önce onları kaldırın.`)
-      setConfirmingId(null)
-      return
-    }
-    if (confirmingId !== branch.id) { setConfirmingId(branch.id); return }
-    await onDelete(branch.id)
-    setConfirmingId(null)
-  }
-
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
-      <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Şube ekle</p>
+      <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Şube ekle</p>
+      <p style={{ fontSize: 13, color: '#666', margin: '0 0 12px' }}>Bir şubeyi pasif yaparsan panelde görünmez ama tüm verisi (kayıtlar, kullanıcılar) korunur, istediğin zaman tekrar aktif edebilirsin.</p>
       <form onSubmit={submit} style={{ display: 'flex', gap: 10 }}>
         <input placeholder="Şube adı (örn. Aris Kadıköy)" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
         <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
       </form>
-      {err && <p style={{ fontSize: 12, color: '#c0392b', margin: '8px 0 0' }}>{err}</p>}
       <div style={{ marginTop: 12 }}>
         {branches.map(b => (
           <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
-            <p style={{ fontSize: 13, margin: 0, color: '#666' }}>🏪 {b.name}</p>
-            <button onClick={() => handleDelete(b)} style={{
-              fontSize: 12, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-              border: confirmingId === b.id ? '1px solid #c0392b' : '1px solid #ddd',
-              background: confirmingId === b.id ? '#c0392b' : '#fff',
-              color: confirmingId === b.id ? '#fff' : '#999'
+            <p style={{ fontSize: 13, margin: 0, color: b.active === false ? '#bbb' : '#666' }}>🏪 {b.name}{b.active === false ? ' (pasif)' : ''}</p>
+            <button onClick={() => onToggleActive(b.id, b.active)} style={{
+              fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+              border: b.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
+              background: b.active === false ? '#2e7d32' : '#c0392b',
+              color: '#fff'
             }}>
-              {confirmingId === b.id ? 'Emin misin?' : 'Sil'}
+              {b.active === false ? 'Aktif et' : 'Pasif yap'}
             </button>
           </div>
         ))}
@@ -574,7 +558,7 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
     </div>
   )
 }
-function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, branches, templates }) {
+function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeUsername, branches, templates }) {
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newBranchId, setNewBranchId] = useState(branches[0]?.id || '')
@@ -582,6 +566,9 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, br
   const [addErr, setAddErr] = useState('')
   const [editingPwFor, setEditingPwFor] = useState(null)
   const [pwValue, setPwValue] = useState('')
+  const [editingUsernameFor, setEditingUsernameFor] = useState(null)
+  const [usernameValue, setUsernameValue] = useState('')
+  const [usernameErr, setUsernameErr] = useState('')
   const [confirmingDeleteFor, setConfirmingDeleteFor] = useState(null)
 
   const nonSuperAdminTemplates = (templates || []).filter(t => t.id !== 'tpl_super_admin')
@@ -607,6 +594,19 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, br
     setEditingPwFor(null); setPwValue('')
   }
 
+  async function submitUsernameChange(oldUsername) {
+    setUsernameErr('')
+    const trimmed = usernameValue.trim()
+    if (!trimmed) return
+    if (trimmed.toLowerCase() === oldUsername.toLowerCase()) { setEditingUsernameFor(null); return }
+    if (users.some(u => u.username.toLowerCase() === trimmed.toLowerCase())) {
+      setUsernameErr('Bu kullanıcı adı zaten kullanılıyor.')
+      return
+    }
+    await onChangeUsername(oldUsername, trimmed)
+    setEditingUsernameFor(null); setUsernameValue('')
+  }
+
   async function handleDelete(username) {
     if (confirmingDeleteFor !== username) { setConfirmingDeleteFor(username); return }
     await onDelete(username)
@@ -629,9 +629,13 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, br
                 <p style={{ margin: 0, fontSize: 12, color: '#777' }}>{tplName} · {branch ? branch.name : '—'}</p>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue('') }}
-                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}>
+                <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue(''); setEditingUsernameFor(null) }}
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500 }}>
                   Şifre değiştir
+                </button>
+                <button onClick={() => { setEditingUsernameFor(editingUsernameFor === u.username ? null : u.username); setUsernameValue(u.username); setEditingPwFor(null) }}
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500 }}>
+                  Kullanıcı adı değiştir
                 </button>
                 <button onClick={() => onToggle(u.username, u.active)} style={{
                   fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
@@ -655,6 +659,15 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, br
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <input type="text" placeholder="Yeni şifre" value={pwValue} onChange={e => setPwValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                 <button onClick={() => submitPasswordChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+              </div>
+            )}
+            {editingUsernameFor === u.username && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input type="text" placeholder="Yeni kullanıcı adı" value={usernameValue} onChange={e => setUsernameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                  <button onClick={() => submitUsernameChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+                </div>
+                {usernameErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '6px 0 0' }}>{usernameErr}</p>}
               </div>
             )}
           </div>
@@ -943,13 +956,28 @@ export default function App() {
     const { data } = await supabase.from('app_users').update({ password: newPassword }).eq('username', username).select()
     if (data) setUsers(prev => prev.map(u => u.username === username ? data[0] : u))
   }
+  async function changeUsername(oldUsername, newUsername) {
+    const existing = users.find(u => u.username === oldUsername)
+    if (!existing) return
+    // Yeni kullanıcı adıyla yeni satır oluştur (aynı bilgilerle)
+    const { username: _old, ...rest } = existing
+    const { data: created } = await supabase.from('app_users').insert({ ...rest, username: newUsername }).select()
+    if (!created) return
+    // Bu kullanıcının girdiği geçmiş kayıtları yeni kullanıcı adına taşı
+    await supabase.from('leads').update({ entered_by: newUsername }).eq('entered_by', oldUsername)
+    // Eski kullanıcı satırını sil
+    await supabase.from('app_users').delete().eq('username', oldUsername)
+    setUsers(prev => prev.map(u => u.username === oldUsername ? created[0] : u))
+    setLeads(prev => prev.map(l => l.entered_by === oldUsername ? { ...l, entered_by: newUsername } : l))
+  }
   async function addBranch(branch) {
     const { data } = await supabase.from('branches').insert(branch).select()
     if (data) setBranches(prev => [...prev, data[0]])
   }
-  async function deleteBranch(id) {
-    await supabase.from('branches').delete().eq('id', id)
-    setBranches(prev => prev.filter(b => b.id !== id))
+  async function toggleBranchActive(id, currentActive) {
+    const newActive = currentActive === false ? true : false
+    const { data } = await supabase.from('branches').update({ active: newActive }).eq('id', id).select()
+    if (data) setBranches(prev => prev.map(b => b.id === id ? data[0] : b))
   }
   async function addService(service) {
     const { data } = await supabase.from('branch_services').insert(service).select()
@@ -982,6 +1010,7 @@ export default function App() {
 
   const relevantBranchId = isSuperAdmin && filterBranch !== 'all' ? filterBranch : currentUser.branch_id
   const currentBranchServices = branchServices.filter(s => s.branch_id === relevantBranchId)
+  const activeBranches = branches.filter(b => b.active !== false)
 
   const scopedLeads = isSuperAdmin ? (filterBranch === 'all' ? leads : leads.filter(l => l.branch_id === filterBranch)) : leads.filter(l => l.branch_id === currentUser.branch_id)
   const visibleLeads = isStaff ? scopedLeads.filter(l => l.entered_by === currentUser.username) : scopedLeads
@@ -1027,7 +1056,7 @@ export default function App() {
         <div style={{ marginBottom: '1.5rem' }}>
           <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: 240 }}>
             <option value="all">Tüm şubeler (toplu rapor)</option>
-            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {branches.filter(b => b.active !== false).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
       )}
@@ -1112,8 +1141,8 @@ export default function App() {
         )}
       </div>
 
-      {perms.can_enter_ads_data && <WeeklyAdsForm onAdd={addAdsWeek} branches={branches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />}
-      {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onDelete={deleteBranch} leads={leads} users={users} />}
+      {perms.can_enter_ads_data && <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />}
+      {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} />}
       {!isSuperAdmin && !isStaff && (
         <BranchServiceManager
           services={currentBranchServices}
@@ -1123,7 +1152,7 @@ export default function App() {
           onDelete={deleteService}
         />
       )}
-      {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} branches={branches} templates={templates} />}
+      {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} branches={activeBranches} templates={templates} />}
       {isSuperAdmin && <PermissionTemplateManager />}
       <SecurityNotice isAdmin={isSuperAdmin} />
     </div>
