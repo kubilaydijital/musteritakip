@@ -9,10 +9,10 @@ Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineCo
 
 const CHANNELS = ['Instagram', 'WhatsApp', 'Organik']
 const SERVICES = ['Bölgesel incelme', 'Lazer epilasyon', 'Cilt işlemleri', 'Kalıcı makyaj işlemleri']
-const RESULTS = ['Görüşülüyor', 'Randevu aldı', 'Düşünüyor', 'Vazgeçti', 'Müşteri oldu']
+const RESULTS = ['Görüşülüyor', 'Randevu aldı', 'Düşünüyor', 'Görüşüldü, randevu alınamadı', 'Vazgeçti', 'Müşteri oldu']
 const OPEN_RESULTS = ['Görüşülüyor', 'Düşünüyor']
-const RESULT_COLOR = { 'Görüşülüyor': '#185FA5', 'Randevu aldı': '#0F6E56', 'Düşünüyor': '#854F0B', 'Vazgeçti': '#A32D2D', 'Müşteri oldu': '#3B6D11' }
-const RESULT_HEX = { 'Görüşülüyor': '#378ADD', 'Randevu aldı': '#1D9E75', 'Düşünüyor': '#EF9F27', 'Vazgeçti': '#E24B4A', 'Müşteri oldu': '#639922' }
+const RESULT_COLOR = { 'Görüşülüyor': '#185FA5', 'Randevu aldı': '#0F6E56', 'Düşünüyor': '#854F0B', 'Görüşüldü, randevu alınamadı': '#6B6B6B', 'Vazgeçti': '#A32D2D', 'Müşteri oldu': '#3B6D11' }
+const RESULT_HEX = { 'Görüşülüyor': '#378ADD', 'Randevu aldı': '#1D9E75', 'Düşünüyor': '#EF9F27', 'Görüşüldü, randevu alınamadı': '#9CA3AF', 'Vazgeçti': '#E24B4A', 'Müşteri oldu': '#639922' }
 const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Organik': '#7F77DD' }
 const SERVICE_HEX = { 'Bölgesel incelme': '#D4537E', 'Lazer epilasyon': '#378ADD', 'Cilt işlemleri': '#1D9E75', 'Kalıcı makyaj işlemleri': '#EF9F27' }
 const PHONE_RE = /^\+\d{10,15}$/
