@@ -1177,7 +1177,31 @@ export default function App() {
         />
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12, marginTop: '1.5rem' }}>
+      <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
+          {canSeeOwnDataOnly ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
+        </p>
+        {visibleLeads.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#666' }}>Henüz kayıt yok.</p>
+        ) : (
+          <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '0 1.25rem', overflowX: 'auto' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
+              gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: '#666', minWidth: 760
+            }}>
+              {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
+              <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
+            </div>
+            {visibleLeads.map(l => (
+              <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
+                showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12 }}>
         <StatCard label="Toplam lead" value={stats.total} />
         <StatCard label="Müşteriye dönüşen" value={stats.customers} />
         <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} />
@@ -1217,30 +1241,6 @@ export default function App() {
                 <MonthlySpendChart adsData={scopedAds} />
               </div>
             )}
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginTop: '1.5rem' }}>
-        <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
-          {canSeeOwnDataOnly ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
-        </p>
-        {visibleLeads.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#666' }}>Henüz kayıt yok.</p>
-        ) : (
-          <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '0 1.25rem', overflowX: 'auto' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
-              gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: '#666', minWidth: 760
-            }}>
-              {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
-              <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
-            </div>
-            {visibleLeads.map(l => (
-              <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
-                showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} />
-            ))}
           </div>
         )}
       </div>
