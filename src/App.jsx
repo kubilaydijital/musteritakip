@@ -1006,14 +1006,16 @@ export default function App() {
   }
 
   const isSuperAdmin = perms.can_see_all_branches && perms.can_manage_users && perms.can_manage_branches
-  const isStaff = !perms.can_see_revenue // sosyal medya personeli profili: ciro göremeyen herkes "personel" görünümünde
+  // "isStaff" artık ayrı bir rol değil - her ekran kendi spesifik iznine bakıyor.
+  // canSeeOwnDataOnly: sadece kendi girdiği kaydı görme/listeleme kısıtı, "herkesin kaydını düzenleme" izni yoksa devreye girer
+  const canSeeOwnDataOnly = !perms.can_edit_any_lead && !isSuperAdmin
 
   const relevantBranchId = isSuperAdmin && filterBranch !== 'all' ? filterBranch : currentUser.branch_id
   const currentBranchServices = branchServices.filter(s => s.branch_id === relevantBranchId)
   const activeBranches = branches.filter(b => b.active !== false)
 
   const scopedLeads = isSuperAdmin ? (filterBranch === 'all' ? leads : leads.filter(l => l.branch_id === filterBranch)) : leads.filter(l => l.branch_id === currentUser.branch_id)
-  const visibleLeads = isStaff ? scopedLeads.filter(l => l.entered_by === currentUser.username) : scopedLeads
+  const visibleLeads = canSeeOwnDataOnly ? scopedLeads.filter(l => l.entered_by === currentUser.username) : scopedLeads
   const scopedAds = isSuperAdmin ? (filterBranch === 'all' ? adsData : adsData.filter(a => a.branch_id === filterBranch)) : adsData.filter(a => a.branch_id === currentUser.branch_id)
 
   function canEditLead(lead) {
@@ -1046,7 +1048,7 @@ export default function App() {
         <div>
           <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Lead takip paneli</p>
           <p style={{ fontSize: 13, color: '#666', margin: 0 }}>
-            {currentUser.username} · {isSuperAdmin ? 'süper admin · tüm şubeler' : isStaff ? `personel · ${branchName(currentUser.branch_id)}` : `admin · ${branchName(currentUser.branch_id)}`}
+            {currentUser.username} · {isSuperAdmin ? 'süper admin · tüm şubeler' : canSeeOwnDataOnly ? `personel · ${branchName(currentUser.branch_id)}` : `admin · ${branchName(currentUser.branch_id)}`}
           </p>
         </div>
         <button onClick={logoutAndClear} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>Çıkış yap</button>
@@ -1061,21 +1063,21 @@ export default function App() {
         </div>
       )}
 
-      <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={isStaff} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
-
-      <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={isStaff} />
-
-      {!isStaff && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12 }}>
-          <StatCard label="Toplam lead" value={stats.total} />
-          <StatCard label="Müşteriye dönüşen" value={stats.customers} />
-          <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} />
-          <StatCard label="IG / WA" value={stats.ig + ' / ' + stats.wa} />
-          <StatCard label="Organik" value={stats.organik} />
-        </div>
+      {perms.can_see_calendar && (
+        <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
       )}
 
-      {!isStaff && perms.can_see_revenue && (
+      <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12 }}>
+        <StatCard label="Toplam lead" value={stats.total} />
+        <StatCard label="Müşteriye dönüşen" value={stats.customers} />
+        <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} />
+        <StatCard label="IG / WA" value={stats.ig + ' / ' + stats.wa} />
+        <StatCard label="Organik" value={stats.organik} />
+      </div>
+
+      {perms.can_see_revenue && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.5rem' }}>
           <StatCard label="Toplam ciro (girilen)" value={fmtTL(stats.revenue)} />
           <StatCard label="Ortalama satış tutarı" value={stats.withAmountCount ? fmtTL(stats.avgTicket) : '—'} />
@@ -1083,35 +1085,33 @@ export default function App() {
         </div>
       )}
 
-      {!isStaff && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Aylık rapor — grafikler</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-            <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-              <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Görüşme sonuçları</p>
-              <ResultBarChart leads={scopedLeads} />
-            </div>
-            <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-              <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Lead kanalı dağılımı</p>
-              <ChannelPieChart leads={scopedLeads} />
-            </div>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Aylık rapor — grafikler</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
+            <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Görüşme sonuçları</p>
+            <ResultBarChart leads={scopedLeads} />
           </div>
-          {perms.can_see_revenue && (
-            <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16 }}>
-              <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Hizmete göre ciro</p>
-                <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
-              </div>
-              {scopedAds.length > 0 && (
-                <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-                  <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Haftalık reklam harcaması</p>
-                  <MonthlySpendChart adsData={scopedAds} />
-                </div>
-              )}
-            </div>
-          )}
+          <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
+            <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Lead kanalı dağılımı</p>
+            <ChannelPieChart leads={scopedLeads} />
+          </div>
         </div>
-      )}
+        {perms.can_see_revenue && (
+          <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16 }}>
+            <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
+              <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Hizmete göre ciro</p>
+              <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
+            </div>
+            {scopedAds.length > 0 && (
+              <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
+                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Haftalık reklam harcaması</p>
+                <MonthlySpendChart adsData={scopedAds} />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {perms.can_add_lead && (
         <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices} />
@@ -1119,7 +1119,7 @@ export default function App() {
 
       <div style={{ marginTop: '1.5rem' }}>
         <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
-          {isStaff ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
+          {canSeeOwnDataOnly ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
         </p>
         {visibleLeads.length === 0 ? (
           <p style={{ fontSize: 13, color: '#666' }}>Henüz kayıt yok.</p>
@@ -1143,7 +1143,7 @@ export default function App() {
 
       {perms.can_enter_ads_data && <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />}
       {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} />}
-      {!isSuperAdmin && !isStaff && (
+      {!isSuperAdmin && !canSeeOwnDataOnly && (
         <BranchServiceManager
           services={currentBranchServices}
           branchId={currentUser.branch_id}
