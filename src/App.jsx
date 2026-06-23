@@ -130,7 +130,7 @@ function toLocalInputValue(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services }) {
+function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services, targetBranchId, targetBranchName, isSuperAdmin }) {
   const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
@@ -182,7 +182,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       })
     } else {
       await onAdd({
-        id: uid(), branch_id: currentUser.branch_id, name: form.name, phone: form.phone,
+        id: uid(), branch_id: targetBranchId, name: form.name, phone: form.phone,
         channel: form.channel, service: form.service, note: form.note, result: form.result,
         sale_amount: saleAmount, appointment_at: appointmentAt, entered_by: currentUser.username, date: new Date().toISOString()
       })
@@ -199,6 +199,11 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>{editing ? 'Kaydı düzenle' : 'Yeni görüşme kaydı'}</p>
         {editing && <button type="button" onClick={onCancelEdit} style={{ fontSize: 12 }}>Vazgeç</button>}
       </div>
+      {isSuperAdmin && !editing && (
+        <p style={{ fontSize: 12, color: '#1a6b3a', background: '#eaf3ec', padding: '6px 10px', borderRadius: 6, margin: '0 0 12px' }}>
+          Bu kayıt <strong>{targetBranchName || 'seçili şube'}</strong> şubesine eklenecek. Farklı bir şubeye eklemek için yukarıdaki şube seçiciden değiştirin.
+        </p>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <input placeholder="İsim soyisim" value={form.name} onChange={e => set('name', e.target.value)} style={inputStyle} />
         <div>
@@ -1165,7 +1170,11 @@ export default function App() {
       <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
 
       {perms.can_add_lead && (
-        <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices} />
+        <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices}
+          targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
+          targetBranchName={isSuperAdmin ? (filterBranch !== 'all' ? branchName(filterBranch) : branchName(activeBranches[0]?.id)) : branchName(currentUser.branch_id)}
+          isSuperAdmin={isSuperAdmin}
+        />
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12, marginTop: '1.5rem' }}>
