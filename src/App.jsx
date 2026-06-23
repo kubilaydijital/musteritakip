@@ -827,6 +827,9 @@ function PermissionTemplateManager() {
   const [err, setErr] = useState('')
   const [editingNameFor, setEditingNameFor] = useState(null)
   const [nameValue, setNameValue] = useState('')
+  const [newTplName, setNewTplName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -859,6 +862,42 @@ function PermissionTemplateManager() {
     setEditingNameFor(null); setNameValue('')
   }
 
+  async function createTemplate(e) {
+    e.preventDefault()
+    setErr('')
+    const trimmed = newTplName.trim()
+    if (!trimmed) return
+    setCreating(true)
+    const newId = 'tpl_' + uid()
+    // Yeni şablon, en kısıtlı (hiçbir özel yetki olmayan) haliyle başlar - admin sonra checkbox'larla açar
+    const { data, error } = await supabase.from('permission_templates').insert({
+      id: newId, name: trimmed,
+      can_see_phone: false, can_see_revenue: false, can_see_all_branches: false,
+      can_add_lead: true, can_edit_any_lead: false, can_delete_lead: false,
+      can_manage_users: false, can_manage_branches: false, can_enter_ads_data: false,
+      can_see_calendar: true
+    }).select()
+    if (error) {
+      setErr(`Şablon oluşturulamadı: ${error.message}`)
+    } else if (data && data.length > 0) {
+      setTemplates(prev => [...prev, data[0]].sort((a, b) => a.name.localeCompare(b.name)))
+      setNewTplName('')
+    }
+    setCreating(false)
+  }
+
+  async function deleteTemplate(tpl) {
+    if (confirmingDeleteId !== tpl.id) { setConfirmingDeleteId(tpl.id); return }
+    setErr('')
+    const { error } = await supabase.from('permission_templates').delete().eq('id', tpl.id)
+    if (error) {
+      setErr(`Silinemedi: ${error.message}. Bu şablona bağlı kullanıcılar olabilir, önce onları başka bir şablona taşıyın.`)
+    } else {
+      setTemplates(prev => prev.filter(t => t.id !== tpl.id))
+    }
+    setConfirmingDeleteId(null)
+  }
+
   if (!loaded) return null
 
   return (
@@ -874,6 +913,16 @@ function PermissionTemplateManager() {
               style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer' }}>
               Adı değiştir
             </button>
+            {tpl.id !== 'tpl_super_admin' && (
+              <button onClick={() => deleteTemplate(tpl)} style={{
+                fontSize: 11, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                border: confirmingDeleteId === tpl.id ? '1px solid #c0392b' : '1px solid #ddd',
+                background: confirmingDeleteId === tpl.id ? '#c0392b' : '#fff',
+                color: confirmingDeleteId === tpl.id ? '#fff' : '#999'
+              }}>
+                {confirmingDeleteId === tpl.id ? 'Emin misin?' : 'Şablonu sil'}
+              </button>
+            )}
           </div>
           {editingNameFor === tpl.id && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -891,6 +940,17 @@ function PermissionTemplateManager() {
           </div>
         </div>
       ))}
+
+      <div style={{ marginTop: 8 }}>
+        <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>Yeni izin şablonu oluştur</p>
+        <form onSubmit={createTemplate} style={{ display: 'flex', gap: 10 }}>
+          <input type="text" placeholder="Şablon adı (örn. Muhasebe, Şube Yöneticisi)" value={newTplName} onChange={e => setNewTplName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+          <button type="submit" disabled={creating} style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>
+            {creating ? 'Oluşturuluyor...' : 'Oluştur'}
+          </button>
+        </form>
+        <p style={{ fontSize: 11, color: '#888', margin: '6px 0 0' }}>Yeni şablon, en kısıtlı haliyle (yalnızca kayıt ekleme ve takvim görme açık) oluşur. Oluşturduktan sonra yukarıdaki checkbox'larla yetkilerini ayarlayabilirsin.</p>
+      </div>
     </div>
   )
 }
