@@ -87,8 +87,19 @@ function Login({ onLogin }) {
       }
     }
 
+    // İzin şablonunu çek ve kullanıcı objesine ekle
+    let permissions = null
+    if (data.permission_template_id) {
+      const { data: tpl } = await supabase
+        .from('permission_templates')
+        .select('*')
+        .eq('id', data.permission_template_id)
+        .maybeSingle()
+      permissions = tpl
+    }
+
     setLoading(false)
-    onLogin(data)
+    onLogin({ ...data, permissions })
   }
 
   return (
@@ -563,6 +574,63 @@ function SecurityNotice({ isAdmin }) {
   )
 }
 
+const PERMISSION_LABELS = {
+  can_see_phone: 'Telefon numarasını görebilir',
+  can_see_revenue: 'Ciro / satış tutarını görebilir',
+  can_see_all_branches: 'Tüm şubeleri görebilir',
+  can_add_lead: 'Lead / görüşme kaydı ekleyebilir',
+  can_edit_any_lead: 'Herkesin kaydını düzenleyebilir',
+  can_delete_lead: 'Kayıt silebilir',
+  can_manage_users: 'Kullanıcı ekleyip çıkarabilir',
+  can_manage_branches: 'Şube ekleyip çıkarabilir',
+  can_enter_ads_data: 'Haftalık reklam verisi girebilir',
+  can_see_calendar: 'Randevu takvimini görebilir'
+}
+
+function PermissionTemplateManager() {
+  const [templates, setTemplates] = useState([])
+  const [loaded, setLoaded] = useState(false)
+  const [savingId, setSavingId] = useState(null)
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    const { data } = await supabase.from('permission_templates').select('*').order('name')
+    setTemplates(data || [])
+    setLoaded(true)
+  }
+
+  async function toggle(tpl, key) {
+    const newValue = !tpl[key]
+    setSavingId(tpl.id)
+    const { data } = await supabase.from('permission_templates').update({ [key]: newValue }).eq('id', tpl.id).select()
+    if (data) setTemplates(prev => prev.map(t => t.id === tpl.id ? data[0] : t))
+    setSavingId(null)
+  }
+
+  if (!loaded) return null
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+      <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>İzin şablonları (Süper Admin)</p>
+      <p style={{ fontSize: 13, color: '#666', margin: '0 0 14px' }}>Her şablonun hangi yetkilere sahip olduğunu buradan açıp kapatabilirsin. Değişiklik anında tüm o şablona bağlı kullanıcılara uygulanır.</p>
+      {templates.map(tpl => (
+        <div key={tpl.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' }}>
+          <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 8px' }}>{tpl.name}{savingId === tpl.id ? ' · kaydediliyor...' : ''}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {Object.keys(PERMISSION_LABELS).map(key => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!tpl[key]} onChange={() => toggle(tpl, key)} />
+                {PERMISSION_LABELS[key]}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -644,18 +712,33 @@ export default function App() {
   if (!currentUser) return <Login onLogin={loginAndPersist} />
   if (!loaded) return <p style={{ padding: 40, fontFamily: 'system-ui' }}>Yükleniyor...</p>
 
-  const isAdmin = currentUser.role === 'admin'
-  const isManager = currentUser.role === 'manager'
-  const isStaff = currentUser.role === 'staff'
+  // Geriye dönük uyumluluk: izin objesi yoksa (eski veri) role alanına göre varsayılan izinler uygula
+  const perms = currentUser.permissions || {
+    can_see_phone: currentUser.role === 'admin' || currentUser.role === 'manager',
+    can_see_revenue: currentUser.role === 'admin' || currentUser.role === 'manager',
+    can_see_all_branches: currentUser.role === 'admin',
+    can_add_lead: true,
+    can_edit_any_lead: currentUser.role === 'admin' || currentUser.role === 'manager',
+    can_delete_lead: currentUser.role === 'admin',
+    can_manage_users: currentUser.role === 'admin',
+    can_manage_branches: currentUser.role === 'admin',
+    can_enter_ads_data: currentUser.role === 'admin',
+    can_see_calendar: true
+  }
 
-  const scopedLeads = isAdmin ? (filterBranch === 'all' ? leads : leads.filter(l => l.branch_id === filterBranch)) : leads.filter(l => l.branch_id === currentUser.branch_id)
+  const isSuperAdmin = perms.can_see_all_branches && perms.can_manage_users && perms.can_manage_branches
+  const isStaff = !perms.can_see_revenue // sosyal medya personeli profili: ciro göremeyen herkes "personel" görünümünde
+
+  const scopedLeads = isSuperAdmin ? (filterBranch === 'all' ? leads : leads.filter(l => l.branch_id === filterBranch)) : leads.filter(l => l.branch_id === currentUser.branch_id)
   const visibleLeads = isStaff ? scopedLeads.filter(l => l.entered_by === currentUser.username) : scopedLeads
-  const scopedAds = isAdmin ? (filterBranch === 'all' ? adsData : adsData.filter(a => a.branch_id === filterBranch)) : adsData.filter(a => a.branch_id === currentUser.branch_id)
+  const scopedAds = isSuperAdmin ? (filterBranch === 'all' ? adsData : adsData.filter(a => a.branch_id === filterBranch)) : adsData.filter(a => a.branch_id === currentUser.branch_id)
 
   function canEditLead(lead) {
-    if (isAdmin || isManager) return true
-    if (isStaff) return lead.entered_by === currentUser.username
-    return false
+    if (perms.can_edit_any_lead) return true
+    return lead.entered_by === currentUser.username
+  }
+  function canDeleteLead() {
+    return !!perms.can_delete_lead
   }
   function branchName(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
 
@@ -680,13 +763,13 @@ export default function App() {
         <div>
           <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Lead takip paneli</p>
           <p style={{ fontSize: 13, color: '#666', margin: 0 }}>
-            {currentUser.username} · {isAdmin ? 'tüm şubeler' : isManager ? `şube yöneticisi · ${branchName(currentUser.branch_id)}` : `personel · ${branchName(currentUser.branch_id)}`}
+            {currentUser.username} · {isSuperAdmin ? 'süper admin · tüm şubeler' : isStaff ? `personel · ${branchName(currentUser.branch_id)}` : `admin · ${branchName(currentUser.branch_id)}`}
           </p>
         </div>
         <button onClick={logoutAndClear} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>Çıkış yap</button>
       </div>
 
-      {isAdmin && (
+      {isSuperAdmin && (
         <div style={{ marginBottom: '1.5rem' }}>
           <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: 240 }}>
             <option value="all">Tüm şubeler (toplu rapor)</option>
@@ -695,9 +778,9 @@ export default function App() {
         </div>
       )}
 
-      <AppointmentCalendar leads={visibleLeads} canSeePhone={isAdmin || isManager} currentUserName={currentUser.username} isStaff={isStaff} showBranch={isAdmin && filterBranch === 'all'} branchNameFn={branchName} />
+      <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={isStaff} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
 
-      <StaleAlerts leads={visibleLeads} canSeePhone={isAdmin || isManager} currentUserName={currentUser.username} isStaff={isStaff} />
+      <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={isStaff} />
 
       {!isStaff && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12 }}>
@@ -709,7 +792,7 @@ export default function App() {
         </div>
       )}
 
-      {!isStaff && (
+      {!isStaff && perms.can_see_revenue && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.5rem' }}>
           <StatCard label="Toplam ciro (girilen)" value={fmtTL(stats.revenue)} />
           <StatCard label="Ortalama satış tutarı" value={stats.withAmountCount ? fmtTL(stats.avgTicket) : '—'} />
@@ -730,26 +813,30 @@ export default function App() {
               <ChannelPieChart leads={scopedLeads} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16 }}>
-            <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-              <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Hizmete göre ciro</p>
-              <RevenueByServiceChart leads={scopedLeads} />
-            </div>
-            {scopedAds.length > 0 && (
+          {perms.can_see_revenue && (
+            <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16 }}>
               <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Haftalık reklam harcaması</p>
-                <MonthlySpendChart adsData={scopedAds} />
+                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Hizmete göre ciro</p>
+                <RevenueByServiceChart leads={scopedLeads} />
               </div>
-            )}
-          </div>
+              {scopedAds.length > 0 && (
+                <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
+                  <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Haftalık reklam harcaması</p>
+                  <MonthlySpendChart adsData={scopedAds} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      <LeadForm onAdd={addLead} onUpdate={updateLead} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} />
+      {perms.can_add_lead && (
+        <LeadForm onAdd={addLead} onUpdate={updateLead} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} />
+      )}
 
       <div style={{ marginTop: '1.5rem' }}>
         <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
-          {isStaff ? 'Senin girdiğin kayıtlar' : (isAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
+          {isStaff ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
         </p>
         {visibleLeads.length === 0 ? (
           <p style={{ fontSize: 13, color: '#666' }}>Henüz kayıt yok.</p>
@@ -757,24 +844,25 @@ export default function App() {
           <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '0 1.25rem', overflowX: 'auto' }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: (isAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
+              gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
               gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: '#666', minWidth: 760
             }}>
-              {(isAdmin && filterBranch === 'all') && <span>şube</span>}
+              {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
               <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
             </div>
             {visibleLeads.map(l => (
-              <LeadRow key={l.id} lead={l} canSeePhone={isAdmin || isManager} canEdit={canEditLead(l)} onEdit={setEditingLead}
-                showBranch={isAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} />
+              <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
+                showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} />
             ))}
           </div>
         )}
       </div>
 
-      {isAdmin && <WeeklyAdsForm onAdd={addAdsWeek} branches={branches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />}
-      {isAdmin && <BranchManagement branches={branches} onAdd={addBranch} />}
-      {isAdmin && <UserManagement users={users} onToggle={toggleActive} branches={branches} />}
-      <SecurityNotice isAdmin={isAdmin} />
+      {perms.can_enter_ads_data && <WeeklyAdsForm onAdd={addAdsWeek} branches={branches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />}
+      {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} />}
+      {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} branches={branches} />}
+      {isSuperAdmin && <PermissionTemplateManager />}
+      <SecurityNotice isAdmin={isSuperAdmin} />
     </div>
   )
 }
