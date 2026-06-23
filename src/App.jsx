@@ -829,11 +829,20 @@ function PermissionTemplateManager() {
     setLoaded(true)
   }
 
+  const [err, setErr] = useState('')
+
   async function toggle(tpl, key) {
+    setErr('')
     const newValue = !tpl[key]
     setSavingId(tpl.id)
-    const { data } = await supabase.from('permission_templates').update({ [key]: newValue }).eq('id', tpl.id).select()
-    if (data) setTemplates(prev => prev.map(t => t.id === tpl.id ? data[0] : t))
+    const { data, error } = await supabase.from('permission_templates').update({ [key]: newValue }).eq('id', tpl.id).select()
+    if (error) {
+      setErr(`Kaydedilemedi: ${error.message}`)
+    } else if (data && data.length > 0) {
+      setTemplates(prev => prev.map(t => t.id === tpl.id ? data[0] : t))
+    } else {
+      setErr('Kaydedilemedi: değişiklik veritabanına yansımadı (RLS veya yetki sorunu olabilir).')
+    }
     setSavingId(null)
   }
 
@@ -843,6 +852,7 @@ function PermissionTemplateManager() {
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>İzin şablonları (Süper Admin)</p>
       <p style={{ fontSize: 13, color: '#666', margin: '0 0 14px' }}>Her şablonun hangi yetkilere sahip olduğunu buradan açıp kapatabilirsin. Değişiklik anında tüm o şablona bağlı kullanıcılara uygulanır.</p>
+      {err && <p style={{ fontSize: 13, color: '#c0392b', margin: '0 0 14px', fontWeight: 600 }}>{err}</p>}
       {templates.map(tpl => (
         <div key={tpl.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' }}>
           <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 8px' }}>{tpl.name}{savingId === tpl.id ? ' · kaydediliyor...' : ''}</p>
