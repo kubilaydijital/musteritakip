@@ -8,13 +8,12 @@ import {
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
 
 const CHANNELS = ['Instagram', 'WhatsApp', 'Organik']
-const SERVICES = ['Bölgesel incelme', 'Lazer epilasyon', 'Cilt işlemleri', 'Kalıcı makyaj işlemleri']
-const RESULTS = ['Görüşülüyor', 'Randevu aldı', 'Düşünüyor', 'Görüşüldü, randevu alınamadı', 'Vazgeçti', 'Müşteri oldu']
-const OPEN_RESULTS = ['Görüşülüyor', 'Düşünüyor']
-const RESULT_COLOR = { 'Görüşülüyor': '#185FA5', 'Randevu aldı': '#0F6E56', 'Düşünüyor': '#854F0B', 'Görüşüldü, randevu alınamadı': '#6B6B6B', 'Vazgeçti': '#A32D2D', 'Müşteri oldu': '#3B6D11' }
-const RESULT_HEX = { 'Görüşülüyor': '#378ADD', 'Randevu aldı': '#1D9E75', 'Düşünüyor': '#EF9F27', 'Görüşüldü, randevu alınamadı': '#9CA3AF', 'Vazgeçti': '#E24B4A', 'Müşteri oldu': '#639922' }
+const RESULTS = ['Randevu aldı', 'Görüşüldü, randevu alınamadı', 'Vazgeçti', 'Müşteri oldu']
+const OPEN_RESULTS = []
+const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Görüşüldü, randevu alınamadı': '#6B6B6B', 'Vazgeçti': '#A32D2D', 'Müşteri oldu': '#3B6D11' }
+const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Görüşüldü, randevu alınamadı': '#9CA3AF', 'Vazgeçti': '#E24B4A', 'Müşteri oldu': '#639922' }
 const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Organik': '#7F77DD' }
-const SERVICE_HEX = { 'Bölgesel incelme': '#D4537E', 'Lazer epilasyon': '#378ADD', 'Cilt işlemleri': '#1D9E75', 'Kalıcı makyaj işlemleri': '#EF9F27' }
+const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#E24B4A', '#639922', '#854F0B']
 const PHONE_RE = /^\+\d{10,15}$/
 const WARN_DAYS = 7
 const CRITICAL_DAYS = 14
@@ -23,8 +22,9 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function daysSince(dateStr) { return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000) }
 function lastTouch(lead) { return lead.edited_at || lead.date }
 function staleness(lead) {
-  if (!OPEN_RESULTS.includes(lead.result)) return null
-  const d = daysSince(lastTouch(lead))
+  if (lead.result !== 'Randevu aldı' || !lead.appointment_at) return null
+  const d = daysSince(lead.appointment_at)
+  if (d < 0) return null // randevu henüz geçmedi
   if (d >= CRITICAL_DAYS) return { level: 'critical', days: d }
   if (d >= WARN_DAYS) return { level: 'warning', days: d }
   return null
@@ -121,7 +121,7 @@ function Login({ onLogin }) {
   )
 }
 
-const emptyForm = { name: '', phone: '', channel: 'Instagram', service: SERVICES[0], note: '', result: 'Görüşülüyor', saleAmount: '', appointmentAt: '' }
+const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', result: 'Görüşülüyor', saleAmount: '', appointmentAt: '' }
 
 function toLocalInputValue(iso) {
   if (!iso) return ''
@@ -130,20 +130,33 @@ function toLocalInputValue(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
-  const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? String(editing.sale_amount) : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
+function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services }) {
+  const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
   const [appointmentErr, setAppointmentErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
-    setForm(editing ? { ...editing, saleAmount: editing.sale_amount != null ? String(editing.sale_amount) : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
-    setPhoneErr(''); setNoteErr(''); setAppointmentErr('')
+    setForm(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
+    setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setConfirmingDelete(false)
   }, [editing])
 
+  useEffect(() => {
+    if (!editing && !form.service && services && services.length > 0) {
+      set('service', services[0].name)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services])
+
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function handleDelete() {
+    if (!confirmingDelete) { setConfirmingDelete(true); return }
+    await onDelete(editing.id)
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -158,7 +171,7 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
     if (!ok) return
 
     setSubmitting(true)
-    const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount) : null
+    const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount.replace(/\./g, '')) : null
     const appointmentAt = form.appointmentAt ? new Date(form.appointmentAt).toISOString() : null
 
     if (editing) {
@@ -189,7 +202,11 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <input placeholder="İsim soyisim" value={form.name} onChange={e => set('name', e.target.value)} style={inputStyle} />
         <div>
-          <input placeholder="+905551234567" value={form.phone} onChange={e => set('phone', e.target.value)} style={inputStyle} />
+          <input placeholder="+905551234567" value={form.phone} onChange={e => {
+            let v = e.target.value
+            if (!v.startsWith('+90')) v = '+90' + v.replace(/^\+?90?/, '')
+            set('phone', v)
+          }} style={inputStyle} />
           {phoneErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{phoneErr}</p>}
         </div>
       </div>
@@ -202,7 +219,8 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
         </select>
       </div>
       <select value={form.service} onChange={e => set('service', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
-        {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
+        {(!services || services.length === 0) && <option value="">Hizmet listesi tanımlanmamış</option>}
+        {(services || []).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
       </select>
       <div style={{ marginBottom: 10 }}>
         <input type="datetime-local" value={form.appointmentAt} onChange={e => { set('appointmentAt', e.target.value); if (e.target.value) setAppointmentErr('') }} style={{ ...inputStyle, width: '100%' }} />
@@ -213,17 +231,32 @@ function LeadForm({ onAdd, onUpdate, currentUser, editing, onCancelEdit }) {
       </div>
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
-          <input placeholder="Satış tutarı (TL) — isteğe bağlı" value={form.saleAmount} onChange={e => set('saleAmount', e.target.value)} type="number" min="0" style={{ ...inputStyle, width: '100%' }} />
+          <input placeholder="Satış tutarı (TL) — isteğe bağlı" value={form.saleAmount} onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '')
+            const formatted = digits ? Number(digits).toLocaleString('tr-TR') : ''
+            set('saleAmount', formatted)
+          }} type="text" inputMode="numeric" style={{ ...inputStyle, width: '100%' }} />
           <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Bu alan zorunlu değildir, doldurmak istemezseniz boş bırakabilirsiniz.</p>
         </div>
       )}
       <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => set('note', e.target.value)} rows={2}
         style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: '1px solid #ccc', borderRadius: 8, boxSizing: 'border-box' }} />
       {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
-      <button type="submit" disabled={submitting} style={{ marginTop: 8, padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
-        {submitting ? 'Kaydediliyor...' : (editing ? 'Güncelle' : 'Kaydet')}
-      </button>
-      {saved && <span style={{ marginLeft: 10, fontSize: 13, color: '#2e7d32' }}>{editing ? 'Güncellendi' : 'Kaydedildi'}</span>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+        <button type="submit" disabled={submitting} style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+          {submitting ? 'Kaydediliyor...' : (editing ? 'Güncelle' : 'Kaydet')}
+        </button>
+        {editing && canDelete && (
+          <button type="button" onClick={handleDelete} style={{
+            padding: '8px 16px', borderRadius: 8, border: '1px solid #c0392b',
+            background: confirmingDelete ? '#c0392b' : '#fff', color: confirmingDelete ? '#fff' : '#c0392b',
+            cursor: 'pointer', fontWeight: 500
+          }}>
+            {confirmingDelete ? 'Emin misin? Tekrar tıkla' : 'Kaydı sil'}
+          </button>
+        )}
+        {saved && <span style={{ fontSize: 13, color: '#2e7d32' }}>{editing ? 'Güncellendi' : 'Kaydedildi'}</span>}
+      </div>
     </form>
   )
 }
@@ -279,15 +312,33 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
     setViewDate(new Date(year, month + delta, 1))
     setSelectedDay(null)
   }
+  function jumpToYear(y) {
+    setViewDate(new Date(Number(y), month, 1))
+    setSelectedDay(null)
+  }
+  function jumpToMonth(m) {
+    setViewDate(new Date(year, Number(m), 1))
+    setSelectedDay(null)
+  }
+
+  const yearOptions = []
+  for (let y = 2022; y <= new Date().getFullYear() + 1; y++) yearOptions.push(y)
 
   const selectedKey = selectedDay ? dateKey(new Date(year, month, selectedDay)) : null
   const selectedLeads = selectedKey ? (leadsByDay[selectedKey] || []) : []
 
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginBottom: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 8 }}>
         <button type="button" onClick={() => changeMonth(-1)} style={{ padding: '4px 10px', borderRadius: 8 }}>‹</button>
-        <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>{MONTH_NAMES[month]} {year}</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <select value={month} onChange={e => jumpToMonth(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14, fontWeight: 600 }}>
+            {MONTH_NAMES.map((m, i) => <option key={m} value={i}>{m}</option>)}
+          </select>
+          <select value={year} onChange={e => jumpToYear(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14, fontWeight: 600 }}>
+            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
         <button type="button" onClick={() => changeMonth(1)} style={{ padding: '4px 10px', borderRadius: 8 }}>›</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
@@ -427,14 +478,32 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
   )
 }
 
-function BranchManagement({ branches, onAdd }) {
+function BranchManagement({ branches, onAdd, onDelete, leads, users }) {
   const [name, setName] = useState('')
+  const [confirmingId, setConfirmingId] = useState(null)
+  const [err, setErr] = useState('')
+
   async function submit(e) {
     e.preventDefault()
     if (!name.trim()) return
     await onAdd({ id: uid(), name: name.trim() })
     setName('')
   }
+
+  async function handleDelete(branch) {
+    setErr('')
+    const hasLeads = leads.some(l => l.branch_id === branch.id)
+    const hasUsers = users.some(u => u.branch_id === branch.id)
+    if (hasLeads || hasUsers) {
+      setErr(`"${branch.name}" silinemez: bu şubeye bağlı ${hasLeads ? 'kayıtlar' : ''}${hasLeads && hasUsers ? ' ve ' : ''}${hasUsers ? 'kullanıcılar' : ''} var. Önce onları kaldırın.`)
+      setConfirmingId(null)
+      return
+    }
+    if (confirmingId !== branch.id) { setConfirmingId(branch.id); return }
+    await onDelete(branch.id)
+    setConfirmingId(null)
+  }
+
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Şube ekle</p>
@@ -442,32 +511,176 @@ function BranchManagement({ branches, onAdd }) {
         <input placeholder="Şube adı (örn. Aris Kadıköy)" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
         <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
       </form>
+      {err && <p style={{ fontSize: 12, color: '#c0392b', margin: '8px 0 0' }}>{err}</p>}
       <div style={{ marginTop: 12 }}>
-        {branches.map(b => <p key={b.id} style={{ fontSize: 13, margin: '4px 0', color: '#666' }}>🏪 {b.name}</p>)}
+        {branches.map(b => (
+          <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+            <p style={{ fontSize: 13, margin: 0, color: '#666' }}>🏪 {b.name}</p>
+            <button onClick={() => handleDelete(b)} style={{
+              fontSize: 12, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+              border: confirmingId === b.id ? '1px solid #c0392b' : '1px solid #ddd',
+              background: confirmingId === b.id ? '#c0392b' : '#fff',
+              color: confirmingId === b.id ? '#fff' : '#999'
+            }}>
+              {confirmingId === b.id ? 'Emin misin?' : 'Sil'}
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-function UserManagement({ users, onToggle, branches }) {
+function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete }) {
+  const [name, setName] = useState('')
+  const [confirmingId, setConfirmingId] = useState(null)
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    await onAdd({ id: uid(), branch_id: branchId, name: name.trim() })
+    setName('')
+  }
+
+  async function handleDelete(svc) {
+    if (confirmingId !== svc.id) { setConfirmingId(svc.id); return }
+    await onDelete(svc.id)
+    setConfirmingId(null)
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+      <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Hizmet listesi {branchName ? `· ${branchName}` : ''}</p>
+      <p style={{ fontSize: 13, color: '#666', margin: '0 0 12px' }}>Bu şubenin görüşme formunda görünecek hizmetleri buradan yönetebilirsin.</p>
+      <form onSubmit={submit} style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+        <input placeholder="Hizmet adı (örn. Saç boyama)" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
+      </form>
+      {services.length === 0 ? (
+        <p style={{ fontSize: 13, color: '#888' }}>Henüz hizmet eklenmedi.</p>
+      ) : services.map(s => (
+        <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+          <p style={{ fontSize: 13, margin: 0, color: '#444' }}>{s.name}</p>
+          <button onClick={() => handleDelete(s)} style={{
+            fontSize: 12, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+            border: confirmingId === s.id ? '1px solid #c0392b' : '1px solid #ddd',
+            background: confirmingId === s.id ? '#c0392b' : '#fff',
+            color: confirmingId === s.id ? '#fff' : '#999'
+          }}>
+            {confirmingId === s.id ? 'Emin misin?' : 'Sil'}
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, branches, templates }) {
+  const [newUsername, setNewUsername] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newBranchId, setNewBranchId] = useState(branches[0]?.id || '')
+  const [newTemplateId, setNewTemplateId] = useState('')
+  const [addErr, setAddErr] = useState('')
+  const [editingPwFor, setEditingPwFor] = useState(null)
+  const [pwValue, setPwValue] = useState('')
+  const [confirmingDeleteFor, setConfirmingDeleteFor] = useState(null)
+
+  const nonSuperAdminTemplates = (templates || []).filter(t => t.id !== 'tpl_super_admin')
+
+  async function submitAdd(e) {
+    e.preventDefault()
+    setAddErr('')
+    if (!newUsername.trim() || !newPassword.trim() || !newBranchId || !newTemplateId) {
+      setAddErr('Tüm alanları doldurun.')
+      return
+    }
+    if (users.some(u => u.username.toLowerCase() === newUsername.trim().toLowerCase())) {
+      setAddErr('Bu kullanıcı adı zaten kullanılıyor.')
+      return
+    }
+    await onAdd({ username: newUsername.trim(), password: newPassword.trim(), branch_id: newBranchId, permission_template_id: newTemplateId, active: true })
+    setNewUsername(''); setNewPassword('')
+  }
+
+  async function submitPasswordChange(username) {
+    if (!pwValue.trim()) return
+    await onChangePassword(username, pwValue.trim())
+    setEditingPwFor(null); setPwValue('')
+  }
+
+  async function handleDelete(username) {
+    if (confirmingDeleteFor !== username) { setConfirmingDeleteFor(username); return }
+    await onDelete(username)
+    setConfirmingDeleteFor(null)
+  }
+
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Erişim yönetimi</p>
       <p style={{ fontSize: 13, color: '#666', margin: '0 0 12px' }}>Ödeme alınmazsa ilgili şubenin erişimini buradan askıya alabilirsin.</p>
-      {users.filter(u => u.role !== 'admin').map(u => {
+
+      {users.filter(u => u.role !== 'admin' || u.permission_template_id !== 'tpl_super_admin').map(u => {
         const branch = branches.find(b => b.id === u.branch_id)
+        const tplName = (templates || []).find(t => t.id === u.permission_template_id)?.name || u.role
         return (
-          <div key={u.username} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.username}</p>
-              <p style={{ margin: 0, fontSize: 12, color: '#777' }}>{(u.role === 'manager' ? 'Şube yöneticisi · ' : 'Personel · ') + (branch ? branch.name : '—')}</p>
+          <div key={u.username} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.username}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#777' }}>{tplName} · {branch ? branch.name : '—'}</p>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue('') }}
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}>
+                  Şifre değiştir
+                </button>
+                <button onClick={() => onToggle(u.username, u.active)} style={{
+                  fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+                  border: u.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
+                  background: u.active === false ? '#2e7d32' : '#c0392b',
+                  color: '#fff'
+                }}>
+                  {u.active === false ? 'Erişimi aç' : 'Erişimi askıya al'}
+                </button>
+                <button onClick={() => handleDelete(u.username)} style={{
+                  fontSize: 12, padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
+                  border: confirmingDeleteFor === u.username ? '1px solid #c0392b' : '1px solid #ddd',
+                  background: confirmingDeleteFor === u.username ? '#c0392b' : '#fff',
+                  color: confirmingDeleteFor === u.username ? '#fff' : '#999'
+                }}>
+                  {confirmingDeleteFor === u.username ? 'Emin misin?' : 'Sil'}
+                </button>
+              </div>
             </div>
-            <button onClick={() => onToggle(u.username, u.active)} style={{ fontSize: 12, color: u.active === false ? '#2e7d32' : '#c0392b' }}>
-              {u.active === false ? 'Erişimi aç' : 'Erişimi askıya al'}
-            </button>
+            {editingPwFor === u.username && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <input type="text" placeholder="Yeni şifre" value={pwValue} onChange={e => setPwValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <button onClick={() => submitPasswordChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+              </div>
+            )}
           </div>
         )
       })}
+
+      <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #eee' }}>
+        <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>Yeni kullanıcı ekle</p>
+        <form onSubmit={submitAdd}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <input placeholder="Kullanıcı adı" value={newUsername} onChange={e => setNewUsername(e.target.value)} style={inputStyle} />
+            <input placeholder="Şifre" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inputStyle} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <select value={newBranchId} onChange={e => setNewBranchId(e.target.value)} style={inputStyle}>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <select value={newTemplateId} onChange={e => setNewTemplateId(e.target.value)} style={inputStyle}>
+              <option value="">İzin şablonu seç...</option>
+              {nonSuperAdminTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          {addErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{addErr}</p>}
+          <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Kullanıcı ekle</button>
+        </form>
+      </div>
     </div>
   )
 }
@@ -523,19 +736,22 @@ function ChannelPieChart({ leads }) {
   )
 }
 
-function RevenueByServiceChart({ leads }) {
+function RevenueByServiceChart({ leads, services }) {
   const ref = useRef(null)
   const chartRef = useRef(null)
+  const serviceNames = (services || []).map(s => s.name)
   const sums = useMemo(() => {
-    const s = {}; SERVICES.forEach(sv => s[sv] = 0)
+    const s = {}; serviceNames.forEach(sv => s[sv] = 0)
     leads.forEach(l => { if (l.result === 'Müşteri oldu' && l.sale_amount != null && s[l.service] !== undefined) s[l.service] += Number(l.sale_amount) })
     return s
-  }, [leads])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, serviceNames.join(',')])
   useEffect(() => {
+    if (serviceNames.length === 0) return
     if (chartRef.current) chartRef.current.destroy()
     chartRef.current = new Chart(ref.current, {
       type: 'bar',
-      data: { labels: SERVICES, datasets: [{ label: 'Ciro (TL)', data: SERVICES.map(s => sums[s]), backgroundColor: SERVICES.map(s => SERVICE_HEX[s]) }] },
+      data: { labels: serviceNames, datasets: [{ label: 'Ciro (TL)', data: serviceNames.map(s => sums[s]), backgroundColor: serviceNames.map((_, i) => SERVICE_COLOR_PALETTE[i % SERVICE_COLOR_PALETTE.length]) }] },
       options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
     })
     return () => { if (chartRef.current) chartRef.current.destroy() }
@@ -642,6 +858,8 @@ export default function App() {
   const [users, setUsers] = useState([])
   const [leads, setLeads] = useState([])
   const [adsData, setAdsData] = useState([])
+  const [templates, setTemplates] = useState([])
+  const [branchServices, setBranchServices] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [editingLead, setEditingLead] = useState(null)
   const [adsSelectedBranch, setAdsSelectedBranch] = useState('')
@@ -664,16 +882,20 @@ export default function App() {
 
   async function loadAll() {
     setLoaded(false)
-    const [b, u, l, a] = await Promise.all([
+    const [b, u, l, a, t, bs] = await Promise.all([
       supabase.from('branches').select('*').order('name'),
       supabase.from('app_users').select('*'),
       supabase.from('leads').select('*').order('date', { ascending: false }),
-      supabase.from('ads_data').select('*').order('date', { ascending: false })
+      supabase.from('ads_data').select('*').order('date', { ascending: false }),
+      supabase.from('permission_templates').select('*'),
+      supabase.from('branch_services').select('*').order('name')
     ])
     setBranches(b.data || [])
     setUsers(u.data || [])
     setLeads(l.data || [])
     setAdsData(a.data || [])
+    setTemplates(t.data || [])
+    setBranchServices(bs.data || [])
     if (b.data && b.data.length > 0) setAdsSelectedBranch(b.data[0].id)
     setLoaded(true)
 
@@ -695,6 +917,11 @@ export default function App() {
     if (data) setLeads(prev => prev.map(l => l.id === updated.id ? data[0] : l))
     setEditingLead(null)
   }
+  async function deleteLead(id) {
+    await supabase.from('leads').delete().eq('id', id)
+    setLeads(prev => prev.filter(l => l.id !== id))
+    setEditingLead(null)
+  }
   async function addAdsWeek(week) {
     const { data } = await supabase.from('ads_data').insert(week).select()
     if (data) setAdsData(prev => [data[0], ...prev])
@@ -704,9 +931,33 @@ export default function App() {
     const { data } = await supabase.from('app_users').update({ active: newActive }).eq('username', username).select()
     if (data) setUsers(prev => prev.map(u => u.username === username ? data[0] : u))
   }
+  async function addUser(user) {
+    const { data } = await supabase.from('app_users').insert({ ...user, role: 'staff' }).select()
+    if (data) setUsers(prev => [...prev, data[0]])
+  }
+  async function deleteUser(username) {
+    await supabase.from('app_users').delete().eq('username', username)
+    setUsers(prev => prev.filter(u => u.username !== username))
+  }
+  async function changeUserPassword(username, newPassword) {
+    const { data } = await supabase.from('app_users').update({ password: newPassword }).eq('username', username).select()
+    if (data) setUsers(prev => prev.map(u => u.username === username ? data[0] : u))
+  }
   async function addBranch(branch) {
     const { data } = await supabase.from('branches').insert(branch).select()
     if (data) setBranches(prev => [...prev, data[0]])
+  }
+  async function deleteBranch(id) {
+    await supabase.from('branches').delete().eq('id', id)
+    setBranches(prev => prev.filter(b => b.id !== id))
+  }
+  async function addService(service) {
+    const { data } = await supabase.from('branch_services').insert(service).select()
+    if (data) setBranchServices(prev => [...prev, data[0]])
+  }
+  async function deleteService(id) {
+    await supabase.from('branch_services').delete().eq('id', id)
+    setBranchServices(prev => prev.filter(s => s.id !== id))
   }
 
   if (!currentUser) return <Login onLogin={loginAndPersist} />
@@ -728,6 +979,9 @@ export default function App() {
 
   const isSuperAdmin = perms.can_see_all_branches && perms.can_manage_users && perms.can_manage_branches
   const isStaff = !perms.can_see_revenue // sosyal medya personeli profili: ciro göremeyen herkes "personel" görünümünde
+
+  const relevantBranchId = isSuperAdmin && filterBranch !== 'all' ? filterBranch : currentUser.branch_id
+  const currentBranchServices = branchServices.filter(s => s.branch_id === relevantBranchId)
 
   const scopedLeads = isSuperAdmin ? (filterBranch === 'all' ? leads : leads.filter(l => l.branch_id === filterBranch)) : leads.filter(l => l.branch_id === currentUser.branch_id)
   const visibleLeads = isStaff ? scopedLeads.filter(l => l.entered_by === currentUser.username) : scopedLeads
@@ -817,7 +1071,7 @@ export default function App() {
             <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16 }}>
               <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
                 <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Hizmete göre ciro</p>
-                <RevenueByServiceChart leads={scopedLeads} />
+                <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
               </div>
               {scopedAds.length > 0 && (
                 <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
@@ -831,7 +1085,7 @@ export default function App() {
       )}
 
       {perms.can_add_lead && (
-        <LeadForm onAdd={addLead} onUpdate={updateLead} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} />
+        <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices} />
       )}
 
       <div style={{ marginTop: '1.5rem' }}>
@@ -859,8 +1113,17 @@ export default function App() {
       </div>
 
       {perms.can_enter_ads_data && <WeeklyAdsForm onAdd={addAdsWeek} branches={branches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />}
-      {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} />}
-      {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} branches={branches} />}
+      {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onDelete={deleteBranch} leads={leads} users={users} />}
+      {!isSuperAdmin && !isStaff && (
+        <BranchServiceManager
+          services={currentBranchServices}
+          branchId={currentUser.branch_id}
+          branchName={branchName(currentUser.branch_id)}
+          onAdd={addService}
+          onDelete={deleteService}
+        />
+      )}
+      {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} branches={branches} templates={templates} />}
       {isSuperAdmin && <PermissionTemplateManager />}
       <SecurityNotice isAdmin={isSuperAdmin} />
     </div>
