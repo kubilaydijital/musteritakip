@@ -835,13 +835,14 @@ function PermissionTemplateManager() {
     setErr('')
     const newValue = !tpl[key]
     setSavingId(tpl.id)
-    const { data, error } = await supabase.from('permission_templates').update({ [key]: newValue }).eq('id', tpl.id).select()
+    const { data, error, status, statusText } = await supabase.from('permission_templates').update({ [key]: newValue }).eq('id', tpl.id).select()
+    console.log('TOGGLE DEBUG:', { key, newValue, data, error, status, statusText })
     if (error) {
-      setErr(`Kaydedilemedi: ${error.message}`)
+      setErr(`Kaydedilemedi (hata): ${error.message} [kod: ${error.code || '-'}]`)
     } else if (data && data.length > 0) {
       setTemplates(prev => prev.map(t => t.id === tpl.id ? data[0] : t))
     } else {
-      setErr('Kaydedilemedi: değişiklik veritabanına yansımadı (RLS veya yetki sorunu olabilir).')
+      setErr(`Kaydedilemedi: 0 satır güncellendi (status: ${status}). RLS aktif olabilir, "Run without RLS" ile tabloyu oluşturduğunuzdan emin olun.`)
     }
     setSavingId(null)
   }
