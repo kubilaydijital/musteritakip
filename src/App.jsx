@@ -33,6 +33,19 @@ function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
 const inputStyle = { padding: 10, borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit' }
 
+const SUSPICIOUS_IP_THRESHOLD = 3
+const SUSPICIOUS_WINDOW_MS = 60 * 60 * 1000 // 1 saat
+
+async function getClientIp() {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json')
+    const json = await res.json()
+    return json.ip || null
+  } catch (e) {
+    return null
+  }
+}
+
 function Login({ onLogin }) {
   const [name, setName] = useState('')
   const [pass, setPass] = useState('')
@@ -48,10 +61,33 @@ function Login({ onLogin }) {
       .select('*')
       .ilike('username', name.trim())
       .maybeSingle()
+
+    if (error || !data) { setLoading(false); setErr('Kullanıcı adı veya şifre hatalı.'); return }
+    if (data.password !== pass) { setLoading(false); setErr('Kullanıcı adı veya şifre hatalı.'); return }
+    if (data.active === false) { setLoading(false); setErr('Bu hesabın erişimi şu anda askıya alınmış. Yöneticinizle görüşün.'); return }
+
+    // Admin hesabı IP kontrolünden muaf - kendi erişimin kilitlenmesin
+    if (data.role !== 'admin') {
+      const ip = await getClientIp()
+      if (ip) {
+        await supabase.from('login_logs').insert({ id: uid(), username: data.username, ip })
+        const since = new Date(Date.now() - SUSPICIOUS_WINDOW_MS).toISOString()
+        const { data: recentLogs } = await supabase
+          .from('login_logs')
+          .select('ip')
+          .eq('username', data.username)
+          .gte('created_at', since)
+        const distinctIps = new Set((recentLogs || []).map(l => l.ip).filter(Boolean))
+        if (distinctIps.size >= SUSPICIOUS_IP_THRESHOLD) {
+          await supabase.from('app_users').update({ active: false }).eq('username', data.username)
+          setLoading(false)
+          setErr('Güvenlik nedeniyle bu hesap askıya alındı: kısa sürede çok farklı yerden giriş tespit edildi. Yöneticinizle görüşün.')
+          return
+        }
+      }
+    }
+
     setLoading(false)
-    if (error || !data) { setErr('Kullanıcı adı veya şifre hatalı.'); return }
-    if (data.password !== pass) { setErr('Kullanıcı adı veya şifre hatalı.'); return }
-    if (data.active === false) { setErr('Bu hesabın erişimi şu anda askıya alınmış. Yöneticinizle görüşün.'); return }
     onLogin(data)
   }
 
