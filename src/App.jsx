@@ -719,7 +719,11 @@ function ResultBarChart({ leads }) {
     chartRef.current = new Chart(ref.current, {
       type: 'bar',
       data: { labels: RESULTS, datasets: [{ label: 'Lead sayısı', data: RESULTS.map(r => counts[r]), backgroundColor: RESULTS.map(r => RESULT_HEX[r]) }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      options: {
+        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { size: 12 } } } }
+      }
     })
     return () => { if (chartRef.current) chartRef.current.destroy() }
   }, [counts])
@@ -820,6 +824,9 @@ function PermissionTemplateManager() {
   const [templates, setTemplates] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [savingId, setSavingId] = useState(null)
+  const [err, setErr] = useState('')
+  const [editingNameFor, setEditingNameFor] = useState(null)
+  const [nameValue, setNameValue] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -829,22 +836,27 @@ function PermissionTemplateManager() {
     setLoaded(true)
   }
 
-  const [err, setErr] = useState('')
-
   async function toggle(tpl, key) {
     setErr('')
     const newValue = !tpl[key]
     setSavingId(tpl.id)
-    const { data, error, status, statusText } = await supabase.from('permission_templates').update({ [key]: newValue }).eq('id', tpl.id).select()
-    console.log('TOGGLE DEBUG:', { key, newValue, data, error, status, statusText })
+    const { data, error, status } = await supabase.from('permission_templates').update({ [key]: newValue }).eq('id', tpl.id).select()
     if (error) {
       setErr(`Kaydedilemedi (hata): ${error.message} [kod: ${error.code || '-'}]`)
     } else if (data && data.length > 0) {
       setTemplates(prev => prev.map(t => t.id === tpl.id ? data[0] : t))
     } else {
-      setErr(`Kaydedilemedi: 0 satır güncellendi (status: ${status}). RLS aktif olabilir, "Run without RLS" ile tabloyu oluşturduğunuzdan emin olun.`)
+      setErr(`Kaydedilemedi: 0 satır güncellendi (status: ${status}).`)
     }
     setSavingId(null)
+  }
+
+  async function submitNameChange(tpl) {
+    const trimmed = nameValue.trim()
+    if (!trimmed) return
+    const { data } = await supabase.from('permission_templates').update({ name: trimmed }).eq('id', tpl.id).select()
+    if (data && data.length > 0) setTemplates(prev => prev.map(t => t.id === tpl.id ? data[0] : t))
+    setEditingNameFor(null); setNameValue('')
   }
 
   if (!loaded) return null
@@ -856,7 +868,19 @@ function PermissionTemplateManager() {
       {err && <p style={{ fontSize: 13, color: '#c0392b', margin: '0 0 14px', fontWeight: 600 }}>{err}</p>}
       {templates.map(tpl => (
         <div key={tpl.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' }}>
-          <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 8px' }}>{tpl.name}{savingId === tpl.id ? ' · kaydediliyor...' : ''}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{tpl.name}{savingId === tpl.id ? ' · kaydediliyor...' : ''}</p>
+            <button onClick={() => { setEditingNameFor(editingNameFor === tpl.id ? null : tpl.id); setNameValue(tpl.name) }}
+              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer' }}>
+              Adı değiştir
+            </button>
+          </div>
+          {editingNameFor === tpl.id && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <input type="text" placeholder="Şablon adı" value={nameValue} onChange={e => setNameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+              <button onClick={() => submitNameChange(tpl)} style={{ padding: '8px 14px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             {Object.keys(PERMISSION_LABELS).map(key => (
               <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
@@ -1080,7 +1104,11 @@ export default function App() {
 
       <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12 }}>
+      {perms.can_add_lead && (
+        <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices} />
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12, marginTop: '1.5rem' }}>
         <StatCard label="Toplam lead" value={stats.total} />
         <StatCard label="Müşteriye dönüşen" value={stats.customers} />
         <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} />
@@ -1123,10 +1151,6 @@ export default function App() {
           </div>
         )}
       </div>
-
-      {perms.can_add_lead && (
-        <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices} />
-      )}
 
       <div style={{ marginTop: '1.5rem' }}>
         <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
