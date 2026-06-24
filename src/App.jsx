@@ -4,6 +4,11 @@ import {
   Chart, BarController, BarElement, DoughnutController, ArcElement,
   LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip
 } from 'chart.js'
+import {
+  MessageCircle, CalendarDays, UserRound, ShoppingCart, TrendingUp, Wallet,
+  Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
+  ShieldCheck, Settings, Plus, ChevronDown, LogOut
+} from 'lucide-react'
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
 
@@ -31,27 +36,33 @@ function staleness(lead) {
 }
 function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
-// Tasarım sistemi token'ları
+// Tasarım sistemi token'ları — koyu tema
 const T = {
-  primary: '#6C5CE7',
-  primaryDark: '#5B3DE0',
-  primaryLight: '#F4F2FF',
-  bg: '#FAFAFC',
-  card: '#FFFFFF',
-  border: '#ECEAF5',
-  text: '#1A1D29',
-  textSoft: '#8B8D98',
-  green: '#00B894',
-  greenBg: '#E6FAF5',
-  orange: '#FDA428',
-  orangeBg: '#FFF3DF',
-  red: '#FF6B6B',
-  redBg: '#FFEDED',
-  blue: '#4A90E2',
-  blueBg: '#EAF2FD',
+  primary: '#7C5CFC',
+  primaryDark: '#6C3FFC',
+  primaryLight: 'rgba(124,92,252,0.16)',
+  bg: '#070D18',
+  card: '#0C1626',
+  cardSoft: 'rgba(255,255,255,0.04)',
+  border: 'rgba(255,255,255,0.08)',
+  text: '#FFFFFF',
+  textSoft: '#94A3B8',
+  textFaint: '#64748B',
+  green: '#22C55E',
+  greenBg: 'rgba(34,197,94,0.14)',
+  orange: '#F59E0B',
+  orangeBg: 'rgba(245,158,11,0.14)',
+  red: '#EF4444',
+  redBg: 'rgba(239,68,68,0.14)',
+  blue: '#3B82F6',
+  blueBg: 'rgba(59,130,246,0.14)',
 }
-const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: '#fff', color: T.text }
-const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(26,29,41,0.04)' }
+const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: T.cardSoft, color: T.text }
+const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }
+const quickBtnStyle = {
+  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9,
+  border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, fontSize: 12.5, cursor: 'pointer', textAlign: 'left'
+}
 
 const SUSPICIOUS_IP_THRESHOLD = 3
 const SUSPICIOUS_WINDOW_MS = 60 * 60 * 1000 // 1 saat
@@ -125,15 +136,15 @@ function Login({ onLogin }) {
   return (
     <div style={{ maxWidth: 360, margin: '4rem auto', padding: '1.5rem', fontFamily: 'system-ui, sans-serif' }}>
       <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Müşteri takip sistemi</p>
-      <p style={{ fontSize: 13, color: '#8B8D98', marginBottom: 20 }}>Giriş yapın</p>
+      <p style={{ fontSize: 13, color: T.textSoft, marginBottom: 20 }}>Giriş yapın</p>
       <form onSubmit={submit}>
         <input placeholder="Kullanıcı adı" value={name} onChange={e => setName(e.target.value)}
-          style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box' }} />
+          style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: `1px solid ${T.border}`, boxSizing: 'border-box' }} />
         <input type="password" placeholder="Şifre" value={pass} onChange={e => setPass(e.target.value)}
-          style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box' }} />
+          style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: `1px solid ${T.border}`, boxSizing: 'border-box' }} />
         {err && <p style={{ fontSize: 13, color: '#c0392b', marginBottom: 10 }}>{err}</p>}
         <button type="submit" disabled={loading}
-          style={{ width: '100%', padding: 10, borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+          style={{ width: '100%', padding: 10, borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
           {loading ? 'Giriş yapılıyor...' : 'Giriş yap'}
         </button>
       </form>
@@ -220,7 +231,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   }
 
   return (
-    <form onSubmit={submit} style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem' }}>
+    <form onSubmit={submit} style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>{editing ? 'Kaydı düzenle' : 'Yeni görüşme kaydı'}</p>
         {editing && <button type="button" onClick={onCancelEdit} style={{ fontSize: 12 }}>Vazgeç</button>}
@@ -274,10 +285,10 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         </div>
       )}
       <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => set('note', e.target.value)} rows={2}
-        style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: '1px solid #ccc', borderRadius: 8, boxSizing: 'border-box' }} />
+        style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box' }} />
       {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-        <button type="submit" disabled={submitting} style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+        <button type="submit" disabled={submitting} style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
           {submitting ? 'Kaydediliyor...' : (editing ? 'Güncelle' : 'Kaydet')}
         </button>
         {editing && canDelete && (
@@ -295,28 +306,32 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   )
 }
 
-const STAT_ICON_COLORS = [
-  { bg: T.primaryLight, fg: T.primary },
-  { bg: T.greenBg, fg: T.green },
-  { bg: T.orangeBg, fg: T.orange },
-  { bg: T.blueBg, fg: T.blue },
-  { bg: T.redBg, fg: T.red },
-]
-const STAT_ICONS = ['◐', '◆', '◑', '◧', '◔']
+const STAT_COLOR_MAP = {
+  violet: { solid: T.primary, soft: T.primaryLight },
+  blue: { solid: T.blue, soft: T.blueBg },
+  green: { solid: T.green, soft: T.greenBg },
+  amber: { solid: T.orange, soft: T.orangeBg },
+}
 
-function StatCard({ label, value, colorIndex = 0 }) {
-  const c = STAT_ICON_COLORS[colorIndex % STAT_ICON_COLORS.length]
-  const icon = STAT_ICONS[colorIndex % STAT_ICONS.length]
+function StatCard({ icon, label, value, color = 'violet', trend, trendLabel }) {
+  const c = STAT_COLOR_MAP[color] || STAT_COLOR_MAP.violet
   return (
-    <div style={{ ...cardStyle, padding: '18px 20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+    <div style={{ ...cardStyle, padding: '18px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{
-          width: 34, height: 34, borderRadius: 10, background: c.bg, color: c.fg,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16
+          width: 44, height: 44, borderRadius: '50%', background: c.solid, color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
         }}>{icon}</span>
-        <p style={{ fontSize: 13, color: T.textSoft, margin: 0, fontWeight: 500 }}>{label}</p>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontSize: 12.5, color: T.textSoft, margin: '0 0 2px', fontWeight: 500 }}>{label}</p>
+          <p style={{ fontSize: 22, fontWeight: 700, margin: 0, color: T.text, lineHeight: 1.15 }}>{value}</p>
+          {trend != null && (
+            <p style={{ fontSize: 11.5, margin: '3px 0 0', color: T.green, fontWeight: 600 }}>
+              ↗ {trend}{trendLabel ? <span style={{ color: T.textFaint, fontWeight: 500 }}> · {trendLabel}</span> : null}
+            </p>
+          )}
+        </div>
       </div>
-      <p style={{ fontSize: 24, fontWeight: 700, margin: 0, color: T.text }}>{value}</p>
     </div>
   )
 }
@@ -379,14 +394,14 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
   const selectedLeads = selectedKey ? (leadsByDay[selectedKey] || []) : []
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginBottom: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginBottom: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 8 }}>
         <button type="button" onClick={() => changeMonth(-1)} style={{ padding: '4px 10px', borderRadius: 8 }}>‹</button>
         <div style={{ display: 'flex', gap: 8 }}>
-          <select value={month} onChange={e => jumpToMonth(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14, fontWeight: 600 }}>
+          <select value={month} onChange={e => jumpToMonth(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 600 }}>
             {MONTH_NAMES.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
-          <select value={year} onChange={e => jumpToYear(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14, fontWeight: 600 }}>
+          <select value={year} onChange={e => jumpToYear(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 600 }}>
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
@@ -436,10 +451,10 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
             <div key={lead.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', fontSize: 13, borderBottom: '1px solid #f0f0f0' }}>
               <span>
                 <span style={{ fontWeight: 600 }}>{lead.name}</span>
-                <span style={{ color: '#777', marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
-                {showBranch && <span style={{ color: '#777', marginLeft: 8, fontSize: 12 }}>· {branchNameFn(lead.branch_id)}</span>}
-                <span style={{ color: '#777', marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
-                {lead.note && <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>· {lead.note.slice(0, 40)}</span>}
+                <span style={{ color: T.textSoft, marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
+                {showBranch && <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {branchNameFn(lead.branch_id)}</span>}
+                <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
+                {lead.note && <span style={{ color: T.textFaint, marginLeft: 8, fontSize: 12 }}>· {lead.note.slice(0, 40)}</span>}
               </span>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#6C5CE7' }}>
                 {new Date(lead.appointment_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
@@ -472,13 +487,13 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff }) {
         <div key={lead.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 13, borderTop: '1px solid #f3c4c0' }}>
           <span>
             <span style={{ fontWeight: 600 }}>{lead.name}</span>
-            <span style={{ color: '#777', marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
-            <span style={{ color: '#777', marginLeft: 8, fontSize: 12 }}>· {lead.result}</span>
+            <span style={{ color: T.textSoft, marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
+            <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {lead.result}</span>
           </span>
           <span style={{ fontSize: 12, fontWeight: 600, color: s.level === 'critical' ? '#c0392b' : '#b8860b' }}>{s.days} gün önce — tekrar ara</span>
         </div>
       ))}
-      {stale.length > 8 && <p style={{ fontSize: 12, color: '#777', margin: '8px 0 0' }}>+ {stale.length - 8} kayıt daha</p>}
+      {stale.length > 8 && <p style={{ fontSize: 12, color: T.textSoft, margin: '8px 0 0' }}>+ {stale.length - 8} kayıt daha</p>}
     </div>
   )
 }
@@ -491,12 +506,12 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName })
       gridTemplateColumns: showBranch ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
       gap: 8, padding: '10px 0', borderBottom: '1px solid #eee', fontSize: 13, alignItems: 'center'
     }}>
-      {showBranch && <span style={{ fontSize: 12, color: '#777' }}>{branchName}</span>}
+      {showBranch && <span style={{ fontSize: 12, color: T.textSoft }}>{branchName}</span>}
       <span style={{ fontWeight: 600 }}>{lead.name}</span>
-      <span style={{ color: '#777' }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
+      <span style={{ color: T.textSoft }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
       <span>{lead.channel}</span>
-      <span style={{ color: '#777', fontSize: 12 }}>{lead.service || '—'}</span>
-      <span style={{ fontSize: 12, color: '#777' }}>{lead.note ? lead.note.slice(0, 30) : '—'}</span>
+      <span style={{ color: T.textSoft, fontSize: 12 }}>{lead.service || '—'}</span>
+      <span style={{ fontSize: 12, color: T.textSoft }}>{lead.note ? lead.note.slice(0, 30) : '—'}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: RESULT_COLOR[lead.result] }}>{lead.result}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: '#2e7d32' }}>{lead.sale_amount != null ? fmtTL(lead.sale_amount) : '—'}</span>
       {s ? <span style={{ fontSize: 11, fontWeight: 600, color: s.level === 'critical' ? '#c0392b' : '#b8860b' }}>{s.days}g</span> : <span />}
@@ -518,7 +533,7 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
     setForm({ spend: '', impressions: '', messages: '', manualAdjustment: '' })
   }
   return (
-    <form onSubmit={submit} style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <form onSubmit={submit} style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Haftalık reklam verisi gir (admin)</p>
       <select value={selectedBranch} onChange={e => onSelectBranch(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -530,7 +545,7 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
       </div>
       <input placeholder="Manuel düzeltme (kayıt eksikliği — örn. 5)" value={form.manualAdjustment} onChange={e => set('manualAdjustment', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 6 }} />
       <p style={{ fontSize: 11, color: '#888', margin: '0 0 12px' }}>Sosyal medya personeli kaçırdığı mesajlar varsa, eksik kalan sayıyı buraya yaz — rapor bu sayıyı da hesaba katar.</p>
-      <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>Haftalık veriyi kaydet</button>
+      <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>Haftalık veriyi kaydet</button>
     </form>
   )
 }
@@ -546,12 +561,12 @@ function BranchManagement({ branches, onAdd, onToggleActive }) {
   }
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Şube ekle</p>
-      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 12px' }}>Bir şubeyi pasif yaparsan panelde görünmez ama tüm verisi (kayıtlar, kullanıcılar) korunur, istediğin zaman tekrar aktif edebilirsin.</p>
+      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Bir şubeyi pasif yaparsan panelde görünmez ama tüm verisi (kayıtlar, kullanıcılar) korunur, istediğin zaman tekrar aktif edebilirsin.</p>
       <form onSubmit={submit} style={{ display: 'flex', gap: 10 }}>
         <input placeholder="Şube adı (örn. Aris Kadıköy)" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
+        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
       </form>
       <div style={{ marginTop: 12 }}>
         {branches.map(b => (
@@ -590,12 +605,12 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
   }
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Hizmet listesi {branchName ? `· ${branchName}` : ''}</p>
-      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 12px' }}>Bu şubenin görüşme formunda görünecek hizmetleri buradan yönetebilirsin.</p>
+      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Bu şubenin görüşme formunda görünecek hizmetleri buradan yönetebilirsin.</p>
       <form onSubmit={submit} style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
         <input placeholder="Hizmet adı (örn. Saç boyama)" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
+        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
       </form>
       {services.length === 0 ? (
         <p style={{ fontSize: 13, color: '#888' }}>Henüz hizmet eklenmedi.</p>
@@ -671,9 +686,9 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
   }
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Erişim yönetimi</p>
-      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 12px' }}>Ödeme alınmazsa ilgili şubenin erişimini buradan askıya alabilirsin.</p>
+      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Ödeme alınmazsa ilgili şubenin erişimini buradan askıya alabilirsin.</p>
 
       {users.filter(u => u.role !== 'admin' || u.permission_template_id !== 'tpl_super_admin').map(u => {
         const branch = branches.find(b => b.id === u.branch_id)
@@ -683,15 +698,15 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.username}</p>
-                <p style={{ margin: 0, fontSize: 12, color: '#777' }}>{tplName} · {branch ? branch.name : '—'}</p>
+                <p style={{ margin: 0, fontSize: 12, color: T.textSoft }}>{tplName} · {branch ? branch.name : '—'}</p>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue(''); setEditingUsernameFor(null) }}
-                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   Şifre değiştir
                 </button>
                 <button onClick={() => { setEditingUsernameFor(editingUsernameFor === u.username ? null : u.username); setUsernameValue(u.username); setEditingPwFor(null) }}
-                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   Kullanıcı adı değiştir
                 </button>
                 <button onClick={() => onToggle(u.username, u.active)} style={{
@@ -715,14 +730,14 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
             {editingPwFor === u.username && (
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <input type="text" placeholder="Yeni şifre" value={pwValue} onChange={e => setPwValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={() => submitPasswordChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+                <button onClick={() => submitPasswordChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
               </div>
             )}
             {editingUsernameFor === u.username && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input type="text" placeholder="Yeni kullanıcı adı" value={usernameValue} onChange={e => setUsernameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                  <button onClick={() => submitUsernameChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+                  <button onClick={() => submitUsernameChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
                 </div>
                 {usernameErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '6px 0 0' }}>{usernameErr}</p>}
               </div>
@@ -748,7 +763,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
             </select>
           </div>
           {addErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{addErr}</p>}
-          <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>Kullanıcı ekle</button>
+          <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>Kullanıcı ekle</button>
         </form>
       </div>
     </div>
@@ -757,7 +772,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
 
 function ChartLegend({ items }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8, fontSize: 12, color: '#8B8D98' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8, fontSize: 12, color: T.textSoft }}>
       {items.map(it => (
         <span key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 10, height: 10, borderRadius: 2, background: it.color }} />{it.label}
@@ -848,9 +863,9 @@ function MessageMatchReport({ adsData, leads }) {
   }
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Mesaj / kayıt eşleşme raporu</p>
-      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 12px' }}>Meta'nın gösterdiği mesaj sayısı ile sisteme girilen kayıt sayısını karşılaştırır. Manuel düzeltme, kaçırılan mesajları telafi eder.</p>
+      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Meta'nın gösterdiği mesaj sayısı ile sisteme girilen kayıt sayısını karşılaştırır. Manuel düzeltme, kaçırılan mesajları telafi eder.</p>
       {sorted.slice(0, 8).map(week => {
         const recordCount = recordCountForWeek(week.date)
         const adjusted = recordCount + (week.manual_adjustment || 0)
@@ -861,7 +876,7 @@ function MessageMatchReport({ adsData, leads }) {
         return (
           <div key={week.id} style={{ padding: '8px 0', borderBottom: '1px solid #eee', fontSize: 13 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-              <span style={{ color: '#777' }}>{dateLabel}</span>
+              <span style={{ color: T.textSoft }}>{dateLabel}</span>
               <span style={{ fontWeight: 600, color: pct >= 90 ? '#2e7d32' : pct >= 70 ? '#b8860b' : '#c0392b' }}>%{pct} kayıt oranı</span>
             </div>
             <span style={{ color: '#444' }}>
@@ -895,7 +910,7 @@ function MonthlySpendChart({ adsData }) {
 function SecurityNotice({ isAdmin }) {
   if (!isAdmin) return null
   return (
-    <div style={{ background: '#FAFAFC', borderRadius: 12, padding: '1rem 1.25rem', marginTop: '1.5rem', fontSize: 12, color: '#8B8D98' }}>
+    <div style={{ background: '#FAFAFC', borderRadius: 12, padding: '1rem 1.25rem', marginTop: '1.5rem', fontSize: 12, color: T.textSoft }}>
       <p style={{ margin: '0 0 8px', fontWeight: 600, color: '#222' }}>🔒 Veri koruma durumu</p>
       <p style={{ margin: '2px 0' }}>✓ Toplu dışa aktarma (CSV/Excel indirme) kapalı — sadece görüntüleme</p>
       <p style={{ margin: '2px 0' }}>✓ Telefon numaraları personelden gizli, sadece admin/yönetici görür</p>
@@ -999,16 +1014,16 @@ function PermissionTemplateManager() {
   if (!loaded) return null
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>İzin şablonları (Süper Admin)</p>
-      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 14px' }}>Her şablonun hangi yetkilere sahip olduğunu buradan açıp kapatabilirsin. Değişiklik anında tüm o şablona bağlı kullanıcılara uygulanır.</p>
+      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 14px' }}>Her şablonun hangi yetkilere sahip olduğunu buradan açıp kapatabilirsin. Değişiklik anında tüm o şablona bağlı kullanıcılara uygulanır.</p>
       {err && <p style={{ fontSize: 13, color: '#c0392b', margin: '0 0 14px', fontWeight: 600 }}>{err}</p>}
       {templates.map(tpl => (
         <div key={tpl.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{tpl.name}{savingId === tpl.id ? ' · kaydediliyor...' : ''}</p>
             <button onClick={() => { setEditingNameFor(editingNameFor === tpl.id ? null : tpl.id); setNameValue(tpl.name) }}
-              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', color: '#6C5CE7', cursor: 'pointer' }}>
+              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer' }}>
               Adı değiştir
             </button>
             {tpl.id !== 'tpl_super_admin' && (
@@ -1025,7 +1040,7 @@ function PermissionTemplateManager() {
           {editingNameFor === tpl.id && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <input type="text" placeholder="Şablon adı" value={nameValue} onChange={e => setNameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-              <button onClick={() => submitNameChange(tpl)} style={{ padding: '8px 14px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+              <button onClick={() => submitNameChange(tpl)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -1043,7 +1058,7 @@ function PermissionTemplateManager() {
         <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>Yeni izin şablonu oluştur</p>
         <form onSubmit={createTemplate} style={{ display: 'flex', gap: 10 }}>
           <input type="text" placeholder="Şablon adı (örn. Muhasebe, Şube Yöneticisi)" value={newTplName} onChange={e => setNewTplName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-          <button type="submit" disabled={creating} style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>
+          <button type="submit" disabled={creating} style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>
             {creating ? 'Oluşturuluyor...' : 'Oluştur'}
           </button>
         </form>
@@ -1054,37 +1069,36 @@ function PermissionTemplateManager() {
 }
 
 const NAV_ITEMS = [
-  { key: 'overview', label: 'Genel Bakış', icon: '◧', show: () => true },
-  { key: 'clients', label: 'Danışanlar', icon: '◐', show: () => true },
-  { key: 'appointments', label: 'Randevular', icon: '◷', show: perms => perms.can_see_calendar },
-  { key: 'reports', label: 'Raporlar', icon: '◫', show: perms => perms.can_see_revenue },
-  { key: 'ads', label: 'Reklam Kaynakları', icon: '◔', show: perms => perms.can_enter_ads_data },
-  { key: 'settings', label: 'Ayarlar', icon: '◍', show: (perms, isSuperAdmin, canSeeOwnDataOnly) => perms.can_manage_users || perms.can_manage_branches || (!isSuperAdmin && !canSeeOwnDataOnly) },
-  { key: 'admin', label: 'Yönetim', icon: '◆', show: (perms, isSuperAdmin) => isSuperAdmin },
+  { key: 'overview', label: 'Genel Bakış', icon: <Home size={18} />, show: () => true },
+  { key: 'clients', label: 'Danışanlar', icon: <Users size={18} />, show: () => true },
+  { key: 'appointments', label: 'Randevular', icon: <CalendarDays size={18} />, show: perms => perms.can_see_calendar },
+  { key: 'reports', label: 'Raporlar', icon: <BarChart3 size={18} />, show: perms => perms.can_see_revenue },
+  { key: 'ads', label: 'Reklam Kaynakları', icon: <Megaphone size={18} />, show: perms => perms.can_enter_ads_data },
+  { key: 'settings', label: 'Ayarlar', icon: <Settings size={18} />, show: (perms, isSuperAdmin, canSeeOwnDataOnly) => perms.can_manage_users || perms.can_manage_branches || (!isSuperAdmin && !canSeeOwnDataOnly) },
+  { key: 'admin', label: 'Yönetim', icon: <ShieldCheck size={18} />, show: (perms, isSuperAdmin) => isSuperAdmin },
 ]
 
-function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout }) {
+function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout, onQuickAction }) {
   return (
     <div style={{
-      width: 232, flexShrink: 0, background: T.card, borderRight: `1px solid ${T.border}`,
+      width: 248, flexShrink: 0, background: T.card, borderRight: `1px solid ${T.border}`,
       minHeight: '100vh', padding: '22px 16px', display: 'flex', flexDirection: 'column'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 6px 18px', marginBottom: 14 }}>
         <span style={{
-          width: 34, height: 34, borderRadius: 10, background: `linear-gradient(135deg, ${T.primary}, #8C7BFF)`,
-          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16
+          width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${T.primary}, #A78BFA)`,
+          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 17
         }}>M</span>
         <div>
-          <p style={{ fontWeight: 700, fontSize: 15, margin: 0, color: T.text, lineHeight: 1.2 }}>Müşteri Takip</p>
-          <p style={{ fontSize: 11, color: T.textSoft, margin: 0 }}>{currentUser.username}</p>
+          <p style={{ fontWeight: 800, fontSize: 14.5, margin: 0, color: T.text, lineHeight: 1.25, letterSpacing: '0.01em' }}>MÜŞTERİ<br />TAKİP</p>
         </div>
       </div>
       <div style={{
-        background: T.primaryLight, borderRadius: 10, padding: '8px 10px', marginBottom: 18,
-        fontSize: 11.5, color: T.primaryDark, fontWeight: 600
-      }}>{branchLabel}</div>
+        background: T.primaryLight, borderRadius: 10, padding: '9px 11px', marginBottom: 16,
+        fontSize: 12, color: '#C7B9FF', fontWeight: 600
+      }}>{currentUser.username} · {branchLabel}</div>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {items.map(item => {
           const active = activeTab === item.key
           return (
@@ -1095,16 +1109,251 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
               fontWeight: active ? 600 : 500, fontSize: 14, cursor: 'pointer',
               textAlign: 'left', width: '100%', transition: 'background 0.15s ease'
             }}>
-              <span style={{ fontSize: 15, width: 18, textAlign: 'center', opacity: active ? 1 : 0.75 }}>{item.icon}</span>
+              <span style={{ display: 'flex', opacity: active ? 1 : 0.8 }}>{item.icon}</span>
               {item.label}
             </button>
           )
         })}
       </nav>
-      <button onClick={onLogout} style={{
-        marginTop: 16, padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`,
-        background: '#fff', color: T.textSoft, fontWeight: 500, fontSize: 13, cursor: 'pointer'
-      }}>Çıkış yap</button>
+
+      {onQuickAction && (
+        <div style={{ marginTop: 22 }}>
+          <p style={{ fontSize: 11, color: T.textFaint, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px', fontWeight: 700 }}>Hızlı İşlemler</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <button onClick={() => onQuickAction('clients')} style={quickBtnStyle}><Plus size={14} /> Yeni Görüşme</button>
+            <button onClick={() => onQuickAction('appointments')} style={quickBtnStyle}><Plus size={14} /> Randevu Oluştur</button>
+            <button onClick={() => onQuickAction('ads')} style={quickBtnStyle}><Plus size={14} /> Reklam Verisi Gir</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 'auto', paddingTop: 18 }}>
+        <button onClick={onLogout} style={{
+          width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`,
+          background: 'transparent', color: T.textSoft, fontWeight: 500, fontSize: 13, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+        }}><LogOut size={14} /> Çıkış yap</button>
+        <p style={{ fontSize: 11, color: T.textFaint, margin: '14px 0 0', textAlign: 'center' }}>Müşteri Takip v2.0.0</p>
+      </div>
+    </div>
+  )
+}
+
+function FunnelSection({ stats }) {
+  const stages = [
+    { label: '1. Mesaj Geldi', value: stats.total, icon: <MessageCircle size={18} />, color: T.primary },
+    { label: '2. Randevu Verildi', value: stats.appointed, icon: <CalendarDays size={18} />, color: T.blue },
+    { label: '3. Geldi', value: stats.arrived, icon: <UserRound size={18} />, color: T.green },
+    { label: '4. Satış Oldu', value: stats.customers, icon: <ShoppingCart size={18} />, color: T.orange },
+  ]
+  const rates = [stats.pctAppointed, stats.pctArrived, stats.pctSold]
+  return (
+    <div style={{ ...cardStyle, padding: '1.25rem' }}>
+      <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 20px', color: T.text }}>Satış Hunisi</h2>
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
+        {stages.map((s, i) => (
+          <div key={s.label} style={{ display: 'flex', alignItems: 'center', flex: i < stages.length ? 1 : 0, gap: 12 }}>
+            <div style={{
+              flex: 1, minHeight: 130, borderRadius: 14, padding: '16px 18px',
+              background: `linear-gradient(160deg, ${s.color}33, transparent)`, border: `1px solid ${T.border}`,
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
+            }}>
+              <p style={{ fontSize: 13, color: T.textSoft, margin: 0, fontWeight: 600 }}>{s.label}</p>
+              <p style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 0', color: T.text }}>{s.value}</p>
+              <span style={{ color: s.color, marginTop: 8 }}>{s.icon}</span>
+            </div>
+            {i < stages.length - 1 && (
+              <div style={{ textAlign: 'center', color: T.textSoft, fontSize: 13, flexShrink: 0, width: 46 }}>
+                %{rates[i]}<br />→
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <p style={{ textAlign: 'center', color: T.textSoft, margin: '18px 0 0', fontSize: 13 }}>
+        Toplam dönüşüm oranı: <span style={{ color: T.green, fontWeight: 700 }}>%{stats.rate}</span>
+      </p>
+    </div>
+  )
+}
+
+function LossAnalysis({ stats }) {
+  const items = [
+    { text: 'Randevu verildi, gelmedi', count: stats.noShowCount, rate: stats.pctNoShow },
+    { text: 'Geldi, satın almadı', count: stats.notBoughtCount, rate: stats.pctNotBought },
+    { text: 'Cevap alınamadı', count: stats.noResponseCount, rate: stats.pctNoResponse },
+  ]
+  return (
+    <div style={{ ...cardStyle, padding: '1.25rem' }}>
+      <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 16px', color: T.text }}>Kayıp Analizi</h2>
+      {items.map((it, i) => (
+        <div key={it.text} style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 0',
+          borderBottom: i < items.length - 1 ? `1px solid ${T.border}` : 'none', fontSize: 13.5
+        }}>
+          <span style={{ color: T.text }}>{it.text}</span>
+          <span style={{ color: T.textSoft }}>{it.count} kişi</span>
+          <span style={{ color: T.red, fontWeight: 700 }}>%{it.rate}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ChannelDonut({ leads }) {
+  const ref = useRef(null)
+  const chartRef = useRef(null)
+  const data = useMemo(() => {
+    const counts = {}
+    CHANNELS.forEach(c => counts[c] = 0)
+    leads.forEach(l => { if (counts[l.channel] !== undefined) counts[l.channel]++ })
+    const total = leads.length || 1
+    return CHANNELS.map(c => ({ label: c, count: counts[c], pct: Math.round((counts[c] / total) * 100) }))
+  }, [leads])
+  useEffect(() => {
+    if (chartRef.current) chartRef.current.destroy()
+    chartRef.current = new Chart(ref.current, {
+      type: 'doughnut',
+      data: { labels: data.map(d => d.label), datasets: [{ data: data.map(d => d.count), backgroundColor: data.map(d => CHANNEL_HEX[d.label]), borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '68%' }
+    })
+    return () => { if (chartRef.current) chartRef.current.destroy() }
+  }, [data])
+  return (
+    <div>
+      <div style={{ position: 'relative', width: 140, height: 140, margin: '0 auto' }}><canvas ref={ref} /></div>
+      <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {data.map(d => (
+          <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.textSoft }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: CHANNEL_HEX[d.label], flexShrink: 0 }} />
+            {d.label} <span style={{ color: T.text, fontWeight: 600 }}>%{d.pct} ({d.count})</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MonthlyTrendChart({ leads }) {
+  const ref = useRef(null)
+  const chartRef = useRef(null)
+  const data = useMemo(() => {
+    const byDay = {}
+    leads.forEach(l => {
+      const day = new Date(l.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })
+      byDay[day] = (byDay[day] || 0) + 1
+    })
+    const sortedDays = Object.keys(byDay).sort((a, b) => {
+      const [da, ma] = a.split('.'); const [db, mb] = b.split('.')
+      return new Date(2026, ma - 1, da) - new Date(2026, mb - 1, db)
+    })
+    return { labels: sortedDays, values: sortedDays.map(d => byDay[d]) }
+  }, [leads])
+  useEffect(() => {
+    if (chartRef.current) chartRef.current.destroy()
+    if (data.labels.length === 0) return
+    chartRef.current = new Chart(ref.current, {
+      type: 'line',
+      data: { labels: data.labels, datasets: [{ data: data.values, borderColor: T.primary, backgroundColor: 'rgba(124,92,252,0.15)', fill: true, tension: 0.35, pointRadius: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: T.textFaint, maxTicksLimit: 6 }, grid: { display: false } },
+          y: { ticks: { color: T.textFaint, precision: 0 }, grid: { color: T.border } }
+        }
+      }
+    })
+    return () => { if (chartRef.current) chartRef.current.destroy() }
+  }, [data])
+  if (data.labels.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Henüz veri yok.</p>
+  return <div style={{ position: 'relative', width: '100%', height: 176 }}><canvas ref={ref} /></div>
+}
+
+function AdsPerformanceTable({ adsData, leads }) {
+  const rows = useMemo(() => {
+    const byChannel = {}
+    adsData.forEach(w => {
+      const ch = w.channel || 'Instagram'
+      if (!byChannel[ch]) byChannel[ch] = { spend: 0, messages: 0 }
+      byChannel[ch].spend += Number(w.spend) || 0
+      byChannel[ch].messages += Number(w.messages) || 0
+    })
+    return Object.keys(byChannel).map(ch => {
+      const sales = leads.filter(l => l.channel === ch && l.result === 'Müşteri oldu').length
+      const spend = byChannel[ch].spend
+      const revenue = leads.filter(l => l.channel === ch && l.result === 'Müşteri oldu').reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
+      const roas = spend > 0 ? (revenue / spend).toFixed(1) : '—'
+      return { channel: ch, spend, messages: byChannel[ch].messages, sales, roas }
+    }).sort((a, b) => b.spend - a.spend)
+  }, [adsData, leads])
+
+  if (rows.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Henüz reklam verisi girilmemiş.</p>
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 0.7fr 0.7fr 0.7fr', gap: 6, fontSize: 11.5, color: T.textFaint, paddingBottom: 8, borderBottom: `1px solid ${T.border}` }}>
+        <span>KANAL</span><span>HARCANAN</span><span>MESAJ</span><span>SATIŞ</span><span>ROAS</span>
+      </div>
+      {rows.map(r => (
+        <div key={r.channel} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 0.7fr 0.7fr 0.7fr', gap: 6, padding: '11px 0', borderBottom: `1px solid ${T.border}`, fontSize: 13, alignItems: 'center' }}>
+          <span style={{ color: T.text, fontWeight: 600 }}>{r.channel}</span>
+          <span style={{ color: T.textSoft }}>{fmtTL(r.spend)}</span>
+          <span style={{ color: T.textSoft }}>{r.messages}</span>
+          <span style={{ color: T.textSoft }}>{r.sales}</span>
+          <span style={{ color: r.roas !== '—' && Number(r.roas) >= 2 ? T.green : T.orange, fontWeight: 700 }}>{r.roas}{r.roas !== '—' ? 'x' : ''}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function BranchesOverview({ branches, leads }) {
+  const rows = useMemo(() => branches.filter(b => b.active !== false).map(b => {
+    const branchLeads = leads.filter(l => l.branch_id === b.id)
+    const arrived = branchLeads.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result)).length
+    const revenue = branchLeads.filter(l => l.result === 'Müşteri oldu').reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
+    return { name: b.name, arrived, revenue }
+  }).sort((a, b) => b.revenue - a.revenue), [branches, leads])
+
+  if (rows.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Henüz şube yok.</p>
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 11.5, color: T.textFaint, paddingBottom: 8, borderBottom: `1px solid ${T.border}`, gap: 24 }}>
+        <span style={{ width: 70, textAlign: 'right' }}>GELEN</span>
+        <span style={{ width: 80, textAlign: 'right' }}>CİRO</span>
+      </div>
+      {rows.map(r => (
+        <div key={r.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${T.border}`, fontSize: 13.5 }}>
+          <span style={{ color: T.text }}>{r.name}</span>
+          <div style={{ display: 'flex', gap: 24 }}>
+            <span style={{ color: T.textSoft, width: 70, textAlign: 'right' }}>{r.arrived}</span>
+            <span style={{ color: T.textSoft, width: 80, textAlign: 'right' }}>{fmtTL(r.revenue)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RecentLeadsTable({ leads, canSeePhone, showBranch, branchNameFn }) {
+  const recent = useMemo(() => [...leads].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [leads])
+  if (recent.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Henüz kayıt yok.</p>
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: showBranch ? '1.1fr 0.8fr 1fr 1.4fr 0.8fr 0.9fr' : '1.1fr 0.8fr 1fr 1.6fr 0.8fr', gap: 8, fontSize: 11.5, color: T.textFaint, paddingBottom: 8, borderBottom: `1px solid ${T.border}`, minWidth: 600 }}>
+        <span>AD SOYAD</span><span>KAYNAK</span><span>DURUM</span><span>SON NOT</span><span>TARİH</span>{showBranch && <span>ŞUBE</span>}
+      </div>
+      {recent.map(l => (
+        <div key={l.id} style={{ display: 'grid', gridTemplateColumns: showBranch ? '1.1fr 0.8fr 1fr 1.4fr 0.8fr 0.9fr' : '1.1fr 0.8fr 1fr 1.6fr 0.8fr', gap: 8, padding: '12px 0', borderBottom: `1px solid ${T.border}`, fontSize: 13, alignItems: 'center', minWidth: 600 }}>
+          <span style={{ color: T.text, fontWeight: 600 }}>{l.name}</span>
+          <span style={{ color: T.textSoft }}>{l.channel}</span>
+          <span><span style={{ background: T.primaryLight, color: T.primary, padding: '3px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{l.result}</span></span>
+          <span style={{ color: T.textSoft, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.note}</span>
+          <span style={{ color: T.textFaint, fontSize: 12 }}>{new Date(l.date).toLocaleDateString('tr-TR')}</span>
+          {showBranch && <span style={{ color: T.textFaint, fontSize: 12 }}>{branchNameFn(l.branch_id)}</span>}
+        </div>
+      ))}
     </div>
   )
 }
@@ -1281,6 +1530,11 @@ export function PanelApp() {
   const withAmount = customers.filter(l => l.sale_amount != null)
   const revenue = customers.reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
   const avgTicket = withAmount.length ? Math.round(revenue / withAmount.length) : 0
+  const noShow = scopedLeads.filter(l => l.result === 'Randevuya gelmedi')
+  const notBought = scopedLeads.filter(l => l.result === 'Satın almadı')
+  const noResponse = scopedLeads.filter(l => l.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
+  const appointed = scopedLeads.filter(l => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(l.result))
+  const arrived = scopedLeads.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
   const stats = {
     total: scopedLeads.length,
     customers: customers.length,
@@ -1288,7 +1542,15 @@ export function PanelApp() {
     wa: scopedLeads.filter(l => l.channel === 'WhatsApp').length,
     organik: scopedLeads.filter(l => l.channel === 'Organik').length,
     rate: scopedLeads.length ? Math.round((customers.length / scopedLeads.length) * 100) : 0,
-    revenue, avgTicket, withAmountCount: withAmount.length
+    revenue, avgTicket, withAmountCount: withAmount.length,
+    appointed: appointed.length, arrived: arrived.length,
+    noShowCount: noShow.length, notBoughtCount: notBought.length, noResponseCount: noResponse.length,
+    pctAppointed: scopedLeads.length ? Math.round((appointed.length / scopedLeads.length) * 100) : 0,
+    pctArrived: appointed.length ? Math.round((arrived.length / appointed.length) * 100) : 0,
+    pctSold: arrived.length ? Math.round((customers.length / arrived.length) * 100) : 0,
+    pctNoShow: appointed.length ? Math.round((noShow.length / appointed.length) * 100) : 0,
+    pctNotBought: arrived.length ? Math.round((notBought.length / arrived.length) * 100) : 0,
+    pctNoResponse: scopedLeads.length ? Math.round((noResponse.length / scopedLeads.length) * 100) : 0,
   }
   const totalSpend = scopedAds.reduce((s, w) => s + Number(w.spend), 0)
 
@@ -1300,11 +1562,13 @@ export function PanelApp() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         select, input, textarea { font-family: 'Inter', system-ui, sans-serif; }
+        select option { background: #0C1626; color: #fff; }
         button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid ${T.primary}; outline-offset: 1px; }
+        ::placeholder { color: ${T.textFaint}; }
       `}</style>
 
       <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
-        isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} />
+        isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={setActiveTab} />
 
       <div style={{ flex: 1, padding: '28px 36px', maxWidth: 1140 }}>
         {isSuperAdmin && (
@@ -1318,41 +1582,73 @@ export function PanelApp() {
 
         {activeTab === 'overview' && (
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, margin: '0 0 20px', letterSpacing: '-0.01em' }}>Genel Bakış</h1>
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Genel Bakış</h1>
+            <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>
+              {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
+            </p>
             <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 14 }}>
-              <StatCard label="Toplam lead" value={stats.total} colorIndex={0} />
-              <StatCard label="Müşteriye dönüşen" value={stats.customers} colorIndex={1} />
-              <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} colorIndex={2} />
-              <StatCard label="IG / WA" value={stats.ig + ' / ' + stats.wa} colorIndex={3} />
-              <StatCard label="Organik" value={stats.organik} colorIndex={4} />
+            <div style={{ display: 'grid', gridTemplateColumns: perms.can_see_revenue ? 'repeat(6, 1fr)' : 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
+              <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet" />
+              <StatCard icon={<CalendarDays size={20} />} label="Randevu Verilen" value={stats.appointed} color="blue" />
+              <StatCard icon={<UserRound size={20} />} label="Gelen Müşteri" value={stats.arrived} color="green" />
+              <StatCard icon={<ShoppingCart size={20} />} label="Satış Olan" value={stats.customers} color="amber" />
+              {perms.can_see_revenue && (
+                <>
+                  <StatCard icon={<TrendingUp size={20} />} label="Dönüşüm Oranı" value={`%${stats.rate}`} color="violet" />
+                  <StatCard icon={<Wallet size={20} />} label="Toplam Ciro" value={fmtTL(stats.revenue)} color="blue" />
+                </>
+              )}
             </div>
 
-            {perms.can_see_revenue && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: '1.5rem' }}>
-                <StatCard label="Toplam ciro (girilen)" value={fmtTL(stats.revenue)} colorIndex={1} />
-                <StatCard label="Ortalama satış tutarı" value={stats.withAmountCount ? fmtTL(stats.avgTicket) : '—'} colorIndex={2} />
-                <StatCard label="Tutar girilen satış" value={`${stats.withAmountCount} / ${stats.customers}`} colorIndex={0} />
-              </div>
-            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
+              <FunnelSection stats={stats} />
+              <LossAnalysis stats={stats} />
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: perms.can_see_revenue ? '1fr 1fr 1fr 1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 10px', fontWeight: 600 }}>Görüşme sonuçları</p>
-                <ResultBarChart leads={scopedLeads} />
+                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Lead Kaynak Dağılımı</p>
+                <ChannelDonut leads={scopedLeads} />
               </div>
-              <div style={{ background: '#fff', border: '1px solid #ECEAF5', borderRadius: 14, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 8px', fontWeight: 600 }}>Lead kanalı dağılımı</p>
-                <ChannelPieChart leads={scopedLeads} />
+              <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Aylık Trend</p>
+                <MonthlyTrendChart leads={scopedLeads} />
               </div>
+              {perms.can_see_revenue && (
+                <>
+                  <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                    <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Hizmete Göre Ciro</p>
+                    <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
+                  </div>
+                  {perms.can_enter_ads_data && (
+                    <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                      <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Reklam Performansı (Bu Ay)</p>
+                      <AdsPerformanceTable adsData={scopedAds} leads={scopedLeads} />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isSuperAdmin && filterBranch === 'all' ? '2fr 1fr' : '1fr', gap: 16 }}>
+              <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Son Görüşmeler</p>
+                <RecentLeadsTable leads={visibleLeads} canSeePhone={perms.can_see_phone} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
+              </div>
+              {isSuperAdmin && filterBranch === 'all' && (
+                <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                  <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Şubeler</p>
+                  <BranchesOverview branches={branches} leads={leads} />
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'clients' && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Danışanlar</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Danışanlar</h1>
             {perms.can_add_lead && (
               <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices}
                 targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
@@ -1365,13 +1661,13 @@ export function PanelApp() {
                 {canSeeOwnDataOnly ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
               </p>
               {visibleLeads.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#8B8D98' }}>Henüz kayıt yok.</p>
+                <p style={{ fontSize: 13, color: T.textSoft }}>Henüz kayıt yok.</p>
               ) : (
-                <div style={{ background: '#fff', border: '1px solid #ECEAF5', borderRadius: 14, padding: '0 1.25rem', overflowX: 'auto' }}>
+                <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '0 1.25rem', overflowX: 'auto' }}>
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
-                    gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: '#8B8D98', minWidth: 760
+                    gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: T.textSoft, minWidth: 760
                   }}>
                     {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
                     <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
@@ -1388,22 +1684,22 @@ export function PanelApp() {
 
         {activeTab === 'appointments' && perms.can_see_calendar && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Randevular</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Randevular</h1>
             <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
           </div>
         )}
 
         {activeTab === 'reports' && perms.can_see_revenue && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Raporlar</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Raporlar</h1>
             <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16 }}>
-              <div style={{ background: '#fff', border: '1px solid #ECEAF5', borderRadius: 14, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 8px', fontWeight: 600 }}>Hizmete göre ciro</p>
+              <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '1rem' }}>
+                <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 8px', fontWeight: 600 }}>Hizmete göre ciro</p>
                 <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
               </div>
               {scopedAds.length > 0 && (
-                <div style={{ background: '#fff', border: '1px solid #ECEAF5', borderRadius: 14, padding: '1rem' }}>
-                  <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 8px', fontWeight: 600 }}>Haftalık reklam harcaması</p>
+                <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '1rem' }}>
+                  <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 8px', fontWeight: 600 }}>Haftalık reklam harcaması</p>
                   <MonthlySpendChart adsData={scopedAds} />
                 </div>
               )}
@@ -1414,14 +1710,14 @@ export function PanelApp() {
 
         {activeTab === 'ads' && perms.can_enter_ads_data && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Reklam Kaynakları</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Reklam Kaynakları</h1>
             <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />
           </div>
         )}
 
         {activeTab === 'settings' && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Ayarlar</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Ayarlar</h1>
             {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} />}
             {!isSuperAdmin && !canSeeOwnDataOnly && (
               <BranchServiceManager
@@ -1438,7 +1734,7 @@ export function PanelApp() {
 
         {activeTab === 'admin' && isSuperAdmin && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Yönetim</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Yönetim</h1>
             <PermissionTemplateManager />
             <SecurityNotice isAdmin={isSuperAdmin} />
           </div>
