@@ -63,7 +63,19 @@ const quickBtnStyle = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9,
   border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, fontSize: 12.5, cursor: 'pointer', textAlign: 'left'
 }
+const pageWrapStyle = {
+  flex: 1,
+  padding: '28px 32px',
+  width: '100%',
+  maxWidth: 'none',
+  overflowX: 'hidden'
+}
 
+const sectionGridStyle = {
+  display: 'grid',
+  gap: 16,
+  marginBottom: 16
+}
 const SUSPICIOUS_IP_THRESHOLD = 3
 const SUSPICIOUS_WINDOW_MS = 60 * 60 * 1000 // 1 saat
 
@@ -1141,38 +1153,144 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
 
 function FunnelSection({ stats }) {
   const stages = [
-    { label: '1. Mesaj Geldi', value: stats.total, icon: <MessageCircle size={18} />, color: T.primary },
-    { label: '2. Randevu Verildi', value: stats.appointed, icon: <CalendarDays size={18} />, color: T.blue },
-    { label: '3. Geldi', value: stats.arrived, icon: <UserRound size={18} />, color: T.green },
-    { label: '4. Satış Oldu', value: stats.customers, icon: <ShoppingCart size={18} />, color: T.orange },
+    {
+      label: '1. Mesaj Geldi',
+      value: stats.total,
+      icon: <MessageCircle size={20} />,
+      color: T.primary,
+      bg: 'linear-gradient(135deg, rgba(124,92,252,0.38), rgba(124,92,252,0.08))'
+    },
+    {
+      label: '2. Randevu Verildi',
+      value: stats.appointed,
+      icon: <CalendarDays size={20} />,
+      color: T.blue,
+      bg: 'linear-gradient(135deg, rgba(59,130,246,0.36), rgba(59,130,246,0.08))'
+    },
+    {
+      label: '3. Geldi',
+      value: stats.arrived,
+      icon: <UserRound size={20} />,
+      color: T.green,
+      bg: 'linear-gradient(135deg, rgba(34,197,94,0.32), rgba(34,197,94,0.08))'
+    },
+    {
+      label: '4. Satış Oldu',
+      value: stats.customers,
+      icon: <ShoppingCart size={20} />,
+      color: T.orange,
+      bg: 'linear-gradient(135deg, rgba(245,158,11,0.35), rgba(245,158,11,0.08))'
+    },
   ]
+
   const rates = [stats.pctAppointed, stats.pctArrived, stats.pctSold]
+
   return (
-    <div style={{ ...cardStyle, padding: '1.25rem' }}>
-      <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 20px', color: T.text }}>Satış Hunisi</h2>
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
+    <div style={{ ...cardStyle, padding: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: T.text }}>
+            Satış Hunisi
+          </h2>
+          <p style={{ fontSize: 12.5, color: T.textSoft, margin: '4px 0 0' }}>
+            Mesajdan satışa kadar müşteri kaybını takip edin.
+          </p>
+        </div>
+
+        <span style={{
+          background: T.greenBg,
+          color: T.green,
+          border: '1px solid rgba(34,197,94,0.25)',
+          padding: '7px 10px',
+          borderRadius: 999,
+          fontSize: 12,
+          fontWeight: 700
+        }}>
+          Toplam dönüşüm %{stats.rate}
+        </span>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        gap: 12,
+        alignItems: 'stretch'
+      }}>
         {stages.map((s, i) => (
-          <div key={s.label} style={{ display: 'flex', alignItems: 'center', flex: i < stages.length ? 1 : 0, gap: 12 }}>
+          <div key={s.label} style={{ position: 'relative' }}>
             <div style={{
-              flex: 1, minHeight: 130, borderRadius: 14, padding: '16px 18px',
-              background: `linear-gradient(160deg, ${s.color}33, transparent)`, border: `1px solid ${T.border}`,
-              display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
+              minHeight: 150,
+              borderRadius: 18,
+              padding: 18,
+              background: s.bg,
+              border: `1px solid ${T.border}`,
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              overflow: 'hidden'
             }}>
-              <p style={{ fontSize: 13, color: T.textSoft, margin: 0, fontWeight: 600 }}>{s.label}</p>
-              <p style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 0', color: T.text }}>{s.value}</p>
-              <span style={{ color: s.color, marginTop: 8 }}>{s.icon}</span>
+              <div>
+                <p style={{
+                  fontSize: 13,
+                  color: T.textSoft,
+                  margin: 0,
+                  fontWeight: 700,
+                  lineHeight: 1.35
+                }}>
+                  {s.label}
+                </p>
+
+                <p style={{
+                  fontSize: 34,
+                  fontWeight: 900,
+                  margin: '12px 0 0',
+                  color: T.text,
+                  letterSpacing: '-0.03em'
+                }}>
+                  {s.value}
+                </p>
+              </div>
+
+              <div style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.06)',
+                color: s.color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {s.icon}
+              </div>
             </div>
+
             {i < stages.length - 1 && (
-              <div style={{ textAlign: 'center', color: T.textSoft, fontSize: 13, flexShrink: 0, width: 46 }}>
-                %{rates[i]}<br />→
+              <div style={{
+                position: 'absolute',
+                right: -22,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 5,
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                background: '#08111F',
+                border: `1px solid ${T.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: T.textSoft,
+                fontSize: 12,
+                fontWeight: 800
+              }}>
+                %{rates[i]}
               </div>
             )}
           </div>
         ))}
       </div>
-      <p style={{ textAlign: 'center', color: T.textSoft, margin: '18px 0 0', fontSize: 13 }}>
-        Toplam dönüşüm oranı: <span style={{ color: T.green, fontWeight: 700 }}>%{stats.rate}</span>
-      </p>
     </div>
   )
 }
@@ -1570,7 +1688,7 @@ export function PanelApp() {
       <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
         isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={setActiveTab} />
 
-      <div style={{ flex: 1, padding: '28px 36px', maxWidth: 1140 }}>
+<div style={pageWrapStyle} className="page-wrap">
         {isSuperAdmin && (
           <div style={{ marginBottom: '1.5rem' }}>
             <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: 240, fontWeight: 600 }}>
@@ -1588,8 +1706,15 @@ export function PanelApp() {
             </p>
             <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: perms.can_see_revenue ? 'repeat(6, 1fr)' : 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
-              <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet" />
+<div style={{
+  display: 'grid',
+  gridTemplateColumns: perms.can_see_revenue
+    ? 'repeat(auto-fit, minmax(180px, 1fr))'
+    : 'repeat(auto-fit, minmax(190px, 1fr))',
+  gap: 14,
+  marginBottom: 18
+}}>
+  <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet" />
               <StatCard icon={<CalendarDays size={20} />} label="Randevu Verilen" value={stats.appointed} color="blue" />
               <StatCard icon={<UserRound size={20} />} label="Gelen Müşteri" value={stats.arrived} color="green" />
               <StatCard icon={<ShoppingCart size={20} />} label="Satış Olan" value={stats.customers} color="amber" />
@@ -1601,13 +1726,28 @@ export function PanelApp() {
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
-              <FunnelSection stats={stats} />
-              <LossAnalysis stats={stats} />
-            </div>
+<div style={{
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: 16,
+  marginBottom: 16
+}}>
+<div style={{ ...sectionGridStyle, gridTemplateColumns: 'minmax(0, 1fr)' }}>
+  <FunnelSection stats={stats} />
+</div> 
 
-            <div style={{ display: 'grid', gridTemplateColumns: perms.can_see_revenue ? '1fr 1fr 1fr 1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
-              <div style={{ ...cardStyle, padding: '1.1rem' }}>
+<div style={{ ...sectionGridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+  <LossAnalysis stats={stats} />
+</div>
+
+<div style={{
+  display: 'grid',
+  gridTemplateColumns: perms.can_see_revenue
+    ? 'repeat(auto-fit, minmax(260px, 1fr))'
+    : 'repeat(auto-fit, minmax(320px, 1fr))',
+  gap: 16,
+  marginBottom: 16
+}}>              <div style={{ ...cardStyle, padding: '1.1rem' }}>
                 <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Lead Kaynak Dağılımı</p>
                 <ChannelDonut leads={scopedLeads} />
               </div>
