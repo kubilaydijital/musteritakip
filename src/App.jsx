@@ -31,7 +31,27 @@ function staleness(lead) {
 }
 function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
-const inputStyle = { padding: 10, borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit' }
+// Tasarım sistemi token'ları
+const T = {
+  primary: '#6C5CE7',
+  primaryDark: '#5B3DE0',
+  primaryLight: '#F4F2FF',
+  bg: '#FAFAFC',
+  card: '#FFFFFF',
+  border: '#ECEAF5',
+  text: '#1A1D29',
+  textSoft: '#8B8D98',
+  green: '#00B894',
+  greenBg: '#E6FAF5',
+  orange: '#FDA428',
+  orangeBg: '#FFF3DF',
+  red: '#FF6B6B',
+  redBg: '#FFEDED',
+  blue: '#4A90E2',
+  blueBg: '#EAF2FD',
+}
+const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: '#fff', color: T.text }
+const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(26,29,41,0.04)' }
 
 const SUSPICIOUS_IP_THRESHOLD = 3
 const SUSPICIOUS_WINDOW_MS = 60 * 60 * 1000 // 1 saat
@@ -105,7 +125,7 @@ function Login({ onLogin }) {
   return (
     <div style={{ maxWidth: 360, margin: '4rem auto', padding: '1.5rem', fontFamily: 'system-ui, sans-serif' }}>
       <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Müşteri takip sistemi</p>
-      <p style={{ fontSize: 13, color: '#666', marginBottom: 20 }}>Giriş yapın</p>
+      <p style={{ fontSize: 13, color: '#8B8D98', marginBottom: 20 }}>Giriş yapın</p>
       <form onSubmit={submit}>
         <input placeholder="Kullanıcı adı" value={name} onChange={e => setName(e.target.value)}
           style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box' }} />
@@ -113,7 +133,7 @@ function Login({ onLogin }) {
           style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box' }} />
         {err && <p style={{ fontSize: 13, color: '#c0392b', marginBottom: 10 }}>{err}</p>}
         <button type="submit" disabled={loading}
-          style={{ width: '100%', padding: 10, borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+          style={{ width: '100%', padding: 10, borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
           {loading ? 'Giriş yapılıyor...' : 'Giriş yap'}
         </button>
       </form>
@@ -257,7 +277,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: '1px solid #ccc', borderRadius: 8, boxSizing: 'border-box' }} />
       {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-        <button type="submit" disabled={submitting} style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+        <button type="submit" disabled={submitting} style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
           {submitting ? 'Kaydediliyor...' : (editing ? 'Güncelle' : 'Kaydet')}
         </button>
         {editing && canDelete && (
@@ -275,11 +295,28 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   )
 }
 
-function StatCard({ label, value }) {
+const STAT_ICON_COLORS = [
+  { bg: T.primaryLight, fg: T.primary },
+  { bg: T.greenBg, fg: T.green },
+  { bg: T.orangeBg, fg: T.orange },
+  { bg: T.blueBg, fg: T.blue },
+  { bg: T.redBg, fg: T.red },
+]
+const STAT_ICONS = ['◐', '◆', '◑', '◧', '◔']
+
+function StatCard({ label, value, colorIndex = 0 }) {
+  const c = STAT_ICON_COLORS[colorIndex % STAT_ICON_COLORS.length]
+  const icon = STAT_ICONS[colorIndex % STAT_ICONS.length]
   return (
-    <div style={{ background: '#f4f5f7', borderRadius: 10, padding: '1rem' }}>
-      <p style={{ fontSize: 13, color: '#666', margin: '0 0 4px' }}>{label}</p>
-      <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{value}</p>
+    <div style={{ ...cardStyle, padding: '18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <span style={{
+          width: 34, height: 34, borderRadius: 10, background: c.bg, color: c.fg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16
+        }}>{icon}</span>
+        <p style={{ fontSize: 13, color: T.textSoft, margin: 0, fontWeight: 500 }}>{label}</p>
+      </div>
+      <p style={{ fontSize: 24, fontWeight: 700, margin: 0, color: T.text }}>{value}</p>
     </div>
   )
 }
@@ -369,16 +406,16 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
             <button key={d} type="button" onClick={() => setSelectedDay(d)}
               style={{
                 position: 'relative', padding: '8px 4px', minHeight: 44, borderRadius: 8, textAlign: 'left',
-                background: isSelected ? '#1a2744' : (isToday ? '#eef2f8' : '#fafafa'),
+                background: isSelected ? '#6C5CE7' : (isToday ? '#eef2f8' : '#fafafa'),
                 color: isSelected ? '#fff' : '#222',
-                border: isToday && !isSelected ? '1px solid #1a2744' : '1px solid #eee',
+                border: isToday && !isSelected ? '1px solid #6C5CE7' : '1px solid #eee',
                 cursor: 'pointer', fontSize: 13
               }}>
               <span>{d}</span>
               {dayLeads.length > 0 && (
                 <span style={{
                   display: 'block', marginTop: 4, fontSize: 10, fontWeight: 700,
-                  color: isSelected ? '#fff' : '#1a2744'
+                  color: isSelected ? '#fff' : '#6C5CE7'
                 }}>
                   {dayLeads.length} randevu
                 </span>
@@ -404,7 +441,7 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
                 <span style={{ color: '#777', marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
                 {lead.note && <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>· {lead.note.slice(0, 40)}</span>}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a2744' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#6C5CE7' }}>
                 {new Date(lead.appointment_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
@@ -493,7 +530,7 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
       </div>
       <input placeholder="Manuel düzeltme (kayıt eksikliği — örn. 5)" value={form.manualAdjustment} onChange={e => set('manualAdjustment', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 6 }} />
       <p style={{ fontSize: 11, color: '#888', margin: '0 0 12px' }}>Sosyal medya personeli kaçırdığı mesajlar varsa, eksik kalan sayıyı buraya yaz — rapor bu sayıyı da hesaba katar.</p>
-      <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Haftalık veriyi kaydet</button>
+      <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>Haftalık veriyi kaydet</button>
     </form>
   )
 }
@@ -511,10 +548,10 @@ function BranchManagement({ branches, onAdd, onToggleActive }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Şube ekle</p>
-      <p style={{ fontSize: 13, color: '#666', margin: '0 0 12px' }}>Bir şubeyi pasif yaparsan panelde görünmez ama tüm verisi (kayıtlar, kullanıcılar) korunur, istediğin zaman tekrar aktif edebilirsin.</p>
+      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 12px' }}>Bir şubeyi pasif yaparsan panelde görünmez ama tüm verisi (kayıtlar, kullanıcılar) korunur, istediğin zaman tekrar aktif edebilirsin.</p>
       <form onSubmit={submit} style={{ display: 'flex', gap: 10 }}>
         <input placeholder="Şube adı (örn. Aris Kadıköy)" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
+        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
       </form>
       <div style={{ marginTop: 12 }}>
         {branches.map(b => (
@@ -555,10 +592,10 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Hizmet listesi {branchName ? `· ${branchName}` : ''}</p>
-      <p style={{ fontSize: 13, color: '#666', margin: '0 0 12px' }}>Bu şubenin görüşme formunda görünecek hizmetleri buradan yönetebilirsin.</p>
+      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 12px' }}>Bu şubenin görüşme formunda görünecek hizmetleri buradan yönetebilirsin.</p>
       <form onSubmit={submit} style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
         <input placeholder="Hizmet adı (örn. Saç boyama)" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
+        <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
       </form>
       {services.length === 0 ? (
         <p style={{ fontSize: 13, color: '#888' }}>Henüz hizmet eklenmedi.</p>
@@ -636,7 +673,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Erişim yönetimi</p>
-      <p style={{ fontSize: 13, color: '#666', margin: '0 0 12px' }}>Ödeme alınmazsa ilgili şubenin erişimini buradan askıya alabilirsin.</p>
+      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 12px' }}>Ödeme alınmazsa ilgili şubenin erişimini buradan askıya alabilirsin.</p>
 
       {users.filter(u => u.role !== 'admin' || u.permission_template_id !== 'tpl_super_admin').map(u => {
         const branch = branches.find(b => b.id === u.branch_id)
@@ -650,11 +687,11 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue(''); setEditingUsernameFor(null) }}
-                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500 }}>
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   Şifre değiştir
                 </button>
                 <button onClick={() => { setEditingUsernameFor(editingUsernameFor === u.username ? null : u.username); setUsernameValue(u.username); setEditingPwFor(null) }}
-                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500 }}>
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   Kullanıcı adı değiştir
                 </button>
                 <button onClick={() => onToggle(u.username, u.active)} style={{
@@ -678,14 +715,14 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
             {editingPwFor === u.username && (
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <input type="text" placeholder="Yeni şifre" value={pwValue} onChange={e => setPwValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={() => submitPasswordChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+                <button onClick={() => submitPasswordChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
               </div>
             )}
             {editingUsernameFor === u.username && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input type="text" placeholder="Yeni kullanıcı adı" value={usernameValue} onChange={e => setUsernameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                  <button onClick={() => submitUsernameChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+                  <button onClick={() => submitUsernameChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
                 </div>
                 {usernameErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '6px 0 0' }}>{usernameErr}</p>}
               </div>
@@ -711,7 +748,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
             </select>
           </div>
           {addErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{addErr}</p>}
-          <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Kullanıcı ekle</button>
+          <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>Kullanıcı ekle</button>
         </form>
       </div>
     </div>
@@ -720,7 +757,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
 
 function ChartLegend({ items }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8, fontSize: 12, color: '#666' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8, fontSize: 12, color: '#8B8D98' }}>
       {items.map(it => (
         <span key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 10, height: 10, borderRadius: 2, background: it.color }} />{it.label}
@@ -813,7 +850,7 @@ function MessageMatchReport({ adsData, leads }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Mesaj / kayıt eşleşme raporu</p>
-      <p style={{ fontSize: 13, color: '#666', margin: '0 0 12px' }}>Meta'nın gösterdiği mesaj sayısı ile sisteme girilen kayıt sayısını karşılaştırır. Manuel düzeltme, kaçırılan mesajları telafi eder.</p>
+      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 12px' }}>Meta'nın gösterdiği mesaj sayısı ile sisteme girilen kayıt sayısını karşılaştırır. Manuel düzeltme, kaçırılan mesajları telafi eder.</p>
       {sorted.slice(0, 8).map(week => {
         const recordCount = recordCountForWeek(week.date)
         const adjusted = recordCount + (week.manual_adjustment || 0)
@@ -858,7 +895,7 @@ function MonthlySpendChart({ adsData }) {
 function SecurityNotice({ isAdmin }) {
   if (!isAdmin) return null
   return (
-    <div style={{ background: '#f4f5f7', borderRadius: 12, padding: '1rem 1.25rem', marginTop: '1.5rem', fontSize: 12, color: '#666' }}>
+    <div style={{ background: '#FAFAFC', borderRadius: 12, padding: '1rem 1.25rem', marginTop: '1.5rem', fontSize: 12, color: '#8B8D98' }}>
       <p style={{ margin: '0 0 8px', fontWeight: 600, color: '#222' }}>🔒 Veri koruma durumu</p>
       <p style={{ margin: '2px 0' }}>✓ Toplu dışa aktarma (CSV/Excel indirme) kapalı — sadece görüntüleme</p>
       <p style={{ margin: '2px 0' }}>✓ Telefon numaraları personelden gizli, sadece admin/yönetici görür</p>
@@ -964,14 +1001,14 @@ function PermissionTemplateManager() {
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>İzin şablonları (Süper Admin)</p>
-      <p style={{ fontSize: 13, color: '#666', margin: '0 0 14px' }}>Her şablonun hangi yetkilere sahip olduğunu buradan açıp kapatabilirsin. Değişiklik anında tüm o şablona bağlı kullanıcılara uygulanır.</p>
+      <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 14px' }}>Her şablonun hangi yetkilere sahip olduğunu buradan açıp kapatabilirsin. Değişiklik anında tüm o şablona bağlı kullanıcılara uygulanır.</p>
       {err && <p style={{ fontSize: 13, color: '#c0392b', margin: '0 0 14px', fontWeight: 600 }}>{err}</p>}
       {templates.map(tpl => (
         <div key={tpl.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{tpl.name}{savingId === tpl.id ? ' · kaydediliyor...' : ''}</p>
             <button onClick={() => { setEditingNameFor(editingNameFor === tpl.id ? null : tpl.id); setNameValue(tpl.name) }}
-              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer' }}>
+              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', color: '#6C5CE7', cursor: 'pointer' }}>
               Adı değiştir
             </button>
             {tpl.id !== 'tpl_super_admin' && (
@@ -988,7 +1025,7 @@ function PermissionTemplateManager() {
           {editingNameFor === tpl.id && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <input type="text" placeholder="Şablon adı" value={nameValue} onChange={e => setNameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-              <button onClick={() => submitNameChange(tpl)} style={{ padding: '8px 14px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+              <button onClick={() => submitNameChange(tpl)} style={{ padding: '8px 14px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -1006,7 +1043,7 @@ function PermissionTemplateManager() {
         <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>Yeni izin şablonu oluştur</p>
         <form onSubmit={createTemplate} style={{ display: 'flex', gap: 10 }}>
           <input type="text" placeholder="Şablon adı (örn. Muhasebe, Şube Yöneticisi)" value={newTplName} onChange={e => setNewTplName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-          <button type="submit" disabled={creating} style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>
+          <button type="submit" disabled={creating} style={{ padding: '8px 16px', borderRadius: 8, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer' }}>
             {creating ? 'Oluşturuluyor...' : 'Oluştur'}
           </button>
         </form>
@@ -1029,31 +1066,44 @@ const NAV_ITEMS = [
 function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout }) {
   return (
     <div style={{
-      width: 220, flexShrink: 0, background: '#fff', borderRight: '1px solid #ECE8DC',
-      minHeight: '100vh', padding: '24px 14px', display: 'flex', flexDirection: 'column'
+      width: 232, flexShrink: 0, background: T.card, borderRight: `1px solid ${T.border}`,
+      minHeight: '100vh', padding: '22px 16px', display: 'flex', flexDirection: 'column'
     }}>
-      <div style={{ padding: '0 10px 20px', borderBottom: '1px solid #F0EEE6', marginBottom: 16 }}>
-        <p style={{ fontWeight: 700, fontSize: 16, margin: 0, color: '#1a2744' }}>Müşteri Takip</p>
-        <p style={{ fontSize: 12, color: '#9aa0ad', margin: '4px 0 0' }}>{currentUser.username}</p>
-        <p style={{ fontSize: 11, color: '#9aa0ad', margin: '1px 0 0' }}>{branchLabel}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 6px 18px', marginBottom: 14 }}>
+        <span style={{
+          width: 34, height: 34, borderRadius: 10, background: `linear-gradient(135deg, ${T.primary}, #8C7BFF)`,
+          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16
+        }}>M</span>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: 15, margin: 0, color: T.text, lineHeight: 1.2 }}>Müşteri Takip</p>
+          <p style={{ fontSize: 11, color: T.textSoft, margin: 0 }}>{currentUser.username}</p>
+        </div>
       </div>
+      <div style={{
+        background: T.primaryLight, borderRadius: 10, padding: '8px 10px', marginBottom: 18,
+        fontSize: 11.5, color: T.primaryDark, fontWeight: 600
+      }}>{branchLabel}</div>
+
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
-        {items.map(item => (
-          <button key={item.key} onClick={() => onSelect(item.key)} style={{
-            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9,
-            border: 'none', background: activeTab === item.key ? '#EFEAFB' : 'transparent',
-            color: activeTab === item.key ? '#5B3DE0' : '#5B6270',
-            fontWeight: activeTab === item.key ? 600 : 500, fontSize: 14, cursor: 'pointer',
-            textAlign: 'left', width: '100%'
-          }}>
-            <span style={{ fontSize: 15, width: 18, textAlign: 'center' }}>{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
+        {items.map(item => {
+          const active = activeTab === item.key
+          return (
+            <button key={item.key} onClick={() => onSelect(item.key)} style={{
+              display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10,
+              border: 'none', background: active ? T.primary : 'transparent',
+              color: active ? '#fff' : T.textSoft,
+              fontWeight: active ? 600 : 500, fontSize: 14, cursor: 'pointer',
+              textAlign: 'left', width: '100%', transition: 'background 0.15s ease'
+            }}>
+              <span style={{ fontSize: 15, width: 18, textAlign: 'center', opacity: active ? 1 : 0.75 }}>{item.icon}</span>
+              {item.label}
+            </button>
+          )
+        })}
       </nav>
       <button onClick={onLogout} style={{
-        marginTop: 16, padding: '10px 12px', borderRadius: 9, border: '1px solid #ECE8DC',
-        background: '#fff', color: '#5B6270', fontWeight: 500, fontSize: 13, cursor: 'pointer'
+        marginTop: 16, padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`,
+        background: '#fff', color: T.textSoft, fontWeight: 500, fontSize: 13, cursor: 'pointer'
       }}>Çıkış yap</button>
     </div>
   )
@@ -1246,16 +1296,20 @@ export function PanelApp() {
   const branchLabel = isSuperAdmin ? 'süper admin · tüm şubeler' : `${branchName(currentUser.branch_id)}`
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', background: '#FAFAF7', minHeight: '100vh' }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');`}</style>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', background: T.bg, minHeight: '100vh' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        select, input, textarea { font-family: 'Inter', system-ui, sans-serif; }
+        button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid ${T.primary}; outline-offset: 1px; }
+      `}</style>
 
       <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
         isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} />
 
-      <div style={{ flex: 1, padding: '28px 32px', maxWidth: 1100 }}>
+      <div style={{ flex: 1, padding: '28px 36px', maxWidth: 1140 }}>
         {isSuperAdmin && (
           <div style={{ marginBottom: '1.5rem' }}>
-            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: 240 }}>
+            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: 240, fontWeight: 600 }}>
               <option value="all">Tüm şubeler (toplu rapor)</option>
               {branches.filter(b => b.active !== false).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
@@ -1264,32 +1318,32 @@ export function PanelApp() {
 
         {activeTab === 'overview' && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Genel Bakış</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, margin: '0 0 20px', letterSpacing: '-0.01em' }}>Genel Bakış</h1>
             <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12 }}>
-              <StatCard label="Toplam lead" value={stats.total} />
-              <StatCard label="Müşteriye dönüşen" value={stats.customers} />
-              <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} />
-              <StatCard label="IG / WA" value={stats.ig + ' / ' + stats.wa} />
-              <StatCard label="Organik" value={stats.organik} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 14 }}>
+              <StatCard label="Toplam lead" value={stats.total} colorIndex={0} />
+              <StatCard label="Müşteriye dönüşen" value={stats.customers} colorIndex={1} />
+              <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} colorIndex={2} />
+              <StatCard label="IG / WA" value={stats.ig + ' / ' + stats.wa} colorIndex={3} />
+              <StatCard label="Organik" value={stats.organik} colorIndex={4} />
             </div>
 
             {perms.can_see_revenue && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.5rem' }}>
-                <StatCard label="Toplam ciro (girilen)" value={fmtTL(stats.revenue)} />
-                <StatCard label="Ortalama satış tutarı" value={stats.withAmountCount ? fmtTL(stats.avgTicket) : '—'} />
-                <StatCard label="Tutar girilen satış" value={`${stats.withAmountCount} / ${stats.customers}`} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: '1.5rem' }}>
+                <StatCard label="Toplam ciro (girilen)" value={fmtTL(stats.revenue)} colorIndex={1} />
+                <StatCard label="Ortalama satış tutarı" value={stats.withAmountCount ? fmtTL(stats.avgTicket) : '—'} colorIndex={2} />
+                <StatCard label="Tutar girilen satış" value={`${stats.withAmountCount} / ${stats.customers}`} colorIndex={0} />
               </div>
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Görüşme sonuçları</p>
+              <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 10px', fontWeight: 600 }}>Görüşme sonuçları</p>
                 <ResultBarChart leads={scopedLeads} />
               </div>
-              <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Lead kanalı dağılımı</p>
+              <div style={{ background: '#fff', border: '1px solid #ECEAF5', borderRadius: 14, padding: '1rem' }}>
+                <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 8px', fontWeight: 600 }}>Lead kanalı dağılımı</p>
                 <ChannelPieChart leads={scopedLeads} />
               </div>
             </div>
@@ -1298,7 +1352,7 @@ export function PanelApp() {
 
         {activeTab === 'clients' && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Danışanlar</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Danışanlar</h1>
             {perms.can_add_lead && (
               <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices}
                 targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
@@ -1311,13 +1365,13 @@ export function PanelApp() {
                 {canSeeOwnDataOnly ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
               </p>
               {visibleLeads.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#666' }}>Henüz kayıt yok.</p>
+                <p style={{ fontSize: 13, color: '#8B8D98' }}>Henüz kayıt yok.</p>
               ) : (
-                <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '0 1.25rem', overflowX: 'auto' }}>
+                <div style={{ background: '#fff', border: '1px solid #ECEAF5', borderRadius: 14, padding: '0 1.25rem', overflowX: 'auto' }}>
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
-                    gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: '#666', minWidth: 760
+                    gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: '#8B8D98', minWidth: 760
                   }}>
                     {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
                     <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
@@ -1334,22 +1388,22 @@ export function PanelApp() {
 
         {activeTab === 'appointments' && perms.can_see_calendar && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Randevular</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Randevular</h1>
             <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
           </div>
         )}
 
         {activeTab === 'reports' && perms.can_see_revenue && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Raporlar</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Raporlar</h1>
             <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16 }}>
-              <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Hizmete göre ciro</p>
+              <div style={{ background: '#fff', border: '1px solid #ECEAF5', borderRadius: 14, padding: '1rem' }}>
+                <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 8px', fontWeight: 600 }}>Hizmete göre ciro</p>
                 <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
               </div>
               {scopedAds.length > 0 && (
-                <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '1rem' }}>
-                  <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Haftalık reklam harcaması</p>
+                <div style={{ background: '#fff', border: '1px solid #ECEAF5', borderRadius: 14, padding: '1rem' }}>
+                  <p style={{ fontSize: 13, color: '#8B8D98', margin: '0 0 8px', fontWeight: 600 }}>Haftalık reklam harcaması</p>
                   <MonthlySpendChart adsData={scopedAds} />
                 </div>
               )}
@@ -1360,14 +1414,14 @@ export function PanelApp() {
 
         {activeTab === 'ads' && perms.can_enter_ads_data && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Reklam Kaynakları</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Reklam Kaynakları</h1>
             <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />
           </div>
         )}
 
         {activeTab === 'settings' && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Ayarlar</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Ayarlar</h1>
             {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} />}
             {!isSuperAdmin && !canSeeOwnDataOnly && (
               <BranchServiceManager
@@ -1384,7 +1438,7 @@ export function PanelApp() {
 
         {activeTab === 'admin' && isSuperAdmin && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Yönetim</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1D29', margin: '0 0 18px' }}>Yönetim</h1>
             <PermissionTemplateManager />
             <SecurityNotice isAdmin={isSuperAdmin} />
           </div>
