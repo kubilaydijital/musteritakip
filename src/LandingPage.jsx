@@ -72,10 +72,10 @@ export default function LandingPage() {
               Randevu bazlı hizmet işletmeleri için
             </p>
             <h1 className="lp-display lp-fade-up" style={{ fontSize: 'clamp(34px, 5vw, 52px)', lineHeight: 1.08, fontWeight: 600, margin: '0 0 22px', color: '#1a2744', animationDelay: '0.05s' }}>
-              Instagram'dan gelen mesaj,<br />satışa dönüşene kadar<br />gözünün önünde.
+              Reklama verdiğin para<br />nereye gidiyor,<br />biliyor musun?
             </h1>
             <p className="lp-fade-up" style={{ fontSize: 17, lineHeight: 1.6, color: '#5B6270', maxWidth: 480, margin: '0 0 32px', animationDelay: '0.1s' }}>
-              DM'den gelen her müşteri adayı kağıda yazılıp unutuluyor mu? Randevu alıp gelmeyenler, gelip almayanlar nerede kayboluyor bilmiyor musun? Tek ekrandan gör, takip et, kaybı durdur.
+              Mesaj geldi, randevuya dönmedi. Randevu verildi, gelmedi. Geldi, satın almadı. Her aşamada para kayboluyor ama kağıda yazılan bilgiyle bunu görmek mümkün değil. Huninin neresinde tıkandığını gör, kaybı durdur.
             </p>
             <div className="lp-fade-up" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', animationDelay: '0.15s' }}>
               <Link to="/demo" className="lp-btn-primary">Demo'yu Gör</Link>
@@ -86,7 +86,7 @@ export default function LandingPage() {
           </div>
 
           <div className="lp-fade-up" style={{ animationDelay: '0.1s' }}>
-            <FunnelGraphic />
+            <LostNotebookGraphic />
           </div>
         </div>
       </section>
@@ -185,32 +185,80 @@ function FeatureCard({ title, desc }) {
   )
 }
 
-function FunnelGraphic() {
-  const stages = [
-    { label: 'Mesaj geldi', value: 100, color: '#1a2744' },
-    { label: 'Randevu aldı', value: 68, color: '#2d4a7a' },
-    { label: 'Randevuya geldi', value: 52, color: '#C9A05C' },
-    { label: 'Müşteri oldu', value: 31, color: '#3B6D11' },
-  ]
+function LostNotebookGraphic() {
   return (
-    <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 18, padding: '28px 24px', boxShadow: '0 24px 60px -20px rgba(26,39,68,0.18)' }}>
-      <p style={{ fontSize: 12, fontWeight: 600, color: '#9aa0ad', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 18px' }}>
-        Örnek hafta — nereden nereye
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {stages.map((s, i) => (
-          <div key={s.label}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4, color: '#262b36' }}>
-              <span>{s.label}</span>
-              <span style={{ fontWeight: 700 }}>{s.value}</span>
-            </div>
-            <div style={{ height: 10, borderRadius: 6, background: '#F0EEE6' }}>
-              <div style={{ height: '100%', width: `${s.value}%`, borderRadius: 6, background: s.color, transition: 'width 0.6s ease' }} />
-            </div>
-          </div>
-        ))}
-      </div>
-      <p style={{ fontSize: 12, color: '#9aa0ad', margin: '16px 0 0' }}>Gerçek verilerle, kendi şubene özel görünür.</p>
+    <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+      <svg viewBox="0 0 420 460" width="100%" style={{ maxWidth: 380, overflow: 'visible' }} role="img" aria-label="Elle yazılmış, üzeri çizilmiş ve kayıp müşteri notlarıyla dolu dağınık bir not defteri sayfası">
+        <defs>
+          <filter id="paperShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="18" stdDeviation="22" floodColor="#1a2744" floodOpacity="0.16" />
+          </filter>
+        </defs>
+
+        <g transform="rotate(-4 210 230)">
+          <rect x="55" y="40" width="300" height="380" rx="6" fill="#F3EFE3" stroke="#E3DCC8" strokeWidth="1.5" />
+        </g>
+
+        <g filter="url(#paperShadow)" transform="rotate(2 210 230)">
+          <rect x="48" y="32" width="310" height="392" rx="6" fill="#FDFBF4" stroke="#E3DCC8" strokeWidth="1.5" />
+          {Array.from({ length: 11 }).map((_, i) => (
+            <line key={i} x1="68" y1={92 + i * 30} x2="338" y2={92 + i * 30} stroke="#EDE7D6" strokeWidth="1.5" />
+          ))}
+          <circle cx="305" cy="365" r="26" fill="none" stroke="#C9A05C" strokeOpacity="0.35" strokeWidth="6" />
+          <circle cx="305" cy="365" r="19" fill="none" stroke="#C9A05C" strokeOpacity="0.2" strokeWidth="3" />
+
+          <g stroke="#3A4660" strokeWidth="2.6" strokeLinecap="round" fill="none">
+            <path d="M70 88 q10 -8 22 0 t22 0 t20 -2 q14 4 26 -2" />
+            <path d="M70 118 q8 6 18 0 t16 2 q10 -6 20 2 t18 -2" opacity="0.85" />
+          </g>
+          <g stroke="#A32D2D" strokeWidth="3" strokeLinecap="round">
+            <line x1="65" y1="103" x2="200" y2="103" />
+          </g>
+
+          <g stroke="#3A4660" strokeWidth="2.6" strokeLinecap="round" fill="none">
+            <path d="M70 148 q12 -7 24 0 t18 -3 q12 5 22 -1 t20 3" />
+            <path d="M70 178 q9 6 17 -1 t19 2 q11 -5 21 1" opacity="0.85" />
+          </g>
+          <g stroke="#A32D2D" strokeWidth="3" strokeLinecap="round">
+            <line x1="65" y1="163" x2="210" y2="163" />
+          </g>
+
+          <g stroke="#3A4660" strokeWidth="2.6" strokeLinecap="round" fill="none" opacity="0.55">
+            <path d="M70 208 q10 -6 20 0 t18 -2 q12 4 24 -2" />
+          </g>
+
+          <g stroke="#3A4660" strokeWidth="2.6" strokeLinecap="round" fill="none">
+            <path d="M70 238 q11 -7 21 0 t19 -2 q13 5 23 -1 t17 2" />
+            <path d="M70 268 q8 6 16 -1 t20 2" opacity="0.85" />
+          </g>
+          <g stroke="#A32D2D" strokeWidth="3" strokeLinecap="round">
+            <line x1="65" y1="253" x2="195" y2="253" />
+          </g>
+
+          <g stroke="#3A4660" strokeWidth="2.6" strokeLinecap="round" fill="none" opacity="0.5">
+            <path d="M70 298 q12 -6 22 0 t20 -2" />
+          </g>
+
+          <g stroke="#3A4660" strokeWidth="2.6" strokeLinecap="round" fill="none">
+            <path d="M70 328 q10 -7 20 0 t18 -2 q14 5 24 -1" />
+          </g>
+          <g stroke="#A32D2D" strokeWidth="3" strokeLinecap="round">
+            <line x1="65" y1="343" x2="205" y2="343" />
+          </g>
+
+          <g stroke="#9C7A3C" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.7">
+            <path d="M76 392 q4 -14 16 -12 q12 2 8 14 q-3 9 -10 11" />
+            <circle cx="91" cy="412" r="1.8" fill="#9C7A3C" stroke="none" />
+          </g>
+
+          <path d="M338 32 L358 32 L358 52 Z" fill="#FAFAF7" stroke="#E3DCC8" strokeWidth="1.2" />
+        </g>
+
+        <g transform="translate(290 60)">
+          <circle cx="0" cy="0" r="30" fill="#A32D2D" />
+          <text x="0" y="6" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="13" fontWeight="700" fill="#fff">KAYIP</text>
+        </g>
+      </svg>
     </div>
   )
 }
