@@ -1016,7 +1016,7 @@ function PermissionTemplateManager() {
   )
 }
 
-export default function App() {
+export function PanelApp() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('mt_current_user')
