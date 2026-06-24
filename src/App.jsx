@@ -1784,7 +1784,7 @@ export function PanelApp() {
               )}
             </div>
           </div>
-        )}
+               )}
 
         {activeTab === 'clients' && (
           <div>
