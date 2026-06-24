@@ -8,10 +8,10 @@ import {
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
 
 const CHANNELS = ['Instagram', 'WhatsApp', 'Organik']
-const RESULTS = ['Randevu aldı', 'Görüşüldü, randevu alınamadı', 'Vazgeçti', 'Müşteri oldu']
+const RESULTS = ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
 const OPEN_RESULTS = []
-const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Görüşüldü, randevu alınamadı': '#6B6B6B', 'Vazgeçti': '#A32D2D', 'Müşteri oldu': '#3B6D11' }
-const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Görüşüldü, randevu alınamadı': '#9CA3AF', 'Vazgeçti': '#E24B4A', 'Müşteri oldu': '#639922' }
+const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D', 'Satın almadı': '#854F0B', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#6B6B6B', 'Müşteri oldu': '#3B6D11' }
+const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A', 'Satın almadı': '#EF9F27', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#9CA3AF', 'Müşteri oldu': '#639922' }
 const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Organik': '#7F77DD' }
 const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#E24B4A', '#639922', '#854F0B']
 const PHONE_RE = /^\+\d{10,15}$/
@@ -121,17 +121,23 @@ function Login({ onLogin }) {
   )
 }
 
-const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', result: 'Görüşülüyor', saleAmount: '', appointmentAt: '' }
+const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', result: 'Randevu aldı', saleAmount: '', appointmentDate: '', appointmentTime: '' }
 
-function toLocalInputValue(iso) {
+function toLocalDateValue(iso) {
   if (!iso) return ''
   const d = new Date(iso)
   const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+function toLocalTimeValue(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = n => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services, targetBranchId, targetBranchName, isSuperAdmin }) {
-  const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
+  const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
@@ -140,7 +146,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
-    setForm(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentAt: toLocalInputValue(editing.appointment_at) } : emptyForm)
+    setForm(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
     setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setConfirmingDelete(false)
   }, [editing])
 
@@ -165,14 +171,14 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     else setPhoneErr('')
     if (!form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
     else setNoteErr('')
-    if (form.result === 'Randevu aldı' && !form.appointmentAt) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
+    if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
     else setAppointmentErr('')
     if (!form.name.trim()) ok = false
     if (!ok) return
 
     setSubmitting(true)
     const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount.replace(/\./g, '')) : null
-    const appointmentAt = form.appointmentAt ? new Date(form.appointmentAt).toISOString() : null
+    const appointmentAt = (form.appointmentDate && form.appointmentTime) ? new Date(`${form.appointmentDate}T${form.appointmentTime}`).toISOString() : null
 
     if (editing) {
       await onUpdate({
@@ -228,7 +234,10 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         {(services || []).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
       </select>
       <div style={{ marginBottom: 10 }}>
-        <input type="datetime-local" value={form.appointmentAt} onChange={e => { set('appointmentAt', e.target.value); if (e.target.value) setAppointmentErr('') }} style={{ ...inputStyle, width: '100%' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <input type="date" value={form.appointmentDate} onChange={e => { set('appointmentDate', e.target.value); if (e.target.value && form.appointmentTime) setAppointmentErr('') }} style={inputStyle} />
+          <input type="time" value={form.appointmentTime} onChange={e => { set('appointmentTime', e.target.value); if (form.appointmentDate && e.target.value) setAppointmentErr('') }} style={inputStyle} />
+        </div>
         <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>
           {form.result === 'Randevu aldı' ? 'Randevu tarihi ve saati zorunludur.' : 'Randevu tarihi/saati — varsa girin, takvimde görünür. Boş bırakılabilir.'}
         </p>
@@ -460,12 +469,16 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName })
 }
 
 function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
-  const [form, setForm] = useState({ spend: '', impressions: '', messages: '' })
+  const [form, setForm] = useState({ spend: '', impressions: '', messages: '', manualAdjustment: '' })
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
   async function submit(e) {
     e.preventDefault()
-    await onAdd({ id: uid(), branch_id: selectedBranch, date: new Date().toISOString(), spend: Number(form.spend) || 0, impressions: Number(form.impressions) || 0, messages: Number(form.messages) || 0 })
-    setForm({ spend: '', impressions: '', messages: '' })
+    await onAdd({
+      id: uid(), branch_id: selectedBranch, date: new Date().toISOString(),
+      spend: Number(form.spend) || 0, impressions: Number(form.impressions) || 0, messages: Number(form.messages) || 0,
+      manual_adjustment: Number(form.manualAdjustment) || 0
+    })
+    setForm({ spend: '', impressions: '', messages: '', manualAdjustment: '' })
   }
   return (
     <form onSubmit={submit} style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
@@ -473,11 +486,13 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
       <select value={selectedBranch} onChange={e => onSelectBranch(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
         <input placeholder="Harcama (TL)" value={form.spend} onChange={e => set('spend', e.target.value)} style={inputStyle} />
         <input placeholder="Gösterim" value={form.impressions} onChange={e => set('impressions', e.target.value)} style={inputStyle} />
-        <input placeholder="Mesaj sayısı" value={form.messages} onChange={e => set('messages', e.target.value)} style={inputStyle} />
+        <input placeholder="Mesaj sayısı (Meta)" value={form.messages} onChange={e => set('messages', e.target.value)} style={inputStyle} />
       </div>
+      <input placeholder="Manuel düzeltme (kayıt eksikliği — örn. 5)" value={form.manualAdjustment} onChange={e => set('manualAdjustment', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 6 }} />
+      <p style={{ fontSize: 11, color: '#888', margin: '0 0 12px' }}>Sosyal medya personeli kaçırdığı mesajlar varsa, eksik kalan sayıyı buraya yaz — rapor bu sayıyı da hesaba katar.</p>
       <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: '#1a2744', color: '#fff', border: 'none', cursor: 'pointer' }}>Haftalık veriyi kaydet</button>
     </form>
   )
@@ -779,6 +794,47 @@ function RevenueByServiceChart({ leads, services }) {
     return () => { if (chartRef.current) chartRef.current.destroy() }
   }, [sums])
   return <div style={{ position: 'relative', width: '100%', height: 200 }}><canvas ref={ref} /></div>
+}
+
+function MessageMatchReport({ adsData, leads }) {
+  const sorted = useMemo(() => [...adsData].sort((a, b) => new Date(b.date) - new Date(a.date)), [adsData])
+  if (sorted.length === 0) return null
+
+  function recordCountForWeek(weekDate) {
+    // O hafta verisinin girildiği tarihten 7 gün öncesine kadar girilen kayıtları say (basit yaklaşım)
+    const end = new Date(weekDate)
+    const start = new Date(end.getTime() - 7 * 86400000)
+    return leads.filter(l => {
+      const d = new Date(l.date)
+      return d >= start && d <= end
+    }).length
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+      <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Mesaj / kayıt eşleşme raporu</p>
+      <p style={{ fontSize: 13, color: '#666', margin: '0 0 12px' }}>Meta'nın gösterdiği mesaj sayısı ile sisteme girilen kayıt sayısını karşılaştırır. Manuel düzeltme, kaçırılan mesajları telafi eder.</p>
+      {sorted.slice(0, 8).map(week => {
+        const recordCount = recordCountForWeek(week.date)
+        const adjusted = recordCount + (week.manual_adjustment || 0)
+        const total = week.messages || 0
+        const missing = Math.max(0, total - adjusted)
+        const pct = total > 0 ? Math.round((adjusted / total) * 100) : 100
+        const dateLabel = new Date(week.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        return (
+          <div key={week.id} style={{ padding: '8px 0', borderBottom: '1px solid #eee', fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+              <span style={{ color: '#777' }}>{dateLabel}</span>
+              <span style={{ fontWeight: 600, color: pct >= 90 ? '#2e7d32' : pct >= 70 ? '#b8860b' : '#c0392b' }}>%{pct} kayıt oranı</span>
+            </div>
+            <span style={{ color: '#444' }}>
+              Mesaj: {total} · Kayıt: {recordCount}{week.manual_adjustment > 0 ? ` (+${week.manual_adjustment} manuel)` : ''} · {missing > 0 ? <strong style={{ color: '#c0392b' }}>{missing} eksik</strong> : 'eksik yok'}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function MonthlySpendChart({ adsData }) {
@@ -1246,6 +1302,7 @@ export default function App() {
       </div>
 
       {perms.can_enter_ads_data && <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />}
+      {perms.can_enter_ads_data && scopedAds.length > 0 && <MessageMatchReport adsData={scopedAds} leads={scopedLeads} />}
       {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} />}
       {!isSuperAdmin && !canSeeOwnDataOnly && (
         <BranchServiceManager
