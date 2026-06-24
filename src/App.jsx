@@ -336,7 +336,7 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
   }
 
   const yearOptions = []
-  for (let y = 2022; y <= new Date().getFullYear() + 1; y++) yearOptions.push(y)
+  for (let y = 2010; y <= new Date().getFullYear() + 10; y++) yearOptions.push(y)
 
   const selectedKey = selectedDay ? dateKey(new Date(year, month, selectedDay)) : null
   const selectedLeads = selectedKey ? (leadsByDay[selectedKey] || []) : []
