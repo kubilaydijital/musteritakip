@@ -1016,6 +1016,49 @@ function PermissionTemplateManager() {
   )
 }
 
+const NAV_ITEMS = [
+  { key: 'overview', label: 'Genel Bakış', icon: '◧', show: () => true },
+  { key: 'clients', label: 'Danışanlar', icon: '◐', show: () => true },
+  { key: 'appointments', label: 'Randevular', icon: '◷', show: perms => perms.can_see_calendar },
+  { key: 'reports', label: 'Raporlar', icon: '◫', show: perms => perms.can_see_revenue },
+  { key: 'ads', label: 'Reklam Kaynakları', icon: '◔', show: perms => perms.can_enter_ads_data },
+  { key: 'settings', label: 'Ayarlar', icon: '◍', show: (perms, isSuperAdmin, canSeeOwnDataOnly) => perms.can_manage_users || perms.can_manage_branches || (!isSuperAdmin && !canSeeOwnDataOnly) },
+  { key: 'admin', label: 'Yönetim', icon: '◆', show: (perms, isSuperAdmin) => isSuperAdmin },
+]
+
+function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout }) {
+  return (
+    <div style={{
+      width: 220, flexShrink: 0, background: '#fff', borderRight: '1px solid #ECE8DC',
+      minHeight: '100vh', padding: '24px 14px', display: 'flex', flexDirection: 'column'
+    }}>
+      <div style={{ padding: '0 10px 20px', borderBottom: '1px solid #F0EEE6', marginBottom: 16 }}>
+        <p style={{ fontWeight: 700, fontSize: 16, margin: 0, color: '#1a2744' }}>Müşteri Takip</p>
+        <p style={{ fontSize: 12, color: '#9aa0ad', margin: '4px 0 0' }}>{currentUser.username}</p>
+        <p style={{ fontSize: 11, color: '#9aa0ad', margin: '1px 0 0' }}>{branchLabel}</p>
+      </div>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+        {items.map(item => (
+          <button key={item.key} onClick={() => onSelect(item.key)} style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9,
+            border: 'none', background: activeTab === item.key ? '#EFEAFB' : 'transparent',
+            color: activeTab === item.key ? '#5B3DE0' : '#5B6270',
+            fontWeight: activeTab === item.key ? 600 : 500, fontSize: 14, cursor: 'pointer',
+            textAlign: 'left', width: '100%'
+          }}>
+            <span style={{ fontSize: 15, width: 18, textAlign: 'center' }}>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      <button onClick={onLogout} style={{
+        marginTop: 16, padding: '10px 12px', borderRadius: 9, border: '1px solid #ECE8DC',
+        background: '#fff', color: '#5B6270', fontWeight: 500, fontSize: 13, cursor: 'pointer'
+      }}>Çıkış yap</button>
+    </div>
+  )
+}
+
 export function PanelApp() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -1033,6 +1076,7 @@ export function PanelApp() {
   const [editingLead, setEditingLead] = useState(null)
   const [adsSelectedBranch, setAdsSelectedBranch] = useState('')
   const [filterBranch, setFilterBranch] = useState('all')
+  const [activeTab, setActiveTab] = useState('overview')
 
   function loginAndPersist(user) {
     try { localStorage.setItem('mt_current_user', JSON.stringify(user)) } catch (e) {}
@@ -1198,124 +1242,154 @@ export function PanelApp() {
   }
   const totalSpend = scopedAds.reduce((s, w) => s + Number(w.spend), 0)
 
+  const visibleNavItems = NAV_ITEMS.filter(item => item.show(perms, isSuperAdmin, canSeeOwnDataOnly))
+  const branchLabel = isSuperAdmin ? 'süper admin · tüm şubeler' : `${branchName(currentUser.branch_id)}`
+
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 1100, margin: '0 auto', padding: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div>
-          <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Lead takip paneli</p>
-          <p style={{ fontSize: 13, color: '#666', margin: 0 }}>
-            {currentUser.username} · {isSuperAdmin ? 'süper admin · tüm şubeler' : canSeeOwnDataOnly ? `personel · ${branchName(currentUser.branch_id)}` : `admin · ${branchName(currentUser.branch_id)}`}
-          </p>
-        </div>
-        <button onClick={logoutAndClear} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#1a2744', cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>Çıkış yap</button>
-      </div>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', background: '#FAFAF7', minHeight: '100vh' }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');`}</style>
 
-      {isSuperAdmin && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: 240 }}>
-            <option value="all">Tüm şubeler (toplu rapor)</option>
-            {branches.filter(b => b.active !== false).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </div>
-      )}
+      <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
+        isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} />
 
-      {perms.can_see_calendar && (
-        <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
-      )}
-
-      <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
-
-      {perms.can_add_lead && (
-        <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices}
-          targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
-          targetBranchName={isSuperAdmin ? (filterBranch !== 'all' ? branchName(filterBranch) : branchName(activeBranches[0]?.id)) : branchName(currentUser.branch_id)}
-          isSuperAdmin={isSuperAdmin}
-        />
-      )}
-
-      <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
-        <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
-          {canSeeOwnDataOnly ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
-        </p>
-        {visibleLeads.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#666' }}>Henüz kayıt yok.</p>
-        ) : (
-          <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '0 1.25rem', overflowX: 'auto' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
-              gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: '#666', minWidth: 760
-            }}>
-              {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
-              <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
-            </div>
-            {visibleLeads.map(l => (
-              <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
-                showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} />
-            ))}
+      <div style={{ flex: 1, padding: '28px 32px', maxWidth: 1100 }}>
+        {isSuperAdmin && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: 240 }}>
+              <option value="all">Tüm şubeler (toplu rapor)</option>
+              {branches.filter(b => b.active !== false).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
           </div>
         )}
-      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Toplam lead" value={stats.total} />
-        <StatCard label="Müşteriye dönüşen" value={stats.customers} />
-        <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} />
-        <StatCard label="IG / WA" value={stats.ig + ' / ' + stats.wa} />
-        <StatCard label="Organik" value={stats.organik} />
-      </div>
+        {activeTab === 'overview' && (
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Genel Bakış</h1>
+            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
 
-      {perms.can_see_revenue && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.5rem' }}>
-          <StatCard label="Toplam ciro (girilen)" value={fmtTL(stats.revenue)} />
-          <StatCard label="Ortalama satış tutarı" value={stats.withAmountCount ? fmtTL(stats.avgTicket) : '—'} />
-          <StatCard label="Tutar girilen satış" value={`${stats.withAmountCount} / ${stats.customers}`} />
-        </div>
-      )}
-
-      <div style={{ marginBottom: '1.5rem' }}>
-        <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Aylık rapor — grafikler</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-          <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-            <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Görüşme sonuçları</p>
-            <ResultBarChart leads={scopedLeads} />
-          </div>
-          <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-            <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Lead kanalı dağılımı</p>
-            <ChannelPieChart leads={scopedLeads} />
-          </div>
-        </div>
-        {perms.can_see_revenue && (
-          <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16 }}>
-            <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-              <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Hizmete göre ciro</p>
-              <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 12 }}>
+              <StatCard label="Toplam lead" value={stats.total} />
+              <StatCard label="Müşteriye dönüşen" value={stats.customers} />
+              <StatCard label="Dönüşüm oranı" value={stats.rate + '%'} />
+              <StatCard label="IG / WA" value={stats.ig + ' / ' + stats.wa} />
+              <StatCard label="Organik" value={stats.organik} />
             </div>
-            {scopedAds.length > 0 && (
-              <div style={{ background: '#fff', border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px' }}>Haftalık reklam harcaması</p>
-                <MonthlySpendChart adsData={scopedAds} />
+
+            {perms.can_see_revenue && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.5rem' }}>
+                <StatCard label="Toplam ciro (girilen)" value={fmtTL(stats.revenue)} />
+                <StatCard label="Ortalama satış tutarı" value={stats.withAmountCount ? fmtTL(stats.avgTicket) : '—'} />
+                <StatCard label="Tutar girilen satış" value={`${stats.withAmountCount} / ${stats.customers}`} />
               </div>
             )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '1rem' }}>
+                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Görüşme sonuçları</p>
+                <ResultBarChart leads={scopedLeads} />
+              </div>
+              <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '1rem' }}>
+                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Lead kanalı dağılımı</p>
+                <ChannelPieChart leads={scopedLeads} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'clients' && (
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Danışanlar</h1>
+            {perms.can_add_lead && (
+              <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices}
+                targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
+                targetBranchName={isSuperAdmin ? (filterBranch !== 'all' ? branchName(filterBranch) : branchName(activeBranches[0]?.id)) : branchName(currentUser.branch_id)}
+                isSuperAdmin={isSuperAdmin}
+              />
+            )}
+            <div style={{ marginTop: '1.5rem' }}>
+              <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
+                {canSeeOwnDataOnly ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
+              </p>
+              {visibleLeads.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#666' }}>Henüz kayıt yok.</p>
+              ) : (
+                <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '0 1.25rem', overflowX: 'auto' }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
+                    gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: '#666', minWidth: 760
+                  }}>
+                    {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
+                    <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
+                  </div>
+                  {visibleLeads.map(l => (
+                    <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
+                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'appointments' && perms.can_see_calendar && (
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Randevular</h1>
+            <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
+          </div>
+        )}
+
+        {activeTab === 'reports' && perms.can_see_revenue && (
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Raporlar</h1>
+            <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16 }}>
+              <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '1rem' }}>
+                <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Hizmete göre ciro</p>
+                <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
+              </div>
+              {scopedAds.length > 0 && (
+                <div style={{ background: '#fff', border: '1px solid #ECE8DC', borderRadius: 14, padding: '1rem' }}>
+                  <p style={{ fontSize: 13, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Haftalık reklam harcaması</p>
+                  <MonthlySpendChart adsData={scopedAds} />
+                </div>
+              )}
+            </div>
+            {perms.can_enter_ads_data && scopedAds.length > 0 && <MessageMatchReport adsData={scopedAds} leads={scopedLeads} />}
+          </div>
+        )}
+
+        {activeTab === 'ads' && perms.can_enter_ads_data && (
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Reklam Kaynakları</h1>
+            <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Ayarlar</h1>
+            {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} />}
+            {!isSuperAdmin && !canSeeOwnDataOnly && (
+              <BranchServiceManager
+                services={currentBranchServices}
+                branchId={currentUser.branch_id}
+                branchName={branchName(currentUser.branch_id)}
+                onAdd={addService}
+                onDelete={deleteService}
+              />
+            )}
+            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} branches={activeBranches} templates={templates} />}
+          </div>
+        )}
+
+        {activeTab === 'admin' && isSuperAdmin && (
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a2744', margin: '0 0 18px' }}>Yönetim</h1>
+            <PermissionTemplateManager />
+            <SecurityNotice isAdmin={isSuperAdmin} />
           </div>
         )}
       </div>
-
-      {perms.can_enter_ads_data && <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />}
-      {perms.can_enter_ads_data && scopedAds.length > 0 && <MessageMatchReport adsData={scopedAds} leads={scopedLeads} />}
-      {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} />}
-      {!isSuperAdmin && !canSeeOwnDataOnly && (
-        <BranchServiceManager
-          services={currentBranchServices}
-          branchId={currentUser.branch_id}
-          branchName={branchName(currentUser.branch_id)}
-          onAdd={addService}
-          onDelete={deleteService}
-        />
-      )}
-      {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} branches={activeBranches} templates={templates} />}
-      {isSuperAdmin && <PermissionTemplateManager />}
-      <SecurityNotice isAdmin={isSuperAdmin} />
     </div>
   )
 }
