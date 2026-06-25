@@ -57,4 +57,29 @@ export default function Testimonials() {
 
       <section style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '24px 20px 72px' }}>
         <h2 style={{ fontSize: 22, fontWeight: 800, textAlign: 'center', margin: '0 0 32px' }}>Müşterilerimiz ne diyor?</h2>
-        <div className="mt-grid-3" style={{ display: 'grid',
+        <div className="mt-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+          {TESTIMONIALS.map((t, i) => (
+            <div key={i} style={{ ...cardStyle, padding: '24px 22px', display: 'flex', flexDirection: 'column' }}>
+              <p style={{ fontSize: 28, color: T.primary, margin: '0 0 8px', lineHeight: 1 }}>"</p>
+              <p style={{ fontSize: 14, lineHeight: 1.65, color: T.textSoft, margin: '0 0 18px', flex: 1 }}>{t.quote}</p>
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12 }}>
+                <p style={{ fontSize: 13.5, fontWeight: 700, margin: 0, color: T.text }}>{t.name}</p>
+                <p style={{ fontSize: 12, color: T.textFaint, margin: '2px 0 0' }}>{t.sector}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ background: T.card, borderTop: `1px solid ${T.border}` }}>
+        <div style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '64px 20px', textAlign: 'center' }}>
+          <h2 style={{ fontSize: 'clamp(22px, 3vw, 28px)', fontWeight: 800, margin: '0 0 14px' }}>Siz de aramıza katılın</h2>
+          <p style={{ fontSize: 15, color: T.textSoft, margin: '0 0 28px' }}>14 gün ücretsiz deneyin, kredi kartı gerekmez.</p>
+          <Link to="/deneme" className="mt-btn-primary" style={btnPrimary}>Ücretsiz 14 Gün Dene →</Link>
+        </div>
+      </section>
+
+      <SiteFooter />
+    </div>
+  )
+}
