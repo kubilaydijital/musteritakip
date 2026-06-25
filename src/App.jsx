@@ -57,7 +57,7 @@ const T = {
   blue: '#3B82F6',
   blueBg: 'rgba(59,130,246,0.14)',
 }
-const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: T.cardSoft, color: T.text }
+const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: T.cardSoft, color: T.text, colorScheme: 'dark' }
 const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }
 const quickBtnStyle = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9,
@@ -313,7 +313,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         </div>
       )}
       <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => set('note', e.target.value)} rows={2}
-        style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box' }} />
+        style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
       {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
         <button type="submit" disabled={submitting} style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
@@ -1254,7 +1254,7 @@ function MobileTopBar({ currentUser, branchLabel, onLogout }) {
     <div style={{
       position: 'sticky', top: 0, zIndex: 40, display: 'flex', alignItems: 'center',
       justifyContent: 'space-between', padding: '12px 14px', background: T.card,
-      borderBottom: `1px solid ${T.border}`
+      borderBottom: `1px solid ${T.border}`, width: '100%', boxSizing: 'border-box'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
         <span style={{
@@ -1872,13 +1872,16 @@ export function PanelApp() {
   const branchLabel = isSuperAdmin ? 'süper admin · tüm şubeler' : `${branchName(currentUser.branch_id)}`
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: isMobile ? 'column' : 'row', background: T.bg, minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: isMobile ? 'column' : 'row', background: T.bg, minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        select, input, textarea { font-family: 'Inter', system-ui, sans-serif; }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { overflow-x: hidden; max-width: 100%; }
+        select, input, textarea { font-family: 'Inter', system-ui, sans-serif; max-width: 100%; }
         select option { background: #0C1626; color: #fff; }
         button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid ${T.primary}; outline-offset: 1px; }
         ::placeholder { color: ${T.textFaint}; }
+        img, svg, canvas { max-width: 100%; }
       `}</style>
 
       {isMobile ? (
