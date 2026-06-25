@@ -63,12 +63,14 @@ const quickBtnStyle = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9,
   border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, fontSize: 12.5, cursor: 'pointer', textAlign: 'left'
 }
-const pageWrapStyle = {
-  flex: 1,
-  padding: '28px 32px',
-  width: '100%',
-  maxWidth: 'none',
-  overflowX: 'hidden'
+function getPageWrapStyle(isMobile) {
+  return {
+    flex: 1,
+    padding: isMobile ? '16px 14px 84px' : '28px 32px',
+    width: '100%',
+    maxWidth: 'none',
+    overflowX: 'hidden'
+  }
 }
 
 const sectionGridStyle = {
@@ -76,6 +78,20 @@ const sectionGridStyle = {
   gap: 16,
   marginBottom: 16
 }
+const MOBILE_BREAKPOINT = 768
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < MOBILE_BREAKPOINT : false
+  )
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < MOBILE_BREAKPOINT) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return isMobile
+}
+
 const SUSPICIOUS_IP_THRESHOLD = 3
 const SUSPICIOUS_WINDOW_MS = 60 * 60 * 1000 // 1 saat
 
@@ -179,7 +195,7 @@ function toLocalTimeValue(iso) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services, targetBranchId, targetBranchName, isSuperAdmin }) {
+function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile }) {
   const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
@@ -253,7 +269,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
           Bu kayıt <strong>{targetBranchName || 'seçili şube'}</strong> şubesine eklenecek. Farklı bir şubeye eklemek için yukarıdaki şube seçiciden değiştirin.
         </p>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <input placeholder="İsim soyisim" value={form.name} onChange={e => set('name', e.target.value)} style={inputStyle} />
         <div>
           <input placeholder="+905551234567" value={form.phone} onChange={e => {
@@ -264,7 +280,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
           {phoneErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{phoneErr}</p>}
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <select value={form.channel} onChange={e => set('channel', e.target.value)} style={inputStyle}>
           {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -356,7 +372,7 @@ function dateKey(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, showBranch, branchNameFn }) {
+function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, showBranch, branchNameFn, isMobile }) {
   const [viewDate, setViewDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(null)
 
@@ -406,23 +422,23 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
   const selectedLeads = selectedKey ? (leadsByDay[selectedKey] || []) : []
 
   return (
-    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginBottom: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem 0.75rem' : '1.25rem', marginBottom: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 8 }}>
         <button type="button" onClick={() => changeMonth(-1)} style={{ padding: '4px 10px', borderRadius: 8 }}>‹</button>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <select value={month} onChange={e => jumpToMonth(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 600 }}>
+        <div style={{ display: 'flex', gap: isMobile ? 5 : 8 }}>
+          <select value={month} onChange={e => jumpToMonth(e.target.value)} style={{ padding: isMobile ? '6px 4px' : '6px 8px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: isMobile ? 12.5 : 14, fontWeight: 600, minWidth: 0 }}>
             {MONTH_NAMES.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
-          <select value={year} onChange={e => jumpToYear(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 600 }}>
+          <select value={year} onChange={e => jumpToYear(e.target.value)} style={{ padding: isMobile ? '6px 4px' : '6px 8px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: isMobile ? 12.5 : 14, fontWeight: 600, minWidth: 0 }}>
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <button type="button" onClick={() => changeMonth(1)} style={{ padding: '4px 10px', borderRadius: 8 }}>›</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
-        {WEEKDAY_NAMES.map(w => <div key={w} style={{ textAlign: 'center', fontSize: 11, color: '#888', fontWeight: 600 }}>{w}</div>)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? 3 : 4, marginBottom: 6 }}>
+        {WEEKDAY_NAMES.map(w => <div key={w} style={{ textAlign: 'center', fontSize: isMobile ? 10 : 11, color: '#888', fontWeight: 600 }}>{w}</div>)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? 3 : 4 }}>
         {cells.map((d, i) => {
           if (d === null) return <div key={'e' + i} />
           const key = dateKey(new Date(year, month, d))
@@ -432,19 +448,19 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
           return (
             <button key={d} type="button" onClick={() => setSelectedDay(d)}
               style={{
-                position: 'relative', padding: '8px 4px', minHeight: 44, borderRadius: 8, textAlign: 'left',
+                position: 'relative', padding: isMobile ? '5px 2px' : '8px 4px', minHeight: isMobile ? 36 : 44, borderRadius: 8, textAlign: 'left',
                 background: isSelected ? '#6C5CE7' : (isToday ? '#eef2f8' : '#fafafa'),
                 color: isSelected ? '#fff' : '#222',
                 border: isToday && !isSelected ? '1px solid #6C5CE7' : '1px solid #eee',
-                cursor: 'pointer', fontSize: 13
+                cursor: 'pointer', fontSize: isMobile ? 12 : 13
               }}>
               <span>{d}</span>
               {dayLeads.length > 0 && (
                 <span style={{
-                  display: 'block', marginTop: 4, fontSize: 10, fontWeight: 700,
+                  display: 'block', marginTop: 4, fontSize: isMobile ? 9 : 10, fontWeight: 700,
                   color: isSelected ? '#fff' : '#6C5CE7'
                 }}>
-                  {dayLeads.length} randevu
+                  {isMobile ? dayLeads.length : `${dayLeads.length} randevu`}
                 </span>
               )}
             </button>
@@ -460,18 +476,33 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
           {selectedLeads.length === 0 ? (
             <p style={{ fontSize: 13, color: '#888' }}>Bu günde randevu yok.</p>
           ) : selectedLeads.map(lead => (
-            <div key={lead.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', fontSize: 13, borderBottom: '1px solid #f0f0f0' }}>
-              <span>
-                <span style={{ fontWeight: 600 }}>{lead.name}</span>
-                <span style={{ color: T.textSoft, marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
-                {showBranch && <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {branchNameFn(lead.branch_id)}</span>}
-                <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
-                {lead.note && <span style={{ color: T.textFaint, marginLeft: 8, fontSize: 12 }}>· {lead.note.slice(0, 40)}</span>}
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#6C5CE7' }}>
-                {new Date(lead.appointment_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
+            isMobile ? (
+              <div key={lead.id} style={{ padding: '9px 0', fontSize: 13, borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <span style={{ fontWeight: 600 }}>{lead.name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#6C5CE7', flexShrink: 0 }}>
+                    {new Date(lead.appointment_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <p style={{ margin: '3px 0 0', fontSize: 12, color: T.textSoft }}>
+                  {canSeePhone ? lead.phone : '••• gizli'}{showBranch && ` · ${branchNameFn(lead.branch_id)}`} · {lead.service}
+                </p>
+                {lead.note && <p style={{ margin: '2px 0 0', fontSize: 12, color: T.textFaint }}>{lead.note.slice(0, 40)}</p>}
+              </div>
+            ) : (
+              <div key={lead.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', fontSize: 13, borderBottom: '1px solid #f0f0f0' }}>
+                <span>
+                  <span style={{ fontWeight: 600 }}>{lead.name}</span>
+                  <span style={{ color: T.textSoft, marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
+                  {showBranch && <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {branchNameFn(lead.branch_id)}</span>}
+                  <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
+                  {lead.note && <span style={{ color: T.textFaint, marginLeft: 8, fontSize: 12 }}>· {lead.note.slice(0, 40)}</span>}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#6C5CE7' }}>
+                  {new Date(lead.appointment_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            )
           ))}
         </div>
       )}
@@ -510,8 +541,35 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff }) {
   )
 }
 
-function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName }) {
+function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile }) {
   const s = staleness(lead)
+
+  if (isMobile) {
+    return (
+      <div style={{ padding: '12px 0', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontWeight: 700, fontSize: 14, margin: 0, color: T.text }}>{lead.name}</p>
+            <p style={{ fontSize: 12.5, color: T.textSoft, margin: '2px 0 0' }}>
+              {canSeePhone ? lead.phone : '••• gizli'} · {lead.channel}
+              {showBranch && ` · ${branchName}`}
+            </p>
+          </div>
+          {canEdit && (
+            <button onClick={() => onEdit(lead)} style={{ fontSize: 12, padding: '5px 9px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, flexShrink: 0 }}>✎</button>
+          )}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: RESULT_COLOR[lead.result], background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>{lead.result}</span>
+          {lead.service && <span style={{ fontSize: 11.5, color: T.textSoft, background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>{lead.service}</span>}
+          {lead.sale_amount != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: T.green, background: T.greenBg, padding: '3px 8px', borderRadius: 6 }}>{fmtTL(lead.sale_amount)}</span>}
+          {s && <span style={{ fontSize: 11.5, fontWeight: 700, color: s.level === 'critical' ? T.red : T.orange, background: s.level === 'critical' ? T.redBg : T.orangeBg, padding: '3px 8px', borderRadius: 6 }}>{s.days} gün önce</span>}
+        </div>
+        {lead.note && <p style={{ fontSize: 12.5, color: T.textFaint, margin: '8px 0 0' }}>{lead.note}</p>}
+      </div>
+    )
+  }
+
   return (
     <div style={{
       display: 'grid',
@@ -532,7 +590,7 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName })
   )
 }
 
-function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
+function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch, isMobile }) {
   const [form, setForm] = useState({ spend: '', impressions: '', messages: '', manualAdjustment: '' })
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
   async function submit(e) {
@@ -545,12 +603,12 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch }) {
     setForm({ spend: '', impressions: '', messages: '', manualAdjustment: '' })
   }
   return (
-    <form onSubmit={submit} style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <form onSubmit={submit} style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem' : '1.25rem', marginTop: isMobile ? '1rem' : '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Haftalık reklam verisi gir (admin)</p>
       <select value={selectedBranch} onChange={e => onSelectBranch(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
         <input placeholder="Harcama (TL)" value={form.spend} onChange={e => set('spend', e.target.value)} style={inputStyle} />
         <input placeholder="Gösterim" value={form.impressions} onChange={e => set('impressions', e.target.value)} style={inputStyle} />
         <input placeholder="Mesaj sayısı (Meta)" value={form.messages} onChange={e => set('messages', e.target.value)} style={inputStyle} />
@@ -642,7 +700,7 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
     </div>
   )
 }
-function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeUsername, branches, templates }) {
+function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeUsername, branches, templates, isMobile }) {
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newBranchId, setNewBranchId] = useState(branches[0]?.id || '')
@@ -698,7 +756,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
   }
 
   return (
-    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem' : '1.25rem', marginTop: isMobile ? '1rem' : '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Erişim yönetimi</p>
       <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Ödeme alınmazsa ilgili şubenin erişimini buradan askıya alabilirsin.</p>
 
@@ -706,13 +764,13 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
         const branch = branches.find(b => b.id === u.branch_id)
         const tplName = (templates || []).find(t => t.id === u.permission_template_id)?.name || u.role
         return (
-          <div key={u.username} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div key={u.username} style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 8 : 0 }}>
               <div>
                 <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.username}</p>
                 <p style={{ margin: 0, fontSize: 12, color: T.textSoft }}>{tplName} · {branch ? branch.name : '—'}</p>
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
                 <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue(''); setEditingUsernameFor(null) }}
                   style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   Şifre değiştir
@@ -761,11 +819,11 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
       <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #eee' }}>
         <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>Yeni kullanıcı ekle</p>
         <form onSubmit={submitAdd}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <input placeholder="Kullanıcı adı" value={newUsername} onChange={e => setNewUsername(e.target.value)} style={inputStyle} />
             <input placeholder="Şifre" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inputStyle} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <select value={newBranchId} onChange={e => setNewBranchId(e.target.value)} style={inputStyle}>
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
@@ -945,7 +1003,7 @@ const PERMISSION_LABELS = {
   can_see_calendar: 'Randevu takvimini görebilir'
 }
 
-function PermissionTemplateManager() {
+function PermissionTemplateManager({ isMobile }) {
   const [templates, setTemplates] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [savingId, setSavingId] = useState(null)
@@ -1026,13 +1084,13 @@ function PermissionTemplateManager() {
   if (!loaded) return null
 
   return (
-    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem' : '1.25rem', marginTop: isMobile ? '1rem' : '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>İzin şablonları (Süper Admin)</p>
       <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 14px' }}>Her şablonun hangi yetkilere sahip olduğunu buradan açıp kapatabilirsin. Değişiklik anında tüm o şablona bağlı kullanıcılara uygulanır.</p>
       {err && <p style={{ fontSize: 13, color: '#c0392b', margin: '0 0 14px', fontWeight: 600 }}>{err}</p>}
       {templates.map(tpl => (
         <div key={tpl.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
             <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{tpl.name}{savingId === tpl.id ? ' · kaydediliyor...' : ''}</p>
             <button onClick={() => { setEditingNameFor(editingNameFor === tpl.id ? null : tpl.id); setNameValue(tpl.name) }}
               style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer' }}>
@@ -1055,7 +1113,7 @@ function PermissionTemplateManager() {
               <button onClick={() => submitNameChange(tpl)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6 }}>
             {Object.keys(PERMISSION_LABELS).map(key => (
               <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
                 <input type="checkbox" checked={!!tpl[key]} onChange={() => toggle(tpl, key)} />
@@ -1151,7 +1209,102 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
   )
 }
 
-function FunnelSection({ stats }) {
+// Mobilde gösterilecek en fazla 4 ana sekme + "Diğer" — toplam 5 slotu aşmaz
+const MOBILE_PRIMARY_KEYS = ['overview', 'clients', 'appointments', 'reports']
+
+function BottomTabBar({ items, activeTab, onSelect, onMoreClick, isMoreActive }) {
+  const primary = items.filter(i => MOBILE_PRIMARY_KEYS.includes(i.key))
+  const overflow = items.filter(i => !MOBILE_PRIMARY_KEYS.includes(i.key))
+  const showMore = overflow.length > 0
+
+  const tabBtnStyle = (active) => ({
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: 3, flex: 1, padding: '7px 2px 9px', border: 'none', background: 'transparent',
+    color: active ? T.primary : T.textFaint, fontSize: 10.5, fontWeight: active ? 700 : 500,
+    cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
+  })
+
+  return (
+    <nav style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+      display: 'flex', background: T.card, borderTop: `1px solid ${T.border}`,
+      paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+    }}>
+      {primary.map(item => {
+        const active = activeTab === item.key && !isMoreActive
+        return (
+          <button key={item.key} onClick={() => onSelect(item.key)} style={tabBtnStyle(active)}>
+            <span style={{ display: 'flex', opacity: active ? 1 : 0.85 }}>{item.icon}</span>
+            {item.label}
+          </button>
+        )
+      })}
+      {showMore && (
+        <button onClick={onMoreClick} style={tabBtnStyle(isMoreActive)}>
+          <span style={{ display: 'flex', opacity: isMoreActive ? 1 : 0.85 }}><Settings size={18} /></span>
+          Diğer
+        </button>
+      )}
+    </nav>
+  )
+}
+
+function MobileTopBar({ currentUser, branchLabel, onLogout }) {
+  return (
+    <div style={{
+      position: 'sticky', top: 0, zIndex: 40, display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between', padding: '12px 14px', background: T.card,
+      borderBottom: `1px solid ${T.border}`
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+        <span style={{
+          width: 30, height: 30, borderRadius: 8, background: `linear-gradient(135deg, ${T.primary}, #A78BFA)`,
+          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0
+        }}>M</span>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontWeight: 700, fontSize: 13, margin: 0, color: T.text, lineHeight: 1.2 }}>Müşteri Takip</p>
+          <p style={{ fontSize: 11, margin: 0, color: T.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.username} · {branchLabel}</p>
+        </div>
+      </div>
+      <button onClick={onLogout} style={{
+        flexShrink: 0, padding: '7px 9px', borderRadius: 9, border: `1px solid ${T.border}`,
+        background: 'transparent', color: T.textSoft, cursor: 'pointer', display: 'flex', alignItems: 'center'
+      }}><LogOut size={15} /></button>
+    </div>
+  )
+}
+
+function MobileMoreSheet({ items, onSelect, onLogout }) {
+  const overflow = items.filter(i => !MOBILE_PRIMARY_KEYS.includes(i.key))
+  return (
+    <div>
+      <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Diğer</h1>
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden' }}>
+        {overflow.map((item, i) => (
+          <button key={item.key} onClick={() => onSelect(item.key)} style={{
+            display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '14px 16px',
+            border: 'none', borderBottom: i < overflow.length - 1 ? `1px solid ${T.border}` : 'none',
+            background: 'transparent', color: T.text, fontSize: 14.5, fontWeight: 500, cursor: 'pointer', textAlign: 'left'
+          }}>
+            <span style={{ display: 'flex', color: T.textSoft }}>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+        <button onClick={onLogout} style={{
+          display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '14px 16px',
+          border: 'none', borderTop: `1px solid ${T.border}`,
+          background: 'transparent', color: T.red, fontSize: 14.5, fontWeight: 500, cursor: 'pointer', textAlign: 'left'
+        }}>
+          <span style={{ display: 'flex' }}><LogOut size={18} /></span>
+          Çıkış yap
+        </button>
+      </div>
+      <p style={{ fontSize: 11, color: T.textFaint, margin: '16px 0 0', textAlign: 'center' }}>Müşteri Takip v2.0.0</p>
+    </div>
+  )
+}
+
+function FunnelSection({ stats, isMobile }) {
   const stages = [
     {
       label: '1. Mesaj Geldi',
@@ -1186,8 +1339,8 @@ function FunnelSection({ stats }) {
   const rates = [stats.pctAppointed, stats.pctArrived, stats.pctSold]
 
   return (
-    <div style={{ ...cardStyle, padding: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+    <div style={{ ...cardStyle, padding: isMobile ? 14 : 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0, marginBottom: 18 }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: T.text }}>
             Satış Hunisi
@@ -1212,16 +1365,16 @@ function FunnelSection({ stats }) {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
         gap: 12,
         alignItems: 'stretch'
       }}>
         {stages.map((s, i) => (
           <div key={s.label} style={{ position: 'relative' }}>
             <div style={{
-              minHeight: 150,
+              minHeight: isMobile ? 120 : 150,
               borderRadius: 18,
-              padding: 18,
+              padding: isMobile ? 14 : 18,
               background: s.bg,
               border: `1px solid ${T.border}`,
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
@@ -1232,7 +1385,7 @@ function FunnelSection({ stats }) {
             }}>
               <div>
                 <p style={{
-                  fontSize: 13,
+                  fontSize: 12,
                   color: T.textSoft,
                   margin: 0,
                   fontWeight: 700,
@@ -1242,9 +1395,9 @@ function FunnelSection({ stats }) {
                 </p>
 
                 <p style={{
-                  fontSize: 34,
+                  fontSize: isMobile ? 26 : 34,
                   fontWeight: 900,
-                  margin: '12px 0 0',
+                  margin: '10px 0 0',
                   color: T.text,
                   letterSpacing: '-0.03em'
                 }}>
@@ -1253,8 +1406,8 @@ function FunnelSection({ stats }) {
               </div>
 
               <div style={{
-                width: 38,
-                height: 38,
+                width: isMobile ? 32 : 38,
+                height: isMobile ? 32 : 38,
                 borderRadius: 12,
                 background: 'rgba(255,255,255,0.06)',
                 color: s.color,
@@ -1266,7 +1419,7 @@ function FunnelSection({ stats }) {
               </div>
             </div>
 
-            {i < stages.length - 1 && (
+            {!isMobile && i < stages.length - 1 && (
               <div style={{
                 position: 'absolute',
                 right: -22,
@@ -1387,7 +1540,7 @@ function MonthlyTrendChart({ leads }) {
   return <div style={{ position: 'relative', width: '100%', height: 176 }}><canvas ref={ref} /></div>
 }
 
-function AdsPerformanceTable({ adsData, leads }) {
+function AdsPerformanceTable({ adsData, leads, isMobile }) {
   const rows = useMemo(() => {
     const byChannel = {}
     adsData.forEach(w => {
@@ -1406,6 +1559,26 @@ function AdsPerformanceTable({ adsData, leads }) {
   }, [adsData, leads])
 
   if (rows.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Henüz reklam verisi girilmemiş.</p>
+
+  if (isMobile) {
+    return (
+      <div>
+        {rows.map(r => (
+          <div key={r.channel} style={{ padding: '11px 0', borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: T.text, fontWeight: 700, fontSize: 14 }}>{r.channel}</span>
+              <span style={{ color: r.roas !== '—' && Number(r.roas) >= 2 ? T.green : T.orange, fontWeight: 700, fontSize: 14 }}>{r.roas}{r.roas !== '—' ? 'x ROAS' : ''}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 4, fontSize: 12, color: T.textSoft }}>
+              <span>Harcanan: {fmtTL(r.spend)}</span>
+              <span>Mesaj: {r.messages}</span>
+              <span>Satış: {r.sales}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -1454,9 +1627,30 @@ function BranchesOverview({ branches, leads }) {
   )
 }
 
-function RecentLeadsTable({ leads, canSeePhone, showBranch, branchNameFn }) {
+function RecentLeadsTable({ leads, canSeePhone, showBranch, branchNameFn, isMobile }) {
   const recent = useMemo(() => [...leads].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [leads])
   if (recent.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Henüz kayıt yok.</p>
+
+  if (isMobile) {
+    return (
+      <div>
+        {recent.map(l => (
+          <div key={l.id} style={{ padding: '11px 0', borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: T.text, fontWeight: 600, fontSize: 13.5 }}>{l.name}</span>
+              <span style={{ color: T.textFaint, fontSize: 11.5, flexShrink: 0 }}>{new Date(l.date).toLocaleDateString('tr-TR')}</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+              <span style={{ background: T.primaryLight, color: T.primary, padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{l.result}</span>
+              <span style={{ color: T.textSoft, fontSize: 11.5 }}>{l.channel}{showBranch && ` · ${branchNameFn(l.branch_id)}`}</span>
+            </div>
+            {l.note && <p style={{ color: T.textSoft, fontSize: 12, margin: '6px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.note}</p>}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: showBranch ? '1.1fr 0.8fr 1fr 1.4fr 0.8fr 0.9fr' : '1.1fr 0.8fr 1fr 1.6fr 0.8fr', gap: 8, fontSize: 11.5, color: T.textFaint, paddingBottom: 8, borderBottom: `1px solid ${T.border}`, minWidth: 600 }}>
@@ -1494,6 +1688,8 @@ export function PanelApp() {
   const [adsSelectedBranch, setAdsSelectedBranch] = useState('')
   const [filterBranch, setFilterBranch] = useState('all')
   const [activeTab, setActiveTab] = useState('overview')
+  const isMobile = useIsMobile()
+  const [showMobileMore, setShowMobileMore] = useState(false)
 
   function loginAndPersist(user) {
     try { localStorage.setItem('mt_current_user', JSON.stringify(user)) } catch (e) {}
@@ -1676,7 +1872,7 @@ export function PanelApp() {
   const branchLabel = isSuperAdmin ? 'süper admin · tüm şubeler' : `${branchName(currentUser.branch_id)}`
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', background: T.bg, minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: isMobile ? 'column' : 'row', background: T.bg, minHeight: '100vh' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         select, input, textarea { font-family: 'Inter', system-ui, sans-serif; }
@@ -1685,13 +1881,21 @@ export function PanelApp() {
         ::placeholder { color: ${T.textFaint}; }
       `}</style>
 
-      <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
-        isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={setActiveTab} />
+      {isMobile ? (
+        <MobileTopBar currentUser={currentUser} branchLabel={branchLabel} onLogout={logoutAndClear} />
+      ) : (
+        <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
+          isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={setActiveTab} />
+      )}
 
-<div style={pageWrapStyle} className="page-wrap">
+<div style={getPageWrapStyle(isMobile)} className="page-wrap">
+        {isMobile && showMobileMore ? (
+          <MobileMoreSheet items={visibleNavItems} onSelect={(key) => { setActiveTab(key); setShowMobileMore(false) }} onLogout={logoutAndClear} />
+        ) : (
+        <>
         {isSuperAdmin && (
           <div style={{ marginBottom: '1.5rem' }}>
-            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: 240, fontWeight: 600 }}>
+            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: isMobile ? '100%' : 240, fontWeight: 600 }}>
               <option value="all">Tüm şubeler (toplu rapor)</option>
               {branches.filter(b => b.active !== false).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
@@ -1726,15 +1930,9 @@ export function PanelApp() {
               )}
             </div>
 
-<div style={{
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
-  gap: 16,
-  marginBottom: 16
-}}>
 <div style={{ ...sectionGridStyle, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-  <FunnelSection stats={stats} />
-</div> 
+  <FunnelSection stats={stats} isMobile={isMobile} />
+</div>
 
 <div style={{ ...sectionGridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
   <LossAnalysis stats={stats} />
@@ -1764,7 +1962,7 @@ export function PanelApp() {
                   {perms.can_enter_ads_data && (
                     <div style={{ ...cardStyle, padding: '1.1rem' }}>
                       <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Reklam Performansı (Bu Ay)</p>
-                      <AdsPerformanceTable adsData={scopedAds} leads={scopedLeads} />
+                      <AdsPerformanceTable adsData={scopedAds} leads={scopedLeads} isMobile={isMobile} />
                     </div>
                   )}
                 </>
@@ -1774,7 +1972,7 @@ export function PanelApp() {
             <div style={{ display: 'grid', gridTemplateColumns: isSuperAdmin && filterBranch === 'all' ? '2fr 1fr' : '1fr', gap: 16 }}>
               <div style={{ ...cardStyle, padding: '1.1rem' }}>
                 <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Son Görüşmeler</p>
-                <RecentLeadsTable leads={visibleLeads} canSeePhone={perms.can_see_phone} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
+                <RecentLeadsTable leads={visibleLeads} canSeePhone={perms.can_see_phone} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} isMobile={isMobile} />
               </div>
               {isSuperAdmin && filterBranch === 'all' && (
                 <div style={{ ...cardStyle, padding: '1.1rem' }}>
@@ -1790,7 +1988,7 @@ export function PanelApp() {
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Danışanlar</h1>
             {perms.can_add_lead && (
-              <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices}
+              <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices} isMobile={isMobile}
                 targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
                 targetBranchName={isSuperAdmin ? (filterBranch !== 'all' ? branchName(filterBranch) : branchName(activeBranches[0]?.id)) : branchName(currentUser.branch_id)}
                 isSuperAdmin={isSuperAdmin}
@@ -1803,18 +2001,20 @@ export function PanelApp() {
               {visibleLeads.length === 0 ? (
                 <p style={{ fontSize: 13, color: T.textSoft }}>Henüz kayıt yok.</p>
               ) : (
-                <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '0 1.25rem', overflowX: 'auto' }}>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
-                    gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: T.textSoft, minWidth: 760
-                  }}>
-                    {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
-                    <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
-                  </div>
+                <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: isMobile ? '0 1rem' : '0 1.25rem', overflowX: isMobile ? 'visible' : 'auto' }}>
+                  {!isMobile && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
+                      gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: T.textSoft, minWidth: 760
+                    }}>
+                      {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
+                      <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
+                    </div>
+                  )}
                   {visibleLeads.map(l => (
                     <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
-                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} />
+                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} isMobile={isMobile} />
                   ))}
                 </div>
               )}
@@ -1825,7 +2025,7 @@ export function PanelApp() {
         {activeTab === 'appointments' && perms.can_see_calendar && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Randevular</h1>
-            <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} />
+            <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} isMobile={isMobile} />
           </div>
         )}
 
@@ -1851,7 +2051,7 @@ export function PanelApp() {
         {activeTab === 'ads' && perms.can_enter_ads_data && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Reklam Kaynakları</h1>
-            <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} />
+            <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} isMobile={isMobile} />
           </div>
         )}
 
@@ -1868,18 +2068,30 @@ export function PanelApp() {
                 onDelete={deleteService}
               />
             )}
-            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} branches={activeBranches} templates={templates} />}
+            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} branches={activeBranches} templates={templates} isMobile={isMobile} />}
           </div>
         )}
 
         {activeTab === 'admin' && isSuperAdmin && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Yönetim</h1>
-            <PermissionTemplateManager />
+            <PermissionTemplateManager isMobile={isMobile} />
             <SecurityNotice isAdmin={isSuperAdmin} />
           </div>
         )}
+        </>
+        )}
       </div>
+
+      {isMobile && (
+        <BottomTabBar
+          items={visibleNavItems}
+          activeTab={activeTab}
+          isMoreActive={showMobileMore}
+          onSelect={(key) => { setActiveTab(key); setShowMobileMore(false) }}
+          onMoreClick={() => setShowMobileMore(true)}
+        />
+      )}
     </div>
   )
 }
