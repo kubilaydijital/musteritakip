@@ -1756,6 +1756,25 @@ export function PanelApp() {
   const isMobile = useIsMobile()
   const [showMobileMore, setShowMobileMore] = useState(false)
 
+  // Her lead için, MEVCUT sonuç kategorisinde kaç not eklendiğini sayar.
+  // Sonuç değiştiğinde (örn. Satın almadı -> Randevu aldı), eski kategorideki notlar sayılmaz,
+  // sayaç o yeni kategoride sıfırdan başlar - bu yüzden lead_notes.result_at_time ile eşleştiriyoruz.
+  // NOT: Bu hook, aşağıdaki early-return'lerden (if !currentUser, if !loaded) ÖNCE tanımlı olmak
+  // ZORUNDA - aksi halde render'lar arası hook sayısı değişir ve React #310 hatası fırlatır.
+  const noteCountByLeadId = useMemo(() => {
+    const map = {}
+    const leadById = {}
+    leads.forEach(l => { leadById[l.id] = l })
+    leadNotes.forEach(n => {
+      const lead = leadById[n.lead_id]
+      if (!lead) return
+      // result_at_time eski kayıtlarda olmayabilir (migration öncesi); o durumda güvenli tarafta kalıp say.
+      if (n.result_at_time && n.result_at_time !== lead.result) return
+      map[n.lead_id] = (map[n.lead_id] || 0) + 1
+    })
+    return map
+  }, [leadNotes, leads])
+
   function loginAndPersist(user) {
     try { localStorage.setItem('mt_current_user', JSON.stringify(user)) } catch (e) {}
     setCurrentUser(user)
@@ -1917,23 +1936,6 @@ export function PanelApp() {
   // "isStaff" artık ayrı bir rol değil - her ekran kendi spesifik iznine bakıyor.
   // canSeeOwnDataOnly: sadece kendi girdiği kaydı görme/listeleme kısıtı, "herkesin kaydını düzenleme" izni yoksa devreye girer
   const canSeeOwnDataOnly = !perms.can_edit_any_lead && !isSuperAdmin
-
-  // Her lead için, MEVCUT sonuç kategorisinde kaç not eklendiğini sayar.
-  // Sonuç değiştiğinde (örn. Satın almadı -> Randevu aldı), eski kategorideki notlar sayılmaz,
-  // sayaç o yeni kategoride sıfırdan başlar - bu yüzden lead_notes.result_at_time ile eşleştiriyoruz.
-  const noteCountByLeadId = useMemo(() => {
-    const map = {}
-    const leadById = {}
-    leads.forEach(l => { leadById[l.id] = l })
-    leadNotes.forEach(n => {
-      const lead = leadById[n.lead_id]
-      if (!lead) return
-      // result_at_time eski kayıtlarda olmayabilir (migration öncesi); o durumda güvenli tarafta kalıp say.
-      if (n.result_at_time && n.result_at_time !== lead.result) return
-      map[n.lead_id] = (map[n.lead_id] || 0) + 1
-    })
-    return map
-  }, [leadNotes, leads])
 
   const relevantBranchId = isSuperAdmin && filterBranch !== 'all' ? filterBranch : currentUser.branch_id
   const currentBranchServices = branchServices.filter(s => s.branch_id === relevantBranchId)
