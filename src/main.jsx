@@ -1,25 +1,25 @@
-import { StrictMode } from 'react'
+import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import './index.css'
-import LandingPage from './LandingPage.jsx'
-import Features from './Features.jsx'
-import Testimonials from './Testimonials.jsx'
-import About from './About.jsx'
-import Blog from './Blog.jsx'
-import BlogPost from './BlogPost.jsx'
-import Contact from './Contact.jsx'
-import Trial from './Trial.jsx'
+import './styles.css'
+import LandingPage from './pages/LandingPage.jsx'
+import Features from './pages/Features.jsx'
+import References from './pages/References.jsx'
+import About from './pages/About.jsx'
+import Blog from './pages/Blog.jsx'
+import BlogPost from './pages/BlogPost.jsx'
+import Contact from './pages/Contact.jsx'
+import Trial from './pages/Trial.jsx'
 import DemoPage from './DemoPage.jsx'
 import { PanelApp } from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
+  <React.StrictMode>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/ozellikler" element={<Features />} />
-        <Route path="/referanslar" element={<Testimonials />} />
+        <Route path="/referanslar" element={<References />} />
         <Route path="/hakkimizda" element={<About />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
@@ -30,5 +30,5 @@ createRoot(document.getElementById('root')).render(
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
-  </StrictMode>,
+  </React.StrictMode>
 )
