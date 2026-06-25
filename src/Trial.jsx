@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from './supabaseClient'
-import { SiteHeader, SiteFooter } from './SiteLayout'
-import { T, cardStyle, inputStyle, btnPrimary, GLOBAL_CSS, PAGE_MAX } from './theme'
+import { supabase } from '../supabaseClient.js'
+import Layout from '../components/Layout.jsx'
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
 
 // Basit, akılda kalıcı kullanıcı adı üretir: isletmeadi + 3 haneli rastgele sayı.
 function generateUsername(businessName) {
-  const base = businessName
+  const base = (businessName || 'isletme')
     .toLocaleLowerCase('tr-TR')
     .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c')
     .replace(/[^a-z0-9]/g, '')
@@ -24,17 +23,19 @@ function generatePassword() {
   return out
 }
 
+const BUSINESS_TYPES = ['Güzellik salonu', 'Kuaför', 'Diş kliniği', 'Gayrimenkul', 'Hukuk bürosu', 'Diğer']
+
 export default function Trial() {
-  const [form, setForm] = useState({ businessName: '', contactName: '', phone: '+90', email: '' })
+  const [form, setForm] = useState({ businessName: '', contactName: '', phone: '+90', email: '', businessType: '' })
   const [status, setStatus] = useState('idle') // idle | submitting | done | error
   const [errorMsg, setErrorMsg] = useState('')
   const [credentials, setCredentials] = useState(null)
 
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+  function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
 
   async function submit(e) {
     e.preventDefault()
-    if (!form.businessName.trim() || !form.contactName.trim() || !form.phone.trim()) return
+    if (!form.businessName.trim() || !form.contactName.trim() || !form.email.trim()) return
     setStatus('submitting')
     setErrorMsg('')
 
@@ -51,10 +52,10 @@ export default function Trial() {
       if (branchErr) throw new Error('Şube oluşturulamadı: ' + branchErr.message)
 
       // 2) Kendi şubesinde tam yetkili ama süper admin olmayan "Şube Sahibi" şablonuyla kullanıcı oluştur.
-      // Bu şablon trial_migration.sql ile önceden oluşturulmuş olmalı (id: tpl_branch_admin).
+      // Bu şablon panelde önceden mevcut olan "Şube Sahibi" şablonudur (id: tpl_admin).
       const { error: userErr } = await supabase.from('app_users').insert({
         username, password, branch_id: branchId, role: 'admin',
-        permission_template_id: 'tpl_branch_admin',
+        permission_template_id: 'tpl_admin',
         active: true, is_trial: true, trial_ends_at: trialEndsAt,
       })
       if (userErr) throw new Error('Kullanıcı oluşturulamadı: ' + userErr.message)
@@ -62,24 +63,22 @@ export default function Trial() {
       // 3) Talep kaydı (geçmiş takibi için)
       await supabase.from('trial_requests').insert({
         id: uid(), business_name: form.businessName.trim(), contact_name: form.contactName.trim(),
-        phone: form.phone.trim(), email: form.email.trim() || null,
+        phone: form.phone.trim(), email: form.email.trim(), business_type: form.businessType || null,
         status: 'created', generated_username: username, generated_branch_id: branchId,
       })
 
-      // 4) Bilgilendirme maili (Netlify Function üzerinden, Resend ile) - e-posta verilmişse
-      if (form.email.trim()) {
-        try {
-          await fetch('/.netlify/functions/send-trial-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: form.email.trim(), contactName: form.contactName.trim(),
-              businessName: form.businessName.trim(), username, password,
-            }),
-          })
-        } catch {
-          // Mail gönderimi başarısız olsa da hesap zaten oluştu, kullanıcıya bilgileri ekranda göstereceğiz.
-        }
+      // 4) Bilgilendirme maili (Netlify Function üzerinden, Resend ile)
+      try {
+        await fetch('/.netlify/functions/send-trial-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: form.email.trim(), contactName: form.contactName.trim(),
+            businessName: form.businessName.trim(), username, password,
+          }),
+        })
+      } catch {
+        // Mail gönderimi başarısız olsa da hesap zaten oluştu, kullanıcıya bilgileri ekranda göstereceğiz.
       }
 
       setCredentials({ username, password })
@@ -92,82 +91,52 @@ export default function Trial() {
 
   if (status === 'done' && credentials) {
     return (
-      <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: T.bg, color: T.text, minHeight: '100vh' }}>
-        <style>{GLOBAL_CSS}</style>
-        <SiteHeader />
-        <section style={{ maxWidth: 560, margin: '0 auto', padding: '80px 20px' }}>
-          <div style={{ ...cardStyle, padding: 36, textAlign: 'center' }}>
-            <span style={{ fontSize: 44, display: 'block', marginBottom: 16 }}>🎉</span>
-            <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 12px' }}>Hesabınız hazır!</h1>
-            <p style={{ fontSize: 14.5, color: T.textSoft, lineHeight: 1.6, margin: '0 0 28px' }}>
-              14 günlük deneme süreniz başladı. Giriş bilgilerinizi not edin{form.email.trim() ? ' — ayrıca e-posta adresinize de gönderdik.' : '.'}
-            </p>
-            <div style={{ background: T.cardSoft, borderRadius: 12, padding: 20, marginBottom: 28, textAlign: 'left' }}>
-              <p style={{ fontSize: 13, color: T.textFaint, margin: '0 0 4px' }}>Kullanıcı adı</p>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 16px', color: T.text }}>{credentials.username}</p>
-              <p style={{ fontSize: 13, color: T.textFaint, margin: '0 0 4px' }}>Şifre</p>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: 0, color: T.text }}>{credentials.password}</p>
+      <Layout>
+        <main className="page">
+          <section className="container trial-card">
+            <span className="page-no">🎉 Hazır</span>
+            <h1>Hesabınız oluşturuldu!</h1>
+            <p>14 günlük deneme süreniz başladı. Giriş bilgilerinizi not edin — ayrıca e-posta adresinize de gönderdik.</p>
+            <div style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: '20px 22px', margin: '8px 0 24px' }}>
+              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 4px' }}>Kullanıcı adı</p>
+              <p style={{ fontSize: 18, fontWeight: 800, margin: '0 0 14px', color: '#fff' }}>{credentials.username}</p>
+              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 4px' }}>Şifre</p>
+              <p style={{ fontSize: 18, fontWeight: 800, margin: 0, color: '#fff' }}>{credentials.password}</p>
             </div>
-            <Link to="/giris" className="mt-btn-primary" style={{ ...btnPrimary, width: '100%', justifyContent: 'center' }}>
-              Panele Giriş Yap →
-            </Link>
-          </div>
-        </section>
-        <SiteFooter />
-      </div>
+            <Link to="/giris" className="btn btn-primary big">Panele Giriş Yap</Link>
+          </section>
+        </main>
+      </Layout>
     )
   }
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: T.bg, color: T.text, minHeight: '100vh' }}>
-      <style>{GLOBAL_CSS}</style>
-      <SiteHeader />
-
-      <section style={{ maxWidth: 560, margin: '0 auto', padding: '64px 20px 80px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontSize: 'clamp(26px, 4vw, 34px)', fontWeight: 900, margin: '0 0 12px', letterSpacing: '-0.02em' }}>
-            14 gün ücretsiz deneyin
-          </h1>
-          <p style={{ fontSize: 15, color: T.textSoft, margin: 0 }}>
-            Kredi kartı gerekmez. Hesabınız anında oluşturulur.
-          </p>
-        </div>
-
-        <div style={{ ...cardStyle, padding: 28 }}>
+    <Layout>
+      <main className="page">
+        <section className="container trial-card">
+          <span className="page-no">Ücretsiz Deneme</span>
+          <h1>14 gün boyunca sistemi deneyin.</h1>
+          <p>Kredi kartı gerekmez. Bilgilerinizi girin, hesabınız anında oluşturulsun.</p>
           <form onSubmit={submit}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: T.textSoft, display: 'block', marginBottom: 6 }}>İşletme adı</label>
-            <input placeholder="örn. Arzu Beauty Kadıköy" value={form.businessName} onChange={e => set('businessName', e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} required />
-
-            <label style={{ fontSize: 13, fontWeight: 600, color: T.textSoft, display: 'block', marginBottom: 6 }}>Adınız soyadınız</label>
-            <input placeholder="örn. Ayşe Yılmaz" value={form.contactName} onChange={e => set('contactName', e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} required />
-
-            <label style={{ fontSize: 13, fontWeight: 600, color: T.textSoft, display: 'block', marginBottom: 6 }}>Telefon</label>
-            <input placeholder="+905551234567" value={form.phone} onChange={e => {
+            <input placeholder="İşletme adı" value={form.businessName} onChange={(e) => set('businessName', e.target.value)} required/>
+            <input placeholder="Ad Soyad" value={form.contactName} onChange={(e) => set('contactName', e.target.value)} required/>
+            <input placeholder="E-posta" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required/>
+            <input placeholder="Telefon" value={form.phone} onChange={(e) => {
               let v = e.target.value
               if (!v.startsWith('+90')) v = '+90' + v.replace(/^\+?90?/, '')
               set('phone', v)
-            }} style={{ ...inputStyle, marginBottom: 16 }} required />
-
-            <label style={{ fontSize: 13, fontWeight: 600, color: T.textSoft, display: 'block', marginBottom: 6 }}>E-posta (isteğe bağlı)</label>
-            <input type="email" placeholder="ornek@mail.com" value={form.email} onChange={e => set('email', e.target.value)} style={{ ...inputStyle, marginBottom: 6 }} />
-            <p style={{ fontSize: 12, color: T.textFaint, margin: '0 0 20px' }}>Girerseniz giriş bilgileriniz e-postanıza da gönderilir.</p>
-
-            {status === 'error' && (
-              <p style={{ fontSize: 13.5, color: T.red, background: T.redBg, padding: '10px 14px', borderRadius: 8, margin: '0 0 16px' }}>{errorMsg}</p>
-            )}
-
-            <button type="submit" disabled={status === 'submitting'} style={{ ...btnPrimary, width: '100%', justifyContent: 'center', opacity: status === 'submitting' ? 0.7 : 1 }}>
-              {status === 'submitting' ? 'Hesabınız oluşturuluyor...' : 'Ücretsiz Hesap Oluştur →'}
+            }}/>
+            <select value={form.businessType} onChange={(e) => set('businessType', e.target.value)}>
+              <option value="" disabled>İşletme türü</option>
+              {BUSINESS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            {status === 'error' && <p style={{ color: 'var(--red)', fontSize: 14 }}>{errorMsg}</p>}
+            <button className="btn btn-primary" type="submit" disabled={status === 'submitting'}>
+              {status === 'submitting' ? 'Hesabınız oluşturuluyor...' : 'Ücretsiz Deneme Talebi Gönder'}
             </button>
           </form>
-        </div>
-
-        <p style={{ textAlign: 'center', fontSize: 13, color: T.textFaint, marginTop: 20 }}>
-          14 gün sonunda otomatik ücretlendirme yapılmaz, devam etmek isterseniz sizinle iletişime geçeriz.
-        </p>
-      </section>
-
-      <SiteFooter />
-    </div>
+        </section>
+      </main>
+    </Layout>
   )
 }
