@@ -41,9 +41,6 @@ export function Footer() {
         <div>
           <Logo small />
           <p className="footer-text">Hizmet sektöründeki işletmeler için akıllı müşteri takip, randevu ve hatırlatma sistemi.</p>
-          <div className="socials" aria-label="Sosyal medya ikon alanı">
-            <span>IG</span><span>FB</span><span>in</span>
-          </div>
         </div>
         <div>
           <h4>Hızlı Linkler</h4>
