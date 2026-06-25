@@ -175,4 +175,21 @@ function HeroPanelMock() {
         <p style={{ fontSize: 11.5, fontWeight: 700, color: T.textSoft, margin: '0 0 10px' }}>Hatırlatma Performansı</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
           {[['1. hatırlatma', 14], ['2. hatırlatma', 30], ['3. hatırlatma', 60]].map(([label, val]) => (
-            <div key={label}
+            <div key={label} style={{ textAlign: 'center' }}>
+              <p style={{ margin: '0 0 2px', color: T.textFaint }}>{label}</p>
+              <p style={{ margin: 0, fontWeight: 800, color: T.text }}>{val}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ background: T.cardSoft, borderRadius: 10, padding: '12px 14px' }}>
+        <p style={{ fontSize: 11.5, fontWeight: 700, color: T.textSoft, margin: '0 0 8px' }}>Yakın Randevular</p>
+        {[['11:00', 'Ayşe Yılmaz'], ['12:30', 'Mehmet Demir'], ['14:00', 'Elif Kaya']].map(([time, name]) => (
+          <div key={time} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', color: T.textSoft }}>
+            <span>{time}</span><span>{name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
