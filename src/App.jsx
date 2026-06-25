@@ -20,19 +20,48 @@ const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A',
 const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Organik': '#7F77DD' }
 const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#E24B4A', '#639922', '#854F0B']
 const PHONE_RE = /^\+\d{10,15}$/
-const WARN_DAYS = 7
-const CRITICAL_DAYS = 14
+
+// Her sonuç kategorisi için kademeli hatırlatma eşikleri (gün).
+// Dizinin uzunluğu = "soğumadan önce" kaç hatırlatma yapılacağı.
+// Sayaç, o leade eklenen not sayısına (lead_notes) göre ilerler.
+const REMINDER_SCHEDULE = {
+  'Randevu aldı': [1, 15, 45],
+  'Randevuya gelmedi': [3, 17, 47],
+  'Cevap yazıldı, müşteriden dönüş gelmedi': [3, 17, 47],
+  'Satın almadı': [15, 45, 105],
+}
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
 function daysSince(dateStr) { return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000) }
-function lastTouch(lead) { return lead.edited_at || lead.date }
-function staleness(lead) {
-  if (lead.result !== 'Randevu aldı' || !lead.appointment_at) return null
-  const d = daysSince(lead.appointment_at)
+function lastTouch(lead) { return lead.last_note_at || lead.edited_at || lead.date }
+
+// noteCount: leadin MEVCUT sonuç kategorisinde şu ana kadar eklenmiş not sayısı.
+// Sonuç değiştiğinde bu sayaç otomatik sıfırlanır (PanelApp'teki noteCountByLeadId hesaplamasına bak).
+// Süre, "Randevu aldı" için randevu tarihinden, diğerleri için son temas tarihinden işler.
+function staleness(lead, noteCount = 0) {
+  const schedule = REMINDER_SCHEDULE[lead.result]
+  if (!schedule) return null // Müşteri oldu -> takip yok
+
+  let anchorDate
+  if (lead.result === 'Randevu aldı') {
+    if (!lead.appointment_at) return null
+    anchorDate = lead.appointment_at
+  } else {
+    anchorDate = lastTouch(lead)
+  }
+
+  const d = daysSince(anchorDate)
   if (d < 0) return null // randevu henüz geçmedi
-  if (d >= CRITICAL_DAYS) return { level: 'critical', days: d }
-  if (d >= WARN_DAYS) return { level: 'warning', days: d }
-  return null
+
+  // noteCount, son hatırlatmadan sonra kaçıncı temasta olduğumuzu gösterir.
+  // Şimdiye kadar yapılan temas sayısı schedule.length'e ulaştıysa -> soğuk, artık uyarma.
+  if (noteCount >= schedule.length) return { level: 'cold', days: d }
+
+  const threshold = schedule[noteCount]
+  if (d < threshold) return null
+
+  const level = noteCount === schedule.length - 1 ? 'critical' : 'warning'
+  return { level, days: d, reminderNumber: noteCount + 1, totalReminders: schedule.length }
 }
 function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
@@ -180,7 +209,7 @@ function Login({ onLogin }) {
   )
 }
 
-const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', result: 'Randevu aldı', saleAmount: '', appointmentDate: '', appointmentTime: '' }
+const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', newNote: '', result: 'Randevu aldı', saleAmount: '', appointmentDate: '', appointmentTime: '' }
 
 function toLocalDateValue(iso) {
   if (!iso) return ''
@@ -195,8 +224,31 @@ function toLocalTimeValue(iso) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile }) {
-  const [form, setForm] = useState(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
+function NoteHistory({ notes }) {
+  if (!notes || notes.length === 0) {
+    return <p style={{ fontSize: 12.5, color: T.textFaint, margin: '0 0 12px' }}>Henüz not eklenmemiş.</p>
+  }
+  const sorted = [...notes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <p style={{ fontSize: 12.5, fontWeight: 600, color: T.textSoft, margin: '0 0 8px' }}>Not geçmişi ({sorted.length})</p>
+      <div style={{ maxHeight: 180, overflowY: 'auto', border: `1px solid ${T.border}`, borderRadius: 10 }}>
+        {sorted.map((n, i) => (
+          <div key={n.id} style={{ padding: '9px 11px', borderBottom: i < sorted.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 2 }}>
+              <span style={{ fontSize: 11, color: T.textFaint }}>{n.created_by || '—'}</span>
+              <span style={{ fontSize: 11, color: T.textFaint, flexShrink: 0 }}>{new Date(n.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })} · {new Date(n.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <p style={{ fontSize: 13, color: T.text, margin: 0 }}>{n.note}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile, notesForLead }) {
+  const [form, setForm] = useState(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
@@ -205,7 +257,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
-    setForm(editing ? { ...editing, saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
+    setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
     setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setConfirmingDelete(false)
   }, [editing])
 
@@ -228,7 +280,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     let ok = true
     if (!PHONE_RE.test(form.phone.trim())) { setPhoneErr('Telefon +90 ile başlayıp boşluksuz, sadece sayı içermeli. Örnek: +905551234567'); ok = false }
     else setPhoneErr('')
-    if (!form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
+    if (!editing && !form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
     else setNoteErr('')
     if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
     else setAppointmentErr('')
@@ -242,9 +294,9 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     if (editing) {
       await onUpdate({
         id: editing.id, name: form.name, phone: form.phone, channel: form.channel,
-        service: form.service, note: form.note, result: form.result, sale_amount: saleAmount,
+        service: form.service, note: form.newNote, result: form.result, sale_amount: saleAmount,
         appointment_at: appointmentAt, edited_at: new Date().toISOString()
-      })
+      }, currentUser.username)
     } else {
       await onAdd({
         id: uid(), branch_id: targetBranchId, name: form.name, phone: form.phone,
@@ -312,9 +364,20 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
           <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Bu alan zorunlu değildir, doldurmak istemezseniz boş bırakabilirsiniz.</p>
         </div>
       )}
-      <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => set('note', e.target.value)} rows={2}
-        style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
-      {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
+      {editing ? (
+        <>
+          <NoteHistory notes={notesForLead} />
+          <textarea placeholder="Yeni not ekle (isteğe bağlı)" value={form.newNote} onChange={e => set('newNote', e.target.value)} rows={2}
+            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
+          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 10px' }}>Not eklemek, bu kaydın "takip bekliyor" sayacını sıfırlar.</p>
+        </>
+      ) : (
+        <>
+          <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => set('note', e.target.value)} rows={2}
+            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
+          {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
+        </>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
         <button type="submit" disabled={submitting} style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
           {submitting ? 'Kaydediliyor...' : (editing ? 'Güncelle' : 'Kaydet')}
@@ -510,14 +573,14 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
   )
 }
 
-function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff }) {
+function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMap }) {
   const stale = useMemo(() =>
     leads
       .filter(l => isStaff ? l.entered_by === currentUserName : true)
-      .map(l => ({ lead: l, s: staleness(l) }))
-      .filter(x => x.s)
+      .map(l => ({ lead: l, s: staleness(l, noteCountMap[l.id] || 0) }))
+      .filter(x => x.s && x.s.level !== 'cold')
       .sort((a, b) => b.s.days - a.s.days),
-    [leads, currentUserName, isStaff])
+    [leads, currentUserName, isStaff, noteCountMap])
 
   if (stale.length === 0) return null
 
@@ -533,7 +596,7 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff }) {
             <span style={{ color: T.textSoft, marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
             <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {lead.result}</span>
           </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: s.level === 'critical' ? '#c0392b' : '#b8860b' }}>{s.days} gün önce — tekrar ara</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: s.level === 'critical' ? '#c0392b' : '#b8860b' }}>{s.days} gün önce — {s.reminderNumber}. hatırlatma</span>
         </div>
       ))}
       {stale.length > 8 && <p style={{ fontSize: 12, color: T.textSoft, margin: '8px 0 0' }}>+ {stale.length - 8} kayıt daha</p>}
@@ -541,8 +604,8 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff }) {
   )
 }
 
-function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile }) {
-  const s = staleness(lead)
+function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile, noteCount = 0 }) {
+  const s = staleness(lead, noteCount)
 
   if (isMobile) {
     return (
@@ -563,7 +626,8 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
           <span style={{ fontSize: 11.5, fontWeight: 600, color: RESULT_COLOR[lead.result], background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>{lead.result}</span>
           {lead.service && <span style={{ fontSize: 11.5, color: T.textSoft, background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>{lead.service}</span>}
           {lead.sale_amount != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: T.green, background: T.greenBg, padding: '3px 8px', borderRadius: 6 }}>{fmtTL(lead.sale_amount)}</span>}
-          {s && <span style={{ fontSize: 11.5, fontWeight: 700, color: s.level === 'critical' ? T.red : T.orange, background: s.level === 'critical' ? T.redBg : T.orangeBg, padding: '3px 8px', borderRadius: 6 }}>{s.days} gün önce</span>}
+          {s && s.level === 'cold' && <span style={{ fontSize: 11.5, fontWeight: 700, color: T.textFaint, background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>Soğuk</span>}
+          {s && s.level !== 'cold' && <span style={{ fontSize: 11.5, fontWeight: 700, color: s.level === 'critical' ? T.red : T.orange, background: s.level === 'critical' ? T.redBg : T.orangeBg, padding: '3px 8px', borderRadius: 6 }}>{s.days} gün önce</span>}
         </div>
         {lead.note && <p style={{ fontSize: 12.5, color: T.textFaint, margin: '8px 0 0' }}>{lead.note}</p>}
       </div>
@@ -584,7 +648,7 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
       <span style={{ fontSize: 12, color: T.textSoft }}>{lead.note ? lead.note.slice(0, 30) : '—'}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: RESULT_COLOR[lead.result] }}>{lead.result}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: '#2e7d32' }}>{lead.sale_amount != null ? fmtTL(lead.sale_amount) : '—'}</span>
-      {s ? <span style={{ fontSize: 11, fontWeight: 600, color: s.level === 'critical' ? '#c0392b' : '#b8860b' }}>{s.days}g</span> : <span />}
+      {s && s.level === 'cold' ? <span style={{ fontSize: 11, fontWeight: 600, color: T.textFaint }}>Soğuk</span> : s ? <span style={{ fontSize: 11, fontWeight: 600, color: s.level === 'critical' ? '#c0392b' : '#b8860b' }}>{s.days}g</span> : <span />}
       {canEdit ? <button onClick={() => onEdit(lead)} style={{ fontSize: 12, padding: '4px 8px' }}>✎</button> : <span />}
     </div>
   )
@@ -1680,6 +1744,7 @@ export function PanelApp() {
   const [branches, setBranches] = useState([])
   const [users, setUsers] = useState([])
   const [leads, setLeads] = useState([])
+  const [leadNotes, setLeadNotes] = useState([])
   const [adsData, setAdsData] = useState([])
   const [templates, setTemplates] = useState([])
   const [branchServices, setBranchServices] = useState([])
@@ -1708,13 +1773,14 @@ export function PanelApp() {
 
   async function loadAll() {
     setLoaded(false)
-    const [b, u, l, a, t, bs] = await Promise.all([
+    const [b, u, l, a, t, bs, ln] = await Promise.all([
       supabase.from('branches').select('*').order('name'),
       supabase.from('app_users').select('*'),
       supabase.from('leads').select('*').order('date', { ascending: false }),
       supabase.from('ads_data').select('*').order('date', { ascending: false }),
       supabase.from('permission_templates').select('*'),
-      supabase.from('branch_services').select('*').order('name')
+      supabase.from('branch_services').select('*').order('name'),
+      supabase.from('lead_notes').select('*').order('created_at', { ascending: false })
     ])
     setBranches(b.data || [])
     setUsers(u.data || [])
@@ -1722,6 +1788,7 @@ export function PanelApp() {
     setAdsData(a.data || [])
     setTemplates(t.data || [])
     setBranchServices(bs.data || [])
+    setLeadNotes(ln.data || [])
     if (b.data && b.data.length > 0) setAdsSelectedBranch(b.data[0].id)
     setLoaded(true)
 
@@ -1735,17 +1802,45 @@ export function PanelApp() {
   }
 
   async function addLead(lead) {
-    const { data } = await supabase.from('leads').insert(lead).select()
-    if (data) setLeads(prev => [data[0], ...prev])
+    const { data } = await supabase.from('leads').insert({ ...lead, last_note_at: lead.date }).select()
+    if (data) {
+      setLeads(prev => [data[0], ...prev])
+      if (lead.note && lead.note.trim()) {
+        const { data: noteData } = await supabase.from('lead_notes').insert({
+          id: uid(), lead_id: lead.id, note: lead.note, created_by: lead.entered_by, created_at: lead.date, result_at_time: lead.result
+        }).select()
+        if (noteData) setLeadNotes(prev => [noteData[0], ...prev])
+      }
+    }
   }
-  async function updateLead(updated) {
-    const { data } = await supabase.from('leads').update(updated).eq('id', updated.id).select()
+  // updated içindeki 'note' alanı her zaman YENİ bir not olarak eklenir (üzerine yazmaz).
+  // Diğer alanlar (result, channel, vb.) normal şekilde güncellenir.
+  async function updateLead(updated, currentUsername) {
+    const { note: newNoteText, ...leadFields } = updated
+    const nowIso = new Date().toISOString()
+    const hasNewNote = newNoteText && newNoteText.trim()
+
+    const leadPayload = { ...leadFields }
+    if (hasNewNote) {
+      leadPayload.note = newNoteText
+      leadPayload.last_note_at = nowIso
+    }
+
+    const { data } = await supabase.from('leads').update(leadPayload).eq('id', updated.id).select()
     if (data) setLeads(prev => prev.map(l => l.id === updated.id ? data[0] : l))
+
+    if (hasNewNote) {
+      const { data: noteData } = await supabase.from('lead_notes').insert({
+        id: uid(), lead_id: updated.id, note: newNoteText, created_by: currentUsername, created_at: nowIso, result_at_time: updated.result
+      }).select()
+      if (noteData) setLeadNotes(prev => [noteData[0], ...prev])
+    }
     setEditingLead(null)
   }
   async function deleteLead(id) {
     await supabase.from('leads').delete().eq('id', id)
     setLeads(prev => prev.filter(l => l.id !== id))
+    setLeadNotes(prev => prev.filter(n => n.lead_id !== id))
     setEditingLead(null)
   }
   async function addAdsWeek(week) {
@@ -1822,6 +1917,23 @@ export function PanelApp() {
   // "isStaff" artık ayrı bir rol değil - her ekran kendi spesifik iznine bakıyor.
   // canSeeOwnDataOnly: sadece kendi girdiği kaydı görme/listeleme kısıtı, "herkesin kaydını düzenleme" izni yoksa devreye girer
   const canSeeOwnDataOnly = !perms.can_edit_any_lead && !isSuperAdmin
+
+  // Her lead için, MEVCUT sonuç kategorisinde kaç not eklendiğini sayar.
+  // Sonuç değiştiğinde (örn. Satın almadı -> Randevu aldı), eski kategorideki notlar sayılmaz,
+  // sayaç o yeni kategoride sıfırdan başlar - bu yüzden lead_notes.result_at_time ile eşleştiriyoruz.
+  const noteCountByLeadId = useMemo(() => {
+    const map = {}
+    const leadById = {}
+    leads.forEach(l => { leadById[l.id] = l })
+    leadNotes.forEach(n => {
+      const lead = leadById[n.lead_id]
+      if (!lead) return
+      // result_at_time eski kayıtlarda olmayabilir (migration öncesi); o durumda güvenli tarafta kalıp say.
+      if (n.result_at_time && n.result_at_time !== lead.result) return
+      map[n.lead_id] = (map[n.lead_id] || 0) + 1
+    })
+    return map
+  }, [leadNotes, leads])
 
   const relevantBranchId = isSuperAdmin && filterBranch !== 'all' ? filterBranch : currentUser.branch_id
   const currentBranchServices = branchServices.filter(s => s.branch_id === relevantBranchId)
@@ -1911,7 +2023,7 @@ export function PanelApp() {
             <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>
               {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
             </p>
-            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} />
+            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} />
 
 <div style={{
   display: 'grid',
@@ -1995,6 +2107,7 @@ export function PanelApp() {
                 targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
                 targetBranchName={isSuperAdmin ? (filterBranch !== 'all' ? branchName(filterBranch) : branchName(activeBranches[0]?.id)) : branchName(currentUser.branch_id)}
                 isSuperAdmin={isSuperAdmin}
+                notesForLead={editingLead ? leadNotes.filter(n => n.lead_id === editingLead.id) : []}
               />
             )}
             <div style={{ marginTop: '1.5rem' }}>
@@ -2017,7 +2130,7 @@ export function PanelApp() {
                   )}
                   {visibleLeads.map(l => (
                     <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
-                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} isMobile={isMobile} />
+                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} isMobile={isMobile} noteCount={noteCountByLeadId[l.id] || 0} />
                   ))}
                 </div>
               )}
