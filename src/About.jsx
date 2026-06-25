@@ -27,11 +27,12 @@ export default function About() {
               Güzellik salonlarından kliniklere, hukuk bürolarından kurslara kadar randevu bazlı çalışan her işletmenin günlük operasyonunda yaşadığı en büyük sorunu çözmek için kurulduk: <strong style={{ color: T.text }}>kaçan müşteriyi geri kazanmak.</strong>
             </p>
           </div>
-          <div style={{ ...cardStyle, padding: 32, textAlign: 'center' }}>
-            <p style={{ fontSize: 48, margin: '0 0 8px' }}>👥</p>
-            <p style={{ fontSize: 14, color: T.textSoft, lineHeight: 1.6, margin: 0 }}>
-              Sektör deneyimi olan bir ekip tarafından, gerçek işletme ihtiyaçlarından yola çıkılarak tasarlandı.
-            </p>
+          <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+            <img
+              src="/ekip.jpg"
+              alt="Müşteri Takip ekibi ofiste"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 280 }}
+            />
           </div>
         </div>
       </section>

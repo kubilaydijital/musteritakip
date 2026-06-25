@@ -12,12 +12,12 @@ import {
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
 
-const CHANNELS = ['Instagram', 'WhatsApp', 'Organik']
+const CHANNELS = ['Instagram', 'WhatsApp', 'Telefon', 'Google Ads', 'Facebook Ads', 'TikTok', 'Organik']
 const RESULTS = ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
 const OPEN_RESULTS = []
 const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D', 'Satın almadı': '#854F0B', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#6B6B6B', 'Müşteri oldu': '#3B6D11' }
 const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A', 'Satın almadı': '#EF9F27', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#9CA3AF', 'Müşteri oldu': '#639922' }
-const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Organik': '#7F77DD' }
+const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Telefon': '#3B82F6', 'Google Ads': '#EF9F27', 'Facebook Ads': '#4267B2', 'TikTok': '#25F4EE', 'Organik': '#7F77DD' }
 const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#E24B4A', '#639922', '#854F0B']
 const PHONE_RE = /^\+\d{10,15}$/
 
@@ -655,22 +655,25 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
 }
 
 function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch, isMobile }) {
-  const [form, setForm] = useState({ spend: '', impressions: '', messages: '', manualAdjustment: '' })
+  const [form, setForm] = useState({ channel: CHANNELS[0], spend: '', impressions: '', messages: '', manualAdjustment: '' })
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
   async function submit(e) {
     e.preventDefault()
     await onAdd({
-      id: uid(), branch_id: selectedBranch, date: new Date().toISOString(),
+      id: uid(), branch_id: selectedBranch, date: new Date().toISOString(), channel: form.channel,
       spend: Number(form.spend) || 0, impressions: Number(form.impressions) || 0, messages: Number(form.messages) || 0,
       manual_adjustment: Number(form.manualAdjustment) || 0
     })
-    setForm({ spend: '', impressions: '', messages: '', manualAdjustment: '' })
+    setForm({ channel: CHANNELS[0], spend: '', impressions: '', messages: '', manualAdjustment: '' })
   }
   return (
     <form onSubmit={submit} style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem' : '1.25rem', marginTop: isMobile ? '1rem' : '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Haftalık reklam verisi gir (admin)</p>
       <select value={selectedBranch} onChange={e => onSelectBranch(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+      </select>
+      <select value={form.channel} onChange={e => set('channel', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
+        {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
         <input placeholder="Harcama (TL)" value={form.spend} onChange={e => set('spend', e.target.value)} style={inputStyle} />

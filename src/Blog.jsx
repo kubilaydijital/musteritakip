@@ -24,19 +24,20 @@ export default function Blog() {
         </p>
       </section>
 
-      <section style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '40px 20px 72px' }}>
-        <div className="mt-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22 }}>
+      <section style={{ maxWidth: 760, margin: '0 auto', padding: '40px 20px 72px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {sorted.map(post => (
             <Link key={post.slug} to={`/blog/${post.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-              <article style={{ ...cardStyle, padding: '24px 22px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <article style={{ ...cardStyle, padding: 16, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
                 <span style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 44, height: 44, borderRadius: 12, background: T.primaryLight, fontSize: 21, marginBottom: 16
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 56, height: 56, borderRadius: 12, background: T.primaryLight, fontSize: 24, flexShrink: 0
                 }}>{post.icon}</span>
-                <p style={{ fontSize: 12, color: T.textFaint, margin: '0 0 8px' }}>{formatDate(post.date)} · {post.readTime} okuma</p>
-                <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 10px', color: T.text, lineHeight: 1.35 }}>{post.title}</h2>
-                <p style={{ fontSize: 13.5, color: T.textSoft, lineHeight: 1.6, margin: '0 0 14px', flex: 1 }}>{post.excerpt}</p>
-                <span style={{ fontSize: 13.5, fontWeight: 600, color: T.primary }}>Devamını oku →</span>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 11.5, color: T.textFaint, margin: '0 0 4px' }}>{formatDate(post.date)} · {post.readTime} okuma</p>
+                  <h2 style={{ fontSize: 15.5, fontWeight: 700, margin: '0 0 6px', color: T.text, lineHeight: 1.35 }}>{post.title}</h2>
+                  <p style={{ fontSize: 13, color: T.textSoft, lineHeight: 1.55, margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{post.excerpt}</p>
+                </div>
               </article>
             </Link>
           ))}

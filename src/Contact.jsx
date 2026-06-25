@@ -3,9 +3,6 @@ import { SiteHeader, SiteFooter } from './SiteLayout'
 import { T, cardStyle, inputStyle, btnPrimary, GLOBAL_CSS, PAGE_MAX } from './theme'
 
 const FORMSPREE_URL = 'https://formspree.io/f/mlgvyrld'
-const WHATSAPP_NUMBER = '905336153445'
-const WHATSAPP_MESSAGE = encodeURIComponent('Merhaba, Müşteri Takip sistemi hakkında bilgi almak istiyorum.')
-const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MESSAGE}`
 
 const CONTACT_INFO = [
   { icon: '✉️', label: 'info@musteritakip.net' },
@@ -68,10 +65,6 @@ export default function Contact() {
                 </div>
               ))}
             </div>
-
-            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" style={{
-              ...btnPrimary, background: '#1D9E75', width: '100%', justifyContent: 'center'
-            }}>WhatsApp'tan Yazın</a>
           </div>
 
           <div style={{ ...cardStyle, padding: 28 }}>
@@ -86,7 +79,7 @@ export default function Contact() {
                 {status === 'sending' ? 'Gönderiliyor...' : 'Gönder'}
               </button>
               {status === 'sent' && <p style={{ fontSize: 13.5, color: T.green, margin: '12px 0 0', textAlign: 'center' }}>Mesajınız iletildi, en kısa sürede dönüş yapacağız.</p>}
-              {status === 'error' && <p style={{ fontSize: 13.5, color: T.red, margin: '12px 0 0', textAlign: 'center' }}>Bir sorun oluştu, lütfen WhatsApp üzerinden yazın.</p>}
+              {status === 'error' && <p style={{ fontSize: 13.5, color: T.red, margin: '12px 0 0', textAlign: 'center' }}>Bir sorun oluştu, lütfen e-posta ile tekrar deneyin.</p>}
             </form>
           </div>
         </div>

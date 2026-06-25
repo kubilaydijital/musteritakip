@@ -10,11 +10,11 @@ const FEATURES_PREVIEW = [
 ]
 
 const FUNNEL_STAGES = [
-  { label: 'Randevu Aldı\n(Geçti)', sub: '1g', icon: '📅' },
-  { label: 'Randevuya Gelmedi', sub: '3g', icon: '👤' },
-  { label: 'Cevap Yazdı\nDönüş Gelmedi', sub: '3g', icon: '💬' },
-  { label: 'Satın Almadı', sub: '15g', icon: '🛒' },
-  { label: 'Müşteri Oldu', sub: 'Takip Yok', icon: '✅' },
+  { label: 'Randevu Aldı\n(Geçti)', sub: '1g', icon: '📅', color: T.blue },
+  { label: 'Randevuya Gelmedi', sub: '3g', icon: '👤', color: T.red },
+  { label: 'Cevap Yazdı\nDönüş Gelmedi', sub: '3g', icon: '💬', color: T.orange },
+  { label: 'Satın Almadı', sub: '15g', icon: '🛒', color: '#EAB308' },
+  { label: 'Müşteri Oldu', sub: 'Takip Yok', icon: '✅', color: T.green },
 ]
 
 export default function LandingPage() {
@@ -85,19 +85,38 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 0, flexWrap: 'wrap', marginBottom: 36 }}>
-            {FUNNEL_STAGES.map((stage, i) => (
-              <div key={stage.label} style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ ...cardStyle, padding: '18px 16px', width: 150, textAlign: 'center' }}>
-                  <span style={{ fontSize: 22, display: 'block', marginBottom: 8 }}>{stage.icon}</span>
-                  <p style={{ fontSize: 12.5, fontWeight: 700, color: T.textSoft, margin: '0 0 8px', whiteSpace: 'pre-line', lineHeight: 1.35 }}>{stage.label}</p>
-                  <p style={{ fontSize: 13, fontWeight: 800, color: T.primary, margin: 0 }}>{stage.sub}</p>
-                </div>
-                {i < FUNNEL_STAGES.length - 1 && (
-                  <span style={{ color: T.textFaint, fontSize: 18, margin: '0 6px' }}>→</span>
-                )}
+          <div className="mt-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20, alignItems: 'center', marginBottom: 36 }}>
+            <div style={{ overflowX: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, minWidth: 560 }}>
+                {FUNNEL_STAGES.map((stage, i) => (
+                  <div key={stage.label} style={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <div style={{ width: 102, textAlign: 'center' }}>
+                      <span style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 52, height: 52, borderRadius: '50%', background: `${stage.color}22`,
+                        border: `2px solid ${stage.color}`, fontSize: 20, margin: '0 auto 10px'
+                      }}>{stage.icon}</span>
+                      <p style={{ fontSize: 11.5, fontWeight: 700, color: T.textSoft, margin: '0 0 4px', whiteSpace: 'pre-line', lineHeight: 1.3, minHeight: 30 }}>{stage.label}</p>
+                      <p style={{ fontSize: 12.5, fontWeight: 800, color: stage.color, margin: 0 }}>{stage.sub}</p>
+                    </div>
+                    {i < FUNNEL_STAGES.length - 1 && (
+                      <span style={{ color: T.textFaint, fontSize: 16, margin: '16px 2px 0' }}>→</span>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div style={{ ...cardStyle, padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>👥</span>
+                <span style={{ fontSize: 18 }}>🔔</span>
+              </div>
+              <p style={{ fontSize: 12.5, color: T.textSoft, margin: 0, lineHeight: 1.5 }}>
+                Sistem sizi uyarır, siz de doğru zamanda doğru kişiye ulaşırsınız.
+              </p>
+              <p style={{ fontSize: 11.5, color: T.textFaint, margin: 0 }}>Unutmaz, unutturmaz, kazandırır.</p>
+            </div>
           </div>
 
           <ReminderTable />

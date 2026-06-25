@@ -29,16 +29,16 @@ export default function Features() {
         </p>
       </section>
 
-      <section style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '40px 20px 72px' }}>
-        <div className="mt-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+      <section style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '32px 20px 64px' }}>
+        <div className="mt-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
           {FEATURES.map(f => (
-            <div key={f.title} style={{ ...cardStyle, padding: '26px 24px' }}>
+            <div key={f.title} style={{ ...cardStyle, padding: '18px 18px' }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 44, height: 44, borderRadius: 12, background: T.primaryLight, fontSize: 21, marginBottom: 16
+                width: 36, height: 36, borderRadius: 10, background: T.primaryLight, fontSize: 17, marginBottom: 12
               }}>{f.icon}</span>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 8px', color: T.text }}>{f.title}</h3>
-              <p style={{ fontSize: 13.5, lineHeight: 1.6, color: T.textSoft, margin: 0 }}>{f.desc}</p>
+              <h3 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 6px', color: T.text }}>{f.title}</h3>
+              <p style={{ fontSize: 12.5, lineHeight: 1.5, color: T.textSoft, margin: 0 }}>{f.desc}</p>
             </div>
           ))}
         </div>
