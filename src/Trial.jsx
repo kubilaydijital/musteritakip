@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient.js'
 import Layout from '../components/Layout.jsx'
@@ -31,6 +31,11 @@ export default function Trial() {
   const [errorMsg, setErrorMsg] = useState('')
   const [credentials, setCredentials] = useState(null)
 
+  // Sayfaya gelindiğinde üste scroll et (önceki sayfadan scroll pozisyonu kalmasın)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
+
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
 
   async function submit(e) {
@@ -45,29 +50,43 @@ export default function Trial() {
       const password = generatePassword()
       const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
 
-      // 1) Yeni şube oluştur
+      // 1) "Şube Sahibi" yetki şablonunu dinamik olarak bul.
+      // Sabit ID kullanmıyoruz; veritabanında hangi ID ile kayıtlıysa onu kullanırız.
+      // Bu sayede tpl_admin / tpl_branch_admin gibi varyasyonlardan etkilenmeyiz.
+      const { data: templates, error: tplErr } = await supabase
+        .from('permission_templates')
+        .select('id, name')
+        .ilike('name', '%şube sahibi%')
+        .limit(1)
+
+      if (tplErr) throw new Error('Yetki şablonu sorgulanamadı: ' + tplErr.message)
+      if (!templates || templates.length === 0) {
+        throw new Error('Yetki şablonu bulunamadı. Lütfen destek ile iletişime geçin.')
+      }
+      const permissionTemplateId = templates[0].id
+
+      // 2) Yeni şube oluştur
       const { error: branchErr } = await supabase.from('branches').insert({
         id: branchId, name: form.businessName.trim(), active: true,
       })
       if (branchErr) throw new Error('Şube oluşturulamadı: ' + branchErr.message)
 
-      // 2) Kendi şubesinde tam yetkili ama süper admin olmayan "Şube Sahibi" şablonuyla kullanıcı oluştur.
-      // Bu şablon panelde önceden mevcut olan "Şube Sahibi" şablonudur (id: tpl_admin).
+      // 3) Kendi şubesinde tam yetkili kullanıcıyı oluştur
       const { error: userErr } = await supabase.from('app_users').insert({
         username, password, branch_id: branchId, role: 'admin',
-        permission_template_id: 'tpl_admin',
+        permission_template_id: permissionTemplateId,
         active: true, is_trial: true, trial_ends_at: trialEndsAt,
       })
       if (userErr) throw new Error('Kullanıcı oluşturulamadı: ' + userErr.message)
 
-      // 3) Talep kaydı (geçmiş takibi için)
+      // 4) Talep kaydı (geçmiş takibi için)
       await supabase.from('trial_requests').insert({
         id: uid(), business_name: form.businessName.trim(), contact_name: form.contactName.trim(),
         phone: form.phone.trim(), email: form.email.trim(), business_type: form.businessType || null,
         status: 'created', generated_username: username, generated_branch_id: branchId,
       })
 
-      // 4) Bilgilendirme maili (Netlify Function üzerinden, Resend ile)
+      // 5) Bilgilendirme maili (Netlify Function üzerinden, Resend ile)
       try {
         await fetch('/.netlify/functions/send-trial-email', {
           method: 'POST',
