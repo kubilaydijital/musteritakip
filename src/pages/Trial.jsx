@@ -52,10 +52,10 @@ export default function Trial() {
       if (branchErr) throw new Error('Şube oluşturulamadı: ' + branchErr.message)
 
       // 2) Kendi şubesinde tam yetkili ama süper admin olmayan "Şube Sahibi" şablonuyla kullanıcı oluştur.
-      // Bu şablon trial_migration.sql ile önceden oluşturulmuş olmalı (id: tpl_branch_admin).
+      // Bu şablon trial_migration.sql ile önceden oluşturulmuş olmalı (id: tpl_admin).
       const { error: userErr } = await supabase.from('app_users').insert({
         username, password, branch_id: branchId, role: 'admin',
-        permission_template_id: 'tpl_branch_admin',
+        permission_template_id: 'tpl_admin',
         active: true, is_trial: true, trial_ends_at: trialEndsAt,
       })
       if (userErr) throw new Error('Kullanıcı oluşturulamadı: ' + userErr.message)
