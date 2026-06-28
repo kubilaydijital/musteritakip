@@ -784,7 +784,7 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
     </div>
   )
 }
-function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeUsername, branches, templates, isMobile }) {
+function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeUsername, branches, templates, isMobile, currentUsername }) {
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newBranchId, setNewBranchId] = useState(branches[0]?.id || '')
@@ -844,14 +844,15 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Erişim yönetimi</p>
       <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Ödeme alınmazsa ilgili şubenin erişimini buradan askıya alabilirsin.</p>
 
-      {users.filter(u => u.role !== 'admin' || u.permission_template_id !== 'tpl_super_admin').map(u => {
+      {users.map(u => {
         const branch = branches.find(b => b.id === u.branch_id)
         const tplName = (templates || []).find(t => t.id === u.permission_template_id)?.name || u.role
+        const isSelf = u.username === currentUsername
         return (
           <div key={u.username} style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 8 : 0 }}>
               <div>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.username}</p>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.username}{isSelf && <span style={{ color: T.primary, fontWeight: 500 }}> (sen)</span>}</p>
                 <p style={{ margin: 0, fontSize: 12, color: T.textSoft }}>{tplName} · {branch ? branch.name : '—'}</p>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
@@ -863,22 +864,26 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
                   style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   Kullanıcı adı değiştir
                 </button>
-                <button onClick={() => onToggle(u.username, u.active)} style={{
-                  fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
-                  border: u.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
-                  background: u.active === false ? '#2e7d32' : '#c0392b',
-                  color: '#fff'
-                }}>
-                  {u.active === false ? 'Erişimi aç' : 'Erişimi askıya al'}
-                </button>
-                <button onClick={() => handleDelete(u.username)} style={{
-                  fontSize: 12, padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
-                  border: confirmingDeleteFor === u.username ? '1px solid #c0392b' : '1px solid #ddd',
-                  background: confirmingDeleteFor === u.username ? '#c0392b' : '#fff',
-                  color: confirmingDeleteFor === u.username ? '#fff' : '#999'
-                }}>
-                  {confirmingDeleteFor === u.username ? 'Emin misin?' : 'Sil'}
-                </button>
+                {!isSelf && (
+                  <>
+                    <button onClick={() => onToggle(u.username, u.active)} style={{
+                      fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+                      border: u.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
+                      background: u.active === false ? '#2e7d32' : '#c0392b',
+                      color: '#fff'
+                    }}>
+                      {u.active === false ? 'Erişimi aç' : 'Erişimi askıya al'}
+                    </button>
+                    <button onClick={() => handleDelete(u.username)} style={{
+                      fontSize: 12, padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
+                      border: confirmingDeleteFor === u.username ? '1px solid #c0392b' : '1px solid #ddd',
+                      background: confirmingDeleteFor === u.username ? '#c0392b' : '#fff',
+                      color: confirmingDeleteFor === u.username ? '#fff' : '#999'
+                    }}>
+                      {confirmingDeleteFor === u.username ? 'Emin misin?' : 'Sil'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             {editingPwFor === u.username && (
@@ -1916,6 +1921,13 @@ export function PanelApp() {
     await supabase.from('app_users').delete().eq('username', oldUsername)
     setUsers(prev => prev.map(u => u.username === oldUsername ? created[0] : u))
     setLeads(prev => prev.map(l => l.entered_by === oldUsername ? { ...l, entered_by: newUsername } : l))
+    // Eğer kendi kullanıcı adını değiştirdiysek, oturum bilgisini de güncelle - aksi halde
+    // sayfa yenilenince (localStorage'da eski kullanıcı adı kaldığı için) oturum bozulur.
+    if (currentUser.username === oldUsername) {
+      const updatedSelf = { ...currentUser, ...created[0] }
+      setCurrentUser(updatedSelf)
+      try { localStorage.setItem('mt_current_user', JSON.stringify(updatedSelf)) } catch (e) {}
+    }
   }
   async function addBranch(branch) {
     const { data } = await supabase.from('branches').insert(branch).select()
@@ -2256,7 +2268,7 @@ export function PanelApp() {
                 onDelete={deleteService}
               />
             )}
-            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} branches={activeBranches} templates={templates} isMobile={isMobile} />}
+            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} branches={activeBranches} templates={templates} isMobile={isMobile} currentUsername={currentUser.username} />}
           </div>
         )}
 
