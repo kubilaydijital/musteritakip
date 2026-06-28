@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Mail, MapPin } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
 import { EMAIL, LOCATION } from '../data/siteData.js'
+import usePageMeta from '../usePageMeta.js'
 
 const FORMSPREE_URL = 'https://formspree.io/f/mlgvyrld'
 
 export default function Contact() {
+  usePageMeta('İletişim', 'Sorularınız ve demo talepleriniz için bize ulaşın. Müşteri Takip ekibi size yardımcı olmaktan mutluluk duyar.')
   const [form, setForm] = useState({ name: '', email: '', business: '', message: '' })
   const [status, setStatus] = useState('idle') // idle | sending | sent | error
 
