@@ -55,7 +55,7 @@ export async function handler(event) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'Müşteri Takip <onboarding@resend.dev>',
+        from: 'Müşteri Takip <info@musteritakip.net>',
         to: [email],
         subject: 'Müşteri Takip - Deneme Hesabınız Hazır',
         html,
