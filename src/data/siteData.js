@@ -1,6 +1,6 @@
 import {
   CalendarDays, BellRing, UsersRound, Target, BarChart3, Megaphone,
-  FileClock, ShieldCheck, UserCog, Building2, Scale, Scissors, SmilePlus, Flower2
+  FileClock, ShieldCheck, UserCog, Building2, Scale, Scissors, SmilePlus
 } from 'lucide-react'
 
 export const EMAIL = 'info@musteritakip.net'
@@ -18,7 +18,6 @@ export const navItems = [
 export const references = [
   { name: 'ALTINŞEHİR', sub: 'GAYRİMENKUL', icon: Building2 },
   { name: 'DENT CLINIC', sub: 'DİŞ KLİNİĞİ', icon: SmilePlus },
-  { name: 'ARZU BEAUTY', sub: 'GÜZELLİK SALONU', icon: Flower2 },
   { name: 'ÇINAR', sub: 'HUKUK BÜROSU', icon: Scale },
   { name: 'SINERGY', sub: 'BAYAN KUAFÖRÜ', icon: Scissors },
 ]
