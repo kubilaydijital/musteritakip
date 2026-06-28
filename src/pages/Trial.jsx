@@ -37,11 +37,16 @@ function generatePassword() {
 
 const BUSINESS_TYPES = ['Güzellik salonu', 'Kuaför', 'Diş kliniği', 'Gayrimenkul', 'Hukuk bürosu', 'Diğer']
 
+// E.164 formatına uygun Türkiye cep telefonu: +90 ardından 5 ile başlayan 9 hane.
+// Bu format, Meta/Google Ads gibi platformlara müşteri listesi yüklerken eşleşme oranını maksimize eder.
+const PHONE_RE = /^\+905\d{9}$/
+
 export default function Trial() {
   usePageMeta('Ücretsiz 14 Gün Dene', 'Kredi kartı gerekmez. Hesabınızı hemen oluşturun, 14 gün boyunca Müşteri Takip sistemini ücretsiz deneyin.')
   const [form, setForm] = useState({ businessName: '', contactName: '', phone: '+90', email: '', businessType: '' })
   const [status, setStatus] = useState('idle') // idle | submitting | done | error
   const [errorMsg, setErrorMsg] = useState('')
+  const [phoneErr, setPhoneErr] = useState('')
   const [credentials, setCredentials] = useState(null)
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
@@ -49,6 +54,11 @@ export default function Trial() {
   async function submit(e) {
     e.preventDefault()
     if (!form.businessName.trim() || !form.contactName.trim() || !form.email.trim()) return
+    if (!PHONE_RE.test(form.phone.trim())) {
+      setPhoneErr('Telefon numarası +90 ile başlayıp 5 ile devam eden, toplam 10 haneli olmalı. Örnek: +905551234567')
+      return
+    }
+    setPhoneErr('')
     setStatus('submitting')
     setErrorMsg('')
 
@@ -138,7 +148,9 @@ export default function Trial() {
               let v = e.target.value
               if (!v.startsWith('+90')) v = '+90' + v.replace(/^\+?90?/, '')
               set('phone', v)
+              if (phoneErr) setPhoneErr('')
             }}/>
+            {phoneErr && <p style={{ color: 'var(--red)', fontSize: 13, margin: '-6px 0 0' }}>{phoneErr}</p>}
             <select value={form.businessType} onChange={(e) => set('businessType', e.target.value)}>
               <option value="" disabled>İşletme türü</option>
               {BUSINESS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
