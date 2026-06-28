@@ -2,18 +2,30 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient.js'
 import Layout from '../components/Layout.jsx'
+import usePageMeta from '../usePageMeta.js'
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
 
-// Basit, akılda kalıcı kullanıcı adı üretir: isletmeadi + 3 haneli rastgele sayı.
-function generateUsername(businessName) {
-  const base = (businessName || 'isletme')
+// Basit, akılda kalıcı kullanıcı adı tabanı üretir: isletmeadi (rastgele sayı sonra eklenir).
+function usernameBase(businessName) {
+  return (businessName || 'isletme')
     .toLocaleLowerCase('tr-TR')
     .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c')
     .replace(/[^a-z0-9]/g, '')
-    .slice(0, 14)
-  const suffix = Math.floor(100 + Math.random() * 900)
-  return `${base || 'isletme'}${suffix}`
+    .slice(0, 14) || 'isletme'
+}
+
+// Veritabanında benzersiz olduğu doğrulanmış bir kullanıcı adı üretir.
+// 10 denemede benzersiz bulunamazsa (pratikte olmaz), zaman damgası tabanlı garantili bir ad kullanılır.
+async function generateUniqueUsername(businessName) {
+  const base = usernameBase(businessName)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const suffix = Math.floor(100 + Math.random() * 900)
+    const candidate = `${base}${suffix}`
+    const { data } = await supabase.from('app_users').select('username').eq('username', candidate).maybeSingle()
+    if (!data) return candidate
+  }
+  return `${base}${Date.now().toString(36).slice(-5)}`
 }
 
 function generatePassword() {
@@ -26,6 +38,7 @@ function generatePassword() {
 const BUSINESS_TYPES = ['Güzellik salonu', 'Kuaför', 'Diş kliniği', 'Gayrimenkul', 'Hukuk bürosu', 'Diğer']
 
 export default function Trial() {
+  usePageMeta('Ücretsiz 14 Gün Dene', 'Kredi kartı gerekmez. Hesabınızı hemen oluşturun, 14 gün boyunca Müşteri Takip sistemini ücretsiz deneyin.')
   const [form, setForm] = useState({ businessName: '', contactName: '', phone: '+90', email: '', businessType: '' })
   const [status, setStatus] = useState('idle') // idle | submitting | done | error
   const [errorMsg, setErrorMsg] = useState('')
@@ -41,7 +54,7 @@ export default function Trial() {
 
     try {
       const branchId = uid()
-      const username = generateUsername(form.businessName)
+      const username = await generateUniqueUsername(form.businessName)
       const password = generatePassword()
       const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -55,7 +68,7 @@ export default function Trial() {
       // Bu şablon panelde önceden mevcut olan "Şube Sahibi" şablonudur (id: tpl_admin).
       const { error: userErr } = await supabase.from('app_users').insert({
         username, password, branch_id: branchId, role: 'admin',
-        permission_template_id: 'tpl_admin', email: form.email.trim(),
+        permission_template_id: 'tpl_admin',
         active: true, is_trial: true, trial_ends_at: trialEndsAt,
       })
       if (userErr) throw new Error('Kullanıcı oluşturulamadı: ' + userErr.message)
