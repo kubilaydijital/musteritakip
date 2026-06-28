@@ -275,6 +275,38 @@ function Login({ onLogin }) {
   )
 }
 
+const TRIAL_CONTACT_WHATSAPP = '905336153445'
+const TRIAL_CONTACT_EMAIL = 'info@musteritakip.net'
+
+function TrialExpired({ onLogout, trialEndsAt }) {
+  const endedDate = trialEndsAt ? new Date(trialEndsAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null
+  const waUrl = `https://wa.me/${TRIAL_CONTACT_WHATSAPP}?text=${encodeURIComponent('Merhaba, Müşteri Takip deneme sürem doldu, devam etmek istiyorum.')}`
+
+  return (
+    <div style={{ maxWidth: 420, margin: '4rem auto', padding: '2rem', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
+      <p style={{ fontSize: 40, margin: '0 0 12px' }}>⏰</p>
+      <p style={{ fontSize: 19, fontWeight: 700, margin: '0 0 10px', color: T.text }}>14 günlük deneme süreniz doldu</p>
+      <p style={{ fontSize: 14, color: T.textSoft, lineHeight: 1.6, margin: '0 0 4px' }}>
+        {endedDate ? `Deneme süreniz ${endedDate} tarihinde sona erdi.` : 'Deneme süreniz sona erdi.'}
+      </p>
+      <p style={{ fontSize: 14, color: T.textSoft, lineHeight: 1.6, margin: '0 0 26px' }}>
+        Verileriniz güvende — kullanmaya devam etmek için bizimle iletişime geçin.
+      </p>
+      <a href={waUrl} target="_blank" rel="noopener noreferrer" style={{
+        display: 'block', width: '100%', padding: '12px', borderRadius: 10, background: '#1D9E75',
+        color: '#fff', fontWeight: 600, fontSize: 14, textDecoration: 'none', marginBottom: 10, boxSizing: 'border-box'
+      }}>WhatsApp'tan Yazın</a>
+      <a href={`mailto:${TRIAL_CONTACT_EMAIL}`} style={{
+        display: 'block', width: '100%', padding: '12px', borderRadius: 10, border: `1px solid ${T.border}`,
+        color: T.text, fontWeight: 600, fontSize: 14, textDecoration: 'none', marginBottom: 18, boxSizing: 'border-box'
+      }}>{TRIAL_CONTACT_EMAIL}</a>
+      <button onClick={onLogout} style={{
+        background: 'none', border: 'none', color: T.textFaint, fontSize: 13, cursor: 'pointer', textDecoration: 'underline'
+      }}>Çıkış yap</button>
+    </div>
+  )
+}
+
 const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', newNote: '', result: 'Randevu aldı', saleAmount: '', appointmentDate: '', appointmentTime: '' }
 
 function toLocalDateValue(iso) {
@@ -2090,6 +2122,11 @@ export function PanelApp() {
 
   if (!currentUser) return <Login onLogin={loginAndPersist} />
   if (!loaded) return <p style={{ padding: 40, fontFamily: 'system-ui' }}>Yükleniyor...</p>
+
+  // Deneme süresi dolmuşsa panele hiç erişilmesin, sadece bilgi ekranı gösterilsin.
+  if (currentUser.is_trial && currentUser.trial_ends_at && new Date(currentUser.trial_ends_at) < new Date()) {
+    return <TrialExpired onLogout={logoutAndClear} trialEndsAt={currentUser.trial_ends_at} />
+  }
 
   // Geriye dönük uyumluluk: izin objesi yoksa (eski veri) role alanına göre varsayılan izinler uygula
   const perms = currentUser.permissions || {
