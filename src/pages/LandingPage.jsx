@@ -4,9 +4,11 @@ import Layout from '../components/Layout.jsx'
 import DashboardMock, { MobileReminderMock } from '../components/DashboardMock.jsx'
 import ReferenceLogo from '../components/ReferenceLogo.jsx'
 import ReminderTable from '../components/ReminderTable.jsx'
-import { features, references, EMAIL } from '../data/siteData.js'
+import { features, references } from '../data/siteData.js'
+import usePageMeta from '../usePageMeta.js'
 
 export default function LandingPage() {
+  usePageMeta(null, 'Güzellik salonları, klinikler ve randevu bazlı hizmet işletmeleri için lead ve randevu takip sistemi. Instagram, WhatsApp ve telefon görüşmelerini tek panelde topla, kaybı durdur.')
   const preview = features.slice(0, 6)
   return (
     <Layout>
@@ -19,7 +21,7 @@ export default function LandingPage() {
               <p>Kağıda yazılan müşteri unutulur. Müşteri Takip; randevuları, gelen mesajları, satışları ve kaçan müşterileri tek ekranda toplar. Sistem zamanı geldiğinde sizi uyarır, hiçbir potansiyel müşteri arada kaybolmaz.</p>
               <div className="hero-actions">
                 <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
-                <a href={`mailto:${EMAIL}`} className="btn btn-ghost big"><Mail size={18}/> Demo Talep Et</a>
+                <Link to="/demo" className="btn btn-ghost big"><Mail size={18}/> Demo Talep Et</Link>
               </div>
               <div className="hero-checks"><span><CheckCircle2/>14 gün ücretsiz</span><span><CheckCircle2/>Kredi kartı gerekmez</span><span><CheckCircle2/>Kurulum gerektirmez</span></div>
             </div>
@@ -85,7 +87,7 @@ export default function LandingPage() {
           <DashboardMock compact />
         </section>
 
-        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak ve demo talep etmek için bize mail gönderebilirsiniz.</p><div><Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene</Link><a href={`mailto:${EMAIL}`} className="btn btn-ghost big">Mail Gönder</a></div></section>
+        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz deneyebilir veya demoyu inceleyebilirsiniz.</p><div><Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene</Link><Link to="/demo" className="btn btn-ghost big">Demoyu İncele</Link></div></section>
       </main>
     </Layout>
   )
