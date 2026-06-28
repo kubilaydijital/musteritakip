@@ -687,8 +687,9 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch, isMobi
   )
 }
 
-function BranchManagement({ branches, onAdd, onToggleActive }) {
+function BranchManagement({ branches, onAdd, onToggleActive, onDelete }) {
   const [name, setName] = useState('')
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null)
 
   async function submit(e) {
     e.preventDefault()
@@ -697,26 +698,42 @@ function BranchManagement({ branches, onAdd, onToggleActive }) {
     setName('')
   }
 
+  async function handleDelete(id) {
+    if (confirmingDeleteId !== id) { setConfirmingDeleteId(id); return }
+    await onDelete(id)
+    setConfirmingDeleteId(null)
+  }
+
   return (
     <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Şube ekle</p>
-      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Bir şubeyi pasif yaparsan panelde görünmez ama tüm verisi (kayıtlar, kullanıcılar) korunur, istediğin zaman tekrar aktif edebilirsin.</p>
+      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Bir şubeyi pasif yaparsan panelde görünmez ama tüm verisi (kayıtlar, kullanıcılar) korunur, istediğin zaman tekrar aktif edebilirsin. Silersen veri arşive taşınır ve şube panelden tamamen kalkar.</p>
       <form onSubmit={submit} style={{ display: 'flex', gap: 10 }}>
         <input placeholder="Şube adı (örn. Aris Kadıköy)" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
         <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>Ekle</button>
       </form>
       <div style={{ marginTop: 12 }}>
         {branches.map(b => (
-          <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+          <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', gap: 8 }}>
             <p style={{ fontSize: 13, margin: 0, color: b.active === false ? '#bbb' : '#666' }}>🏪 {b.name}{b.active === false ? ' (pasif)' : ''}</p>
-            <button onClick={() => onToggleActive(b.id, b.active)} style={{
-              fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
-              border: b.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
-              background: b.active === false ? '#2e7d32' : '#c0392b',
-              color: '#fff'
-            }}>
-              {b.active === false ? 'Aktif et' : 'Pasif yap'}
-            </button>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button onClick={() => onToggleActive(b.id, b.active)} style={{
+                fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                border: b.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
+                background: b.active === false ? '#2e7d32' : '#c0392b',
+                color: '#fff'
+              }}>
+                {b.active === false ? 'Aktif et' : 'Pasif yap'}
+              </button>
+              <button onClick={() => handleDelete(b.id)} style={{
+                fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                border: confirmingDeleteId === b.id ? '1px solid #c0392b' : '1px solid #ddd',
+                background: confirmingDeleteId === b.id ? '#c0392b' : 'transparent',
+                color: confirmingDeleteId === b.id ? '#fff' : '#999'
+              }}>
+                {confirmingDeleteId === b.id ? 'Emin misin?' : 'Sil'}
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -1909,6 +1926,56 @@ export function PanelApp() {
     const { data } = await supabase.from('branches').update({ active: newActive }).eq('id', id).select()
     if (data) setBranches(prev => prev.map(b => b.id === id ? data[0] : b))
   }
+  // Şubeyi kalıcı olarak siler, ama önce tüm verisini (leads, app_users) arşive kopyalar.
+  // Arşivlenen veri geri panelde görünmez ama ileride toplu indirme için Supabase'de saklı kalır.
+  async function deleteBranch(id) {
+    const branch = branches.find(b => b.id === id)
+    if (!branch) return
+
+    const archiveId = uid()
+    const branchLeads = leads.filter(l => l.branch_id === id)
+    const branchUsers = users.filter(u => u.branch_id === id)
+
+    // 1) Arşiv kaydı oluştur
+    await supabase.from('archived_branches').insert({
+      id: archiveId, original_branch_id: id, branch_name: branch.name,
+    })
+
+    // 2) Leads'i arşive kopyala
+    if (branchLeads.length > 0) {
+      await supabase.from('archived_leads').insert(
+        branchLeads.map(l => ({
+          id: uid(), archive_id: archiveId, original_lead_id: l.id,
+          name: l.name, phone: l.phone, channel: l.channel, service: l.service,
+          note: l.note, result: l.result, sale_amount: l.sale_amount,
+          appointment_at: l.appointment_at, entered_by: l.entered_by, date: l.date,
+          edited_at: l.edited_at, last_note_at: l.last_note_at,
+        }))
+      )
+    }
+
+    // 3) Kullanıcıları arşive kopyala (şifre hariç - güvenlik)
+    if (branchUsers.length > 0) {
+      await supabase.from('archived_app_users').insert(
+        branchUsers.map(u => ({
+          id: uid(), archive_id: archiveId,
+          username: u.username, role: u.role, is_trial: u.is_trial, trial_ends_at: u.trial_ends_at,
+        }))
+      )
+    }
+
+    // 4) Orijinal veriyi sil (leads -> lead_notes cascade ile gider, app_users, branch_services, branch)
+    await supabase.from('leads').delete().eq('branch_id', id)
+    await supabase.from('app_users').delete().eq('branch_id', id)
+    await supabase.from('branch_services').delete().eq('branch_id', id)
+    await supabase.from('branches').delete().eq('id', id)
+
+    // 5) Yerel state'i güncelle
+    setBranches(prev => prev.filter(b => b.id !== id))
+    setLeads(prev => prev.filter(l => l.branch_id !== id))
+    setUsers(prev => prev.filter(u => u.branch_id !== id))
+    setBranchServices(prev => prev.filter(s => s.branch_id !== id))
+  }
   async function addService(service) {
     const { data } = await supabase.from('branch_services').insert(service).select()
     if (data) setBranchServices(prev => [...prev, data[0]])
@@ -2179,7 +2246,7 @@ export function PanelApp() {
         {activeTab === 'settings' && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Ayarlar</h1>
-            {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} />}
+            {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} onDelete={deleteBranch} />}
             {!isSuperAdmin && !canSeeOwnDataOnly && (
               <BranchServiceManager
                 services={currentBranchServices}
