@@ -19,7 +19,10 @@ const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D
 const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A', 'Satın almadı': '#EF9F27', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#9CA3AF', 'Müşteri oldu': '#639922' }
 const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Telefon': '#3B82F6', 'Google Ads': '#EF9F27', 'Facebook Ads': '#4267B2', 'TikTok': '#25F4EE', 'Organik': '#7F77DD' }
 const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#E24B4A', '#639922', '#854F0B']
-const PHONE_RE = /^\+\d{10,15}$/
+// E.164 formatına uygun Türkiye cep telefonu: +90 ardından 5 ile başlayan 9 hane (toplam +90 + 10 hane).
+// Bu format, Meta/Google Ads gibi platformlara müşteri listesi yüklerken eşleşme oranını maksimize eder
+// (boşluksuz, tire/parantez yok, ülke kodu dahil, sabit 12 karakter).
+const PHONE_RE = /^\+905\d{9}$/
 
 // Her sonuç kategorisi için kademeli hatırlatma eşikleri (gün).
 // Dizinin uzunluğu = "soğumadan önce" kaç hatırlatma yapılacağı.
@@ -370,7 +373,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   async function submit(e) {
     e.preventDefault()
     let ok = true
-    if (!PHONE_RE.test(form.phone.trim())) { setPhoneErr('Telefon +90 ile başlayıp boşluksuz, sadece sayı içermeli. Örnek: +905551234567'); ok = false }
+    if (!PHONE_RE.test(form.phone.trim())) { setPhoneErr('Geçerli bir cep telefonu girin: +90 ile başlayıp, 5 ile devam edip, toplam 10 hane olmalı. Örnek: +905551234567'); ok = false }
     else setPhoneErr('')
     if (!editing && !form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
     else setNoteErr('')
