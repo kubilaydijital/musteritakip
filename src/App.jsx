@@ -23,7 +23,6 @@ const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F7
 // Bu format, Meta/Google Ads gibi platformlara müşteri listesi yüklerken eşleşme oranını maksimize eder
 // (boşluksuz, tire/parantez yok, ülke kodu dahil, sabit 12 karakter).
 const PHONE_RE = /^\+905\d{9}$/
-
 // Her sonuç kategorisi için kademeli hatırlatma eşikleri (gün).
 // Dizinin uzunluğu = "soğumadan önce" kaç hatırlatma yapılacağı.
 // Sayaç, o leade eklenen not sayısına (lead_notes) göre ilerler.
