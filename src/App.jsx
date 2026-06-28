@@ -139,6 +139,10 @@ function Login({ onLogin }) {
   const [pass, setPass] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState('login') // login | forgot | sent
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetErr, setResetErr] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
@@ -190,6 +194,65 @@ function Login({ onLogin }) {
     onLogin({ ...data, permissions })
   }
 
+  async function submitForgot(e) {
+    e.preventDefault()
+    setResetErr('')
+    if (!resetEmail.trim()) return
+    setResetLoading(true)
+    try {
+      const res = await fetch('/.netlify/functions/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim() }),
+      })
+      // Güvenlik için: e-posta kayıtlı olmasa da olsa aynı mesajı göster,
+      // böylece sistemde hangi e-postaların kayıtlı olduğu dışarıdan anlaşılamaz.
+      if (res.ok || res.status === 404) {
+        setMode('sent')
+      } else {
+        setResetErr('Bir sorun oluştu, lütfen daha sonra tekrar deneyin.')
+      }
+    } catch {
+      setResetErr('Bir sorun oluştu, lütfen daha sonra tekrar deneyin.')
+    }
+    setResetLoading(false)
+  }
+
+  if (mode === 'forgot') {
+    return (
+      <div style={{ maxWidth: 360, margin: '4rem auto', padding: '1.5rem', fontFamily: 'system-ui, sans-serif' }}>
+        <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Şifremi unuttum</p>
+        <p style={{ fontSize: 13, color: T.textSoft, marginBottom: 20 }}>Hesabınıza kayıtlı e-posta adresinizi girin, yeni şifrenizi gönderelim.</p>
+        <form onSubmit={submitForgot}>
+          <input type="email" placeholder="E-posta adresiniz" value={resetEmail} onChange={e => setResetEmail(e.target.value)}
+            style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: `1px solid ${T.border}`, boxSizing: 'border-box' }} />
+          {resetErr && <p style={{ fontSize: 13, color: '#c0392b', marginBottom: 10 }}>{resetErr}</p>}
+          <button type="submit" disabled={resetLoading}
+            style={{ width: '100%', padding: 10, borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+            {resetLoading ? 'Gönderiliyor...' : 'Yeni şifre gönder'}
+          </button>
+        </form>
+        <button onClick={() => setMode('login')} style={{ marginTop: 14, fontSize: 13, color: T.textSoft, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+          ← Giriş ekranına dön
+        </button>
+      </div>
+    )
+  }
+
+  if (mode === 'sent') {
+    return (
+      <div style={{ maxWidth: 360, margin: '4rem auto', padding: '1.5rem', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
+        <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>E-postanızı kontrol edin</p>
+        <p style={{ fontSize: 13.5, color: T.textSoft, marginBottom: 20, lineHeight: 1.6 }}>
+          Eğer bu e-posta adresine kayıtlı bir hesap varsa, yeni şifre gönderildi. Gelen kutunuzu (ve spam klasörünü) kontrol edin.
+        </p>
+        <button onClick={() => setMode('login')} style={{ fontSize: 13, color: T.primary, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+          ← Giriş ekranına dön
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div style={{ maxWidth: 360, margin: '4rem auto', padding: '1.5rem', fontFamily: 'system-ui, sans-serif' }}>
       <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Müşteri takip sistemi</p>
@@ -205,6 +268,9 @@ function Login({ onLogin }) {
           {loading ? 'Giriş yapılıyor...' : 'Giriş yap'}
         </button>
       </form>
+      <button onClick={() => setMode('forgot')} style={{ marginTop: 14, fontSize: 13, color: T.textSoft, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+        Şifremi unuttum
+      </button>
     </div>
   )
 }
@@ -784,9 +850,10 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
     </div>
   )
 }
-function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeUsername, branches, templates, isMobile, currentUsername }) {
+function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeUsername, onChangeEmail, branches, templates, isMobile, currentUsername }) {
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [newEmail, setNewEmail] = useState('')
   const [newBranchId, setNewBranchId] = useState(branches[0]?.id || '')
   const [newTemplateId, setNewTemplateId] = useState('')
   const [addErr, setAddErr] = useState('')
@@ -795,6 +862,8 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
   const [editingUsernameFor, setEditingUsernameFor] = useState(null)
   const [usernameValue, setUsernameValue] = useState('')
   const [usernameErr, setUsernameErr] = useState('')
+  const [editingEmailFor, setEditingEmailFor] = useState(null)
+  const [emailValue, setEmailValue] = useState('')
   const [confirmingDeleteFor, setConfirmingDeleteFor] = useState(null)
 
   const nonSuperAdminTemplates = (templates || []).filter(t => t.id !== 'tpl_super_admin')
@@ -810,8 +879,8 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
       setAddErr('Bu kullanıcı adı zaten kullanılıyor.')
       return
     }
-    await onAdd({ username: newUsername.trim(), password: newPassword.trim(), branch_id: newBranchId, permission_template_id: newTemplateId, active: true })
-    setNewUsername(''); setNewPassword('')
+    await onAdd({ username: newUsername.trim(), password: newPassword.trim(), branch_id: newBranchId, permission_template_id: newTemplateId, email: newEmail.trim() || null, active: true })
+    setNewUsername(''); setNewPassword(''); setNewEmail('')
   }
 
   async function submitPasswordChange(username) {
@@ -831,6 +900,12 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
     }
     await onChangeUsername(oldUsername, trimmed)
     setEditingUsernameFor(null); setUsernameValue('')
+  }
+
+  async function submitEmailChange(username) {
+    const trimmed = emailValue.trim()
+    await onChangeEmail(username, trimmed)
+    setEditingEmailFor(null); setEmailValue('')
   }
 
   async function handleDelete(username) {
@@ -854,15 +929,20 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
               <div>
                 <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.username}{isSelf && <span style={{ color: T.primary, fontWeight: 500 }}> (sen)</span>}</p>
                 <p style={{ margin: 0, fontSize: 12, color: T.textSoft }}>{tplName} · {branch ? branch.name : '—'}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11.5, color: u.email ? T.textFaint : '#c0392b' }}>{u.email || 'e-posta yok — şifremi unuttum çalışmaz'}</p>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
-                <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue(''); setEditingUsernameFor(null) }}
+                <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue(''); setEditingUsernameFor(null); setEditingEmailFor(null) }}
                   style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   Şifre değiştir
                 </button>
-                <button onClick={() => { setEditingUsernameFor(editingUsernameFor === u.username ? null : u.username); setUsernameValue(u.username); setEditingPwFor(null) }}
+                <button onClick={() => { setEditingUsernameFor(editingUsernameFor === u.username ? null : u.username); setUsernameValue(u.username); setEditingPwFor(null); setEditingEmailFor(null) }}
                   style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   Kullanıcı adı değiştir
+                </button>
+                <button onClick={() => { setEditingEmailFor(editingEmailFor === u.username ? null : u.username); setEmailValue(u.email || ''); setEditingPwFor(null); setEditingUsernameFor(null) }}
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
+                  E-posta düzenle
                 </button>
                 {!isSelf && (
                   <>
@@ -892,6 +972,12 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
                 <button onClick={() => submitPasswordChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
               </div>
             )}
+            {editingEmailFor === u.username && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <input type="email" placeholder="ornek@mail.com" value={emailValue} onChange={e => setEmailValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <button onClick={() => submitEmailChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+              </div>
+            )}
             {editingUsernameFor === u.username && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -912,6 +998,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
             <input placeholder="Kullanıcı adı" value={newUsername} onChange={e => setNewUsername(e.target.value)} style={inputStyle} />
             <input placeholder="Şifre" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inputStyle} />
           </div>
+          <input type="email" placeholder="E-posta (şifremi unuttum için gerekli, isteğe bağlı)" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }} />
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <select value={newBranchId} onChange={e => setNewBranchId(e.target.value)} style={inputStyle}>
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1908,6 +1995,10 @@ export function PanelApp() {
     const { data } = await supabase.from('app_users').update({ password: newPassword }).eq('username', username).select()
     if (data) setUsers(prev => prev.map(u => u.username === username ? data[0] : u))
   }
+  async function changeUserEmail(username, newEmail) {
+    const { data } = await supabase.from('app_users').update({ email: newEmail || null }).eq('username', username).select()
+    if (data) setUsers(prev => prev.map(u => u.username === username ? data[0] : u))
+  }
   async function changeUsername(oldUsername, newUsername) {
     const existing = users.find(u => u.username === oldUsername)
     if (!existing) return
@@ -2268,7 +2359,7 @@ export function PanelApp() {
                 onDelete={deleteService}
               />
             )}
-            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} branches={activeBranches} templates={templates} isMobile={isMobile} currentUsername={currentUser.username} />}
+            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} onChangeEmail={changeUserEmail} branches={activeBranches} templates={templates} isMobile={isMobile} currentUsername={currentUser.username} />}
           </div>
         )}
 
