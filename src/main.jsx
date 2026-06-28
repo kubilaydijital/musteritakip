@@ -2,6 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './styles.css'
+import ScrollToTop from './components/ScrollToTop.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import Features from './pages/Features.jsx'
 import References from './pages/References.jsx'
@@ -16,6 +17,7 @@ import { PanelApp } from './App.jsx'
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/ozellikler" element={<Features />} />
