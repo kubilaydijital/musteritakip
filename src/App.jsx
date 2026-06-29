@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from './supabaseClient'
+import ExcelJS from 'exceljs'
 import {
   Chart, BarController, BarElement, DoughnutController, ArcElement,
   LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip
@@ -7,10 +8,91 @@ import {
 import {
   MessageCircle, CalendarDays, UserRound, ShoppingCart, TrendingUp, Wallet,
   Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
-  ShieldCheck, Settings, Plus, ChevronDown, LogOut
+  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Download
 } from 'lucide-react'
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
+
+// Dosya indirme yardımcı fonksiyonu - tarayıcıda blob oluşturup otomatik indirme tetikler.
+function downloadBlob(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// rows: [{ "Sütun Adı": değer, ... }, ...] formatında satır dizisi bekler.
+function exportToCsv(rows, filename) {
+  if (!rows || rows.length === 0) return
+  const headers = Object.keys(rows[0])
+  // CSV hücrelerinde virgül/tırnak/satır sonu varsa tırnak içine alıp kaçış karakteri ekliyoruz.
+  const escapeCell = (val) => {
+    const str = val == null ? '' : String(val)
+    if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`
+    return str
+  }
+  const lines = [
+    headers.map(escapeCell).join(','),
+    ...rows.map(row => headers.map(h => escapeCell(row[h])).join(',')),
+  ]
+  // Excel'de Türkçe karakterlerin doğru görünmesi için BOM (byte order mark) ekliyoruz.
+  const csvContent = '\uFEFF' + lines.join('\r\n')
+  downloadBlob(csvContent, filename, 'text/csv;charset=utf-8;')
+}
+
+async function exportToExcel(rows, filename, sheetName = 'Veri') {
+  if (!rows || rows.length === 0) return
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet(sheetName)
+  const headers = Object.keys(rows[0])
+  worksheet.columns = headers.map(h => ({ header: h, key: h, width: Math.max(14, h.length + 2) }))
+  worksheet.getRow(1).font = { bold: true }
+  rows.forEach(row => worksheet.addRow(row))
+  const buffer = await workbook.xlsx.writeBuffer()
+  downloadBlob(buffer, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+}
+
+// Danışan kayıtlarını dışa aktarma formatına çevirir (Meta/Google Ads yüklemesine uygun
+// E.164 telefon formatı korunur, panel kolonları Türkçe başlıklarla etiketlenir).
+function leadsToExportRows(leads, branchNameFn, showBranch) {
+  return leads.map(l => ({
+    'Ad Soyad': l.name,
+    'Telefon': l.phone,
+    ...(showBranch ? { 'Şube': branchNameFn(l.branch_id) } : {}),
+    'Kanal': l.channel,
+    'Hizmet': l.service || '',
+    'Sonuç': l.result,
+    'Tutar (TL)': l.sale_amount != null ? l.sale_amount : '',
+    'Randevu Tarihi': l.appointment_at ? new Date(l.appointment_at).toLocaleString('tr-TR') : '',
+    'Not': l.note || '',
+    'Kayıt Tarihi': l.date ? new Date(l.date).toLocaleDateString('tr-TR') : '',
+  }))
+}
+
+function ExportButtons({ rows, baseFilename, sheetName }) {
+  if (!rows || rows.length === 0) return null
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button onClick={() => exportToCsv(rows, `${baseFilename}.csv`)} style={{
+        fontSize: 12.5, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`,
+        background: 'transparent', color: T.textSoft, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
+      }}>
+        <Download size={13} /> CSV
+      </button>
+      <button onClick={() => exportToExcel(rows, `${baseFilename}.xlsx`, sheetName)} style={{
+        fontSize: 12.5, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`,
+        background: 'transparent', color: T.textSoft, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
+      }}>
+        <Download size={13} /> Excel
+      </button>
+    </div>
+  )
+}
 
 const CHANNELS = ['Instagram', 'WhatsApp', 'Telefon', 'Google Ads', 'Facebook Ads', 'TikTok', 'Online Randevu', 'Organik']
 const RESULTS = ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
@@ -2497,9 +2579,16 @@ export function PanelApp() {
               />
             )}
             <div style={{ marginTop: '1.5rem' }}>
-              <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
-                {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları'}
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>
+                  {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları'}
+                </p>
+                <ExportButtons
+                  rows={leadsToExportRows(visibleLeads, branchName, isSuperAdmin && filterBranch === 'all')}
+                  baseFilename={`danisanlar-${new Date().toISOString().slice(0, 10)}`}
+                  sheetName="Danışanlar"
+                />
+              </div>
               {visibleLeads.length === 0 ? (
                 <p style={{ fontSize: 13, color: T.textSoft }}>Henüz kayıt yok.</p>
               ) : (
@@ -2533,7 +2622,14 @@ export function PanelApp() {
 
         {activeTab === 'reports' && perms.can_see_revenue && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Raporlar</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: 0 }}>Raporlar</h1>
+              <ExportButtons
+                rows={leadsToExportRows(scopedLeads, branchName, isSuperAdmin && filterBranch === 'all')}
+                baseFilename={`rapor-${new Date().toISOString().slice(0, 10)}`}
+                sheetName="Rapor"
+              />
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: (scopedAds.length > 0 && !isMobile) ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16 }}>
               <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '1rem' }}>
                 <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 8px', fontWeight: 600 }}>Hizmete göre ciro</p>
