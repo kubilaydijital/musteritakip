@@ -836,9 +836,80 @@ function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch, isMobi
   )
 }
 
-function BranchManagement({ branches, onAdd, onToggleActive, onDelete }) {
+const WEEKDAYS = [
+  { key: 'mon', label: 'Pazartesi' },
+  { key: 'tue', label: 'Salı' },
+  { key: 'wed', label: 'Çarşamba' },
+  { key: 'thu', label: 'Perşembe' },
+  { key: 'fri', label: 'Cuma' },
+  { key: 'sat', label: 'Cumartesi' },
+  { key: 'sun', label: 'Pazar' },
+]
+
+function WorkingHoursEditor({ branch, onSave }) {
+  const initial = branch.working_hours || {}
+  const [hours, setHours] = useState(() => {
+    const h = {}
+    WEEKDAYS.forEach(d => { h[d.key] = initial[d.key] || null })
+    return h
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  function toggleDay(key) {
+    setHours(h => ({ ...h, [key]: h[key] ? null : { open: '09:30', close: '19:30' } }))
+    setSaved(false)
+  }
+  function setTime(key, field, value) {
+    setHours(h => ({ ...h, [key]: { ...h[key], [field]: value } }))
+    setSaved(false)
+  }
+
+  async function save() {
+    setSaving(true)
+    await onSave(branch.id, hours)
+    setSaving(false)
+    setSaved(true)
+  }
+
+  return (
+    <div style={{ background: T.cardSoft, border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 16px', marginTop: 8 }}>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 10px' }}>Çalışma saatleri — {branch.name}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {WEEKDAYS.map(d => (
+          <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, width: 100, flexShrink: 0, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!hours[d.key]} onChange={() => toggleDay(d.key)} />
+              {d.label}
+            </label>
+            {hours[d.key] ? (
+              <>
+                <input type="time" value={hours[d.key].open} onChange={e => setTime(d.key, 'open', e.target.value)}
+                  style={{ ...inputStyle, width: 110, padding: 6, fontSize: 13 }} />
+                <span style={{ fontSize: 12, color: T.textFaint }}>—</span>
+                <input type="time" value={hours[d.key].close} onChange={e => setTime(d.key, 'close', e.target.value)}
+                  style={{ ...inputStyle, width: 110, padding: 6, fontSize: 13 }} />
+              </>
+            ) : (
+              <span style={{ fontSize: 12, color: T.textFaint }}>Kapalı</span>
+            )}
+          </div>
+        ))}
+      </div>
+      <button onClick={save} disabled={saving} style={{
+        marginTop: 14, padding: '7px 16px', borderRadius: 8, background: T.primary, color: '#fff',
+        border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500
+      }}>
+        {saving ? 'Kaydediliyor...' : saved ? 'Kaydedildi ✓' : 'Saatleri Kaydet'}
+      </button>
+    </div>
+  )
+}
+
+function BranchManagement({ branches, onAdd, onToggleActive, onDelete, onSaveWorkingHours }) {
   const [name, setName] = useState('')
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null)
+  const [editingHoursFor, setEditingHoursFor] = useState(null)
 
   async function submit(e) {
     e.preventDefault()
@@ -863,26 +934,35 @@ function BranchManagement({ branches, onAdd, onToggleActive, onDelete }) {
       </form>
       <div style={{ marginTop: 12 }}>
         {branches.map(b => (
-          <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', gap: 8 }}>
-            <p style={{ fontSize: 13, margin: 0, color: b.active === false ? '#bbb' : '#666' }}>🏪 {b.name}{b.active === false ? ' (pasif)' : ''}</p>
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              <button onClick={() => onToggleActive(b.id, b.active)} style={{
-                fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
-                border: b.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
-                background: b.active === false ? '#2e7d32' : '#c0392b',
-                color: '#fff'
-              }}>
-                {b.active === false ? 'Aktif et' : 'Pasif yap'}
-              </button>
-              <button onClick={() => handleDelete(b.id)} style={{
-                fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
-                border: confirmingDeleteId === b.id ? '1px solid #c0392b' : '1px solid #ddd',
-                background: confirmingDeleteId === b.id ? '#c0392b' : 'transparent',
-                color: confirmingDeleteId === b.id ? '#fff' : '#999'
-              }}>
-                {confirmingDeleteId === b.id ? 'Emin misin?' : 'Sil'}
-              </button>
+          <div key={b.id} style={{ padding: '4px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <p style={{ fontSize: 13, margin: 0, color: b.active === false ? '#bbb' : '#666' }}>🏪 {b.name}{b.active === false ? ' (pasif)' : ''}</p>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+                <button onClick={() => setEditingHoursFor(editingHoursFor === b.id ? null : b.id)} style={{
+                  fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                  border: `1px solid ${T.primary}`, background: 'transparent', color: T.primary
+                }}>
+                  🕐 Çalışma Saatleri
+                </button>
+                <button onClick={() => onToggleActive(b.id, b.active)} style={{
+                  fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                  border: b.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
+                  background: b.active === false ? '#2e7d32' : '#c0392b',
+                  color: '#fff'
+                }}>
+                  {b.active === false ? 'Aktif et' : 'Pasif yap'}
+                </button>
+                <button onClick={() => handleDelete(b.id)} style={{
+                  fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                  border: confirmingDeleteId === b.id ? '1px solid #c0392b' : '1px solid #ddd',
+                  background: confirmingDeleteId === b.id ? '#c0392b' : 'transparent',
+                  color: confirmingDeleteId === b.id ? '#fff' : '#999'
+                }}>
+                  {confirmingDeleteId === b.id ? 'Emin misin?' : 'Sil'}
+                </button>
+              </div>
             </div>
+            {editingHoursFor === b.id && <WorkingHoursEditor branch={b} onSave={onSaveWorkingHours} />}
           </div>
         ))}
       </div>
@@ -2115,6 +2195,10 @@ export function PanelApp() {
     const { data } = await supabase.from('branches').update({ active: newActive }).eq('id', id).select()
     if (data) setBranches(prev => prev.map(b => b.id === id ? data[0] : b))
   }
+  async function saveWorkingHours(id, workingHours) {
+    const { data } = await supabase.from('branches').update({ working_hours: workingHours }).eq('id', id).select()
+    if (data) setBranches(prev => prev.map(b => b.id === id ? data[0] : b))
+  }
   // Şubeyi kalıcı olarak siler, ama önce tüm verisini (leads, app_users) arşive kopyalar.
   // Arşivlenen veri geri panelde görünmez ama ileride toplu indirme için Supabase'de saklı kalır.
   async function deleteBranch(id) {
@@ -2440,7 +2524,7 @@ export function PanelApp() {
         {activeTab === 'settings' && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Ayarlar</h1>
-            {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} onDelete={deleteBranch} />}
+            {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} onDelete={deleteBranch} onSaveWorkingHours={saveWorkingHours} />}
             {!isSuperAdmin && !canSeeOwnDataOnly && (
               <BranchServiceManager
                 services={currentBranchServices}
