@@ -22,6 +22,24 @@ export const references = [
   { name: 'SINERGY', sub: 'BAYAN KUAFÖRÜ', icon: Scissors },
 ]
 
+export const testimonials = [
+  {
+    quote: 'Gelen müşteri taleplerini daha önce farklı notlarda ve telefon kayıtlarında takip ediyorduk. Müşteri Takip sayesinde hangi müşterinin hangi aşamada olduğunu tek ekranda görmeye başladık. Özellikle geri dönüş yapılması gereken kişileri kaçırmamak bizim için büyük kolaylık sağladı.',
+    name: 'Alper Sarıtüy',
+    role: 'Altınşehir Gayrimenkul',
+  },
+  {
+    quote: 'Randevu alan, gelmeyen veya bilgi alıp dönüş yapmayan hastaları manuel takip etmek zaman alıyordu. Müşteri Takip ile randevu ve potansiyel hasta süreçlerini daha düzenli yönetmeye başladık. Ekibimiz için pratik ve takip edilebilir bir sistem oldu.',
+    name: 'Dent Clinic',
+    role: 'Ağız ve Diş Sağlığı Polikliniği',
+  },
+  {
+    quote: 'Yoğun günlerde randevuları, gelen mesajları ve tekrar aranması gereken müşterileri takip etmek zor oluyordu. Müşteri Takip sayesinde hiçbir müşteriyi gözden kaçırmadan süreci yönetebiliyoruz. Özellikle hatırlatma sistemi bizim için çok faydalı oldu.',
+    name: 'Sinergy',
+    role: 'Bayan Kuaförü',
+  },
+]
+
 export const features = [
   { icon: CalendarDays, title: 'Akıllı Randevu Yönetimi', desc: 'Tüm randevuları tek takvimde görün, çakışmaları ve iptalleri daha kolay yönetin.' },
   { icon: BellRing, title: 'Hatırlatma Uyarıları', desc: 'Sonuç kategorisine göre 1., 2. ve 3. hatırlatma zamanı geldiğinde sistem sizi uyarır.' },
