@@ -1317,11 +1317,14 @@ function PermissionTemplateManager({ isMobile }) {
               <button onClick={() => submitNameChange(tpl)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8 }}>
             {Object.keys(PERMISSION_LABELS).map(key => (
-              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={!!tpl[key]} onChange={() => toggle(tpl, key)} />
-                {PERMISSION_LABELS[key]}
+              <label key={key} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, cursor: 'pointer',
+                padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,.02)', border: '1px solid #eee', lineHeight: 1.35
+              }}>
+                <input type="checkbox" checked={!!tpl[key]} onChange={() => toggle(tpl, key)} style={{ marginTop: 2, flexShrink: 0, width: 16, height: 16 }} />
+                <span>{PERMISSION_LABELS[key]}</span>
               </label>
             ))}
           </div>
