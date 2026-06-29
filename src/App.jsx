@@ -2011,16 +2011,16 @@ function RecentLeadsTable({ leads, canSeePhone, showBranch, branchNameFn, isMobi
     return (
       <div>
         {recent.map(l => (
-          <div key={l.id} style={{ padding: '11px 0', borderBottom: `1px solid ${T.border}` }}>
+          <div key={l.id} style={{ padding: '11px 0', borderBottom: `1px solid ${T.border}`, minWidth: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: T.text, fontWeight: 600, fontSize: 13.5 }}>{l.name}</span>
+              <span style={{ color: T.text, fontWeight: 600, fontSize: 13.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
               <span style={{ color: T.textFaint, fontSize: 11.5, flexShrink: 0 }}>{new Date(l.date).toLocaleDateString('tr-TR')}</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
               <span style={{ background: T.primaryLight, color: T.primary, padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{l.result}</span>
               <span style={{ color: T.textSoft, fontSize: 11.5 }}>{l.channel}{showBranch && ` · ${branchNameFn(l.branch_id)}`}</span>
             </div>
-            {l.note && <p style={{ color: T.textSoft, fontSize: 12, margin: '6px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.note}</p>}
+            {l.note && <p style={{ color: T.textSoft, fontSize: 12, margin: '6px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{l.note}</p>}
           </div>
         ))}
       </div>
@@ -2471,7 +2471,7 @@ export function PanelApp() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: isSuperAdmin && filterBranch === 'all' ? '2fr 1fr' : '1fr', gap: 16 }}>
-              <div style={{ ...cardStyle, padding: '1.1rem' }}>
+              <div style={{ ...cardStyle, padding: '1.1rem', minWidth: 0, overflow: 'hidden' }}>
                 <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Son Görüşmeler</p>
                 <RecentLeadsTable leads={visibleLeads} canSeePhone={perms.can_see_phone} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} isMobile={isMobile} />
               </div>
