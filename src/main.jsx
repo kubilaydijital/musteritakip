@@ -11,6 +11,7 @@ import Blog from './pages/Blog.jsx'
 import BlogPost from './pages/BlogPost.jsx'
 import Contact from './pages/Contact.jsx'
 import Trial from './pages/Trial.jsx'
+import BookingPage from './pages/BookingPage.jsx'
 import { PanelApp } from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -26,6 +27,7 @@ createRoot(document.getElementById('root')).render(
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/iletisim" element={<Contact />} />
         <Route path="/deneme" element={<Trial />} />
+        <Route path="/randevu/:branchId" element={<BookingPage />} />
         <Route path="/giris" element={<PanelApp />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
