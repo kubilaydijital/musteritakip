@@ -78,6 +78,7 @@ export async function handler(event) {
       body: JSON.stringify({
         id: leadId, branch_id, name: name.trim(), phone: phone.trim(),
         channel: 'Online Randevu', service: service || null,
+        note: 'Müşteri online randevu sayfasından kendisi randevu oluşturdu.',
         result: 'Randevu aldı', appointment_at: appointmentIso,
         entered_by: 'Online Randevu Sistemi', date: new Date().toISOString(),
         last_note_at: new Date().toISOString(),
