@@ -2470,7 +2470,7 @@ export function PanelApp() {
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: isSuperAdmin && filterBranch === 'all' ? '2fr 1fr' : '1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: (isSuperAdmin && filterBranch === 'all' && !isMobile) ? '2fr 1fr' : '1fr', gap: 16 }}>
               <div style={{ ...cardStyle, padding: '1.1rem', minWidth: 0, overflow: 'hidden' }}>
                 <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Son Görüşmeler</p>
                 <RecentLeadsTable leads={visibleLeads} canSeePhone={perms.can_see_phone} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} isMobile={isMobile} />
@@ -2534,7 +2534,7 @@ export function PanelApp() {
         {activeTab === 'reports' && perms.can_see_revenue && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Raporlar</h1>
-            <div style={{ display: 'grid', gridTemplateColumns: scopedAds.length > 0 ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: (scopedAds.length > 0 && !isMobile) ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16 }}>
               <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '1rem' }}>
                 <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 8px', fontWeight: 600 }}>Hizmete göre ciro</p>
                 <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
