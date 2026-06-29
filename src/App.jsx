@@ -1455,7 +1455,8 @@ const PERMISSION_LABELS = {
   can_manage_users: 'Kullanıcı ekleyip çıkarabilir',
   can_manage_branches: 'Şube ekleyip çıkarabilir',
   can_enter_ads_data: 'Haftalık reklam verisi girebilir',
-  can_see_calendar: 'Randevu takvimini görebilir'
+  can_see_calendar: 'Randevu takvimini görebilir',
+  can_export_data: 'Müşteri listesini dışa aktarabilir (CSV/Excel)'
 }
 
 function PermissionTemplateManager({ isMobile }) {
@@ -2583,11 +2584,13 @@ export function PanelApp() {
                 <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>
                   {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları'}
                 </p>
-                <ExportButtons
-                  rows={leadsToExportRows(visibleLeads, branchName, isSuperAdmin && filterBranch === 'all')}
-                  baseFilename={`danisanlar-${new Date().toISOString().slice(0, 10)}`}
-                  sheetName="Danışanlar"
-                />
+                {(isSuperAdmin || perms.can_export_data) && (
+                  <ExportButtons
+                    rows={leadsToExportRows(visibleLeads, branchName, isSuperAdmin && filterBranch === 'all')}
+                    baseFilename={`danisanlar-${new Date().toISOString().slice(0, 10)}`}
+                    sheetName="Danışanlar"
+                  />
+                )}
               </div>
               {visibleLeads.length === 0 ? (
                 <p style={{ fontSize: 13, color: T.textSoft }}>Henüz kayıt yok.</p>
@@ -2624,11 +2627,13 @@ export function PanelApp() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
               <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: 0 }}>Raporlar</h1>
-              <ExportButtons
-                rows={leadsToExportRows(scopedLeads, branchName, isSuperAdmin && filterBranch === 'all')}
-                baseFilename={`rapor-${new Date().toISOString().slice(0, 10)}`}
-                sheetName="Rapor"
-              />
+              {(isSuperAdmin || perms.can_export_data) && (
+                <ExportButtons
+                  rows={leadsToExportRows(scopedLeads, branchName, isSuperAdmin && filterBranch === 'all')}
+                  baseFilename={`rapor-${new Date().toISOString().slice(0, 10)}`}
+                  sheetName="Rapor"
+                />
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: (scopedAds.length > 0 && !isMobile) ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16 }}>
               <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '1rem' }}>
