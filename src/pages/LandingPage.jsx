@@ -21,7 +21,7 @@ export default function LandingPage() {
               <p>Kağıda yazılan müşteri unutulur. Müşteri Takip; randevuları, gelen mesajları, satışları ve kaçan müşterileri tek ekranda toplar. Sistem zamanı geldiğinde sizi uyarır, hiçbir potansiyel müşteri arada kaybolmaz.</p>
               <div className="hero-actions">
                 <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
-                <Link to="/demo" className="btn btn-ghost big"><Mail size={18}/> Demo Talep Et</Link>
+                <Link to="/iletisim" className="btn btn-ghost big"><Mail size={18}/> Sorularınız mı var?</Link>
               </div>
               <div className="hero-checks"><span><CheckCircle2/>14 gün ücretsiz</span><span><CheckCircle2/>Kredi kartı gerekmez</span><span><CheckCircle2/>Kurulum gerektirmez</span></div>
             </div>
@@ -87,7 +87,7 @@ export default function LandingPage() {
           <DashboardMock compact />
         </section>
 
-        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz deneyebilir veya demoyu inceleyebilirsiniz.</p><div><Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene</Link><Link to="/demo" className="btn btn-ghost big">Demoyu İncele</Link></div></section>
+        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz deneyebilir veya bize ulaşabilirsiniz.</p><div><Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene</Link><Link to="/iletisim" className="btn btn-ghost big">Bize Ulaşın</Link></div></section>
       </main>
     </Layout>
   )
