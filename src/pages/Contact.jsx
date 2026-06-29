@@ -7,7 +7,7 @@ import usePageMeta from '../usePageMeta.js'
 const FORMSPREE_URL = 'https://formspree.io/f/mlgvyrld'
 
 export default function Contact() {
-  usePageMeta('İletişim', 'Sorularınız ve demo talepleriniz için bize ulaşın. Müşteri Takip ekibi size yardımcı olmaktan mutluluk duyar.')
+  usePageMeta('İletişim', 'Sorularınız için bize ulaşın. Müşteri Takip ekibi size yardımcı olmaktan mutluluk duyar.')
   const [form, setForm] = useState({ name: '', email: '', business: '', message: '' })
   const [status, setStatus] = useState('idle') // idle | sending | sent | error
 
@@ -44,7 +44,7 @@ export default function Contact() {
           <div>
             <span className="page-no">06</span>
             <h1>Sorularınız için bize ulaşın.</h1>
-            <p>Demo talepleri ve tüm sorularınız için formu doldurabilir veya doğrudan e-posta gönderebilirsiniz.</p>
+            <p>Tüm sorularınız için formu doldurabilir veya doğrudan e-posta gönderebilirsiniz.</p>
             <div className="contact-list">
               <a href={`mailto:${EMAIL}`}><Mail/> {EMAIL}</a>
               <span><MapPin/> {LOCATION}</span>
