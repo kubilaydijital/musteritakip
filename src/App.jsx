@@ -491,12 +491,22 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
           <textarea placeholder="Yeni not ekle (isteğe bağlı)" value={form.newNote} onChange={e => set('newNote', e.target.value)} rows={2}
             style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
           <p style={{ fontSize: 11, color: '#888', margin: '4px 0 10px' }}>Not eklemek, bu kaydın "takip bekliyor" sayacını sıfırlar.</p>
-          <button type="button" disabled={aiLoading || !form.newNote.trim()} onClick={() => getAiTip(form.newNote)} style={{
-            fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
-            color: T.primary, cursor: form.newNote.trim() ? 'pointer' : 'not-allowed', fontWeight: 500, marginBottom: 10, opacity: form.newNote.trim() ? 1 : 0.5
-          }}>
-            {aiLoading ? '💡 Düşünüyor...' : '💡 İpucu Al'}
-          </button>
+          {(() => {
+            // Yeni not yazılmadıysa, geçmişteki en son notu kullan - kullanıcı zaten girdiği
+            // ilk notla ipucu isteyebilsin, tekrar yazmasına gerek kalmasın.
+            const lastOldNote = notesForLead && notesForLead.length > 0
+              ? [...notesForLead].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0].note
+              : ''
+            const noteToUse = form.newNote.trim() || lastOldNote
+            return (
+              <button type="button" disabled={aiLoading || !noteToUse.trim()} onClick={() => getAiTip(noteToUse)} style={{
+                fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
+                color: T.primary, cursor: noteToUse.trim() ? 'pointer' : 'not-allowed', fontWeight: 500, marginBottom: 10, opacity: noteToUse.trim() ? 1 : 0.5
+              }}>
+                {aiLoading ? '💡 Düşünüyor...' : '💡 İpucu Al'}
+              </button>
+            )
+          })()}
         </>
       ) : (
         <>
