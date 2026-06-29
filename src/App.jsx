@@ -349,10 +349,14 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [appointmentErr, setAppointmentErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [aiTip, setAiTip] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiErr, setAiErr] = useState('')
 
   useEffect(() => {
     setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
     setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setConfirmingDelete(false)
+    setAiTip(''); setAiErr('')
   }, [editing])
 
   useEffect(() => {
@@ -363,6 +367,29 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   }, [services])
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function getAiTip(noteText) {
+    if (!noteText || !noteText.trim()) return
+    setAiLoading(true)
+    setAiErr('')
+    setAiTip('')
+    try {
+      const res = await fetch('/.netlify/functions/lead-tip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: noteText, result: form.result, service: form.service }),
+      })
+      const data = await res.json()
+      if (res.ok && data.tip) {
+        setAiTip(data.tip)
+      } else {
+        setAiErr('İpucu alınamadı, lütfen tekrar deneyin.')
+      }
+    } catch {
+      setAiErr('İpucu alınamadı, lütfen tekrar deneyin.')
+    }
+    setAiLoading(false)
+  }
 
   async function handleDelete() {
     if (!confirmingDelete) { setConfirmingDelete(true); return }
@@ -464,14 +491,32 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
           <textarea placeholder="Yeni not ekle (isteğe bağlı)" value={form.newNote} onChange={e => set('newNote', e.target.value)} rows={2}
             style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
           <p style={{ fontSize: 11, color: '#888', margin: '4px 0 10px' }}>Not eklemek, bu kaydın "takip bekliyor" sayacını sıfırlar.</p>
+          <button type="button" disabled={aiLoading || !form.newNote.trim()} onClick={() => getAiTip(form.newNote)} style={{
+            fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
+            color: T.primary, cursor: form.newNote.trim() ? 'pointer' : 'not-allowed', fontWeight: 500, marginBottom: 10, opacity: form.newNote.trim() ? 1 : 0.5
+          }}>
+            {aiLoading ? '💡 Düşünüyor...' : '💡 İpucu Al'}
+          </button>
         </>
       ) : (
         <>
           <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => set('note', e.target.value)} rows={2}
             style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
           {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
+          <button type="button" disabled={aiLoading || !form.note.trim()} onClick={() => getAiTip(form.note)} style={{
+            fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
+            color: T.primary, cursor: form.note.trim() ? 'pointer' : 'not-allowed', fontWeight: 500, marginBottom: 10, opacity: form.note.trim() ? 1 : 0.5
+          }}>
+            {aiLoading ? '💡 Düşünüyor...' : '💡 İpucu Al'}
+          </button>
         </>
       )}
+      {aiTip && (
+        <div style={{ background: T.primaryLight || 'rgba(124,92,255,.1)', border: `1px solid ${T.primary}`, borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: T.text, lineHeight: 1.5 }}>
+          <strong style={{ color: T.primary }}>💡 İpucu:</strong> {aiTip}
+        </div>
+      )}
+      {aiErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{aiErr}</p>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
         <button type="submit" disabled={submitting} style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
           {submitting ? 'Kaydediliyor...' : (editing ? 'Güncelle' : 'Kaydet')}
