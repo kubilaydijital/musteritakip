@@ -589,7 +589,7 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
   const [selectedDay, setSelectedDay] = useState(null)
 
   const scopedLeads = useMemo(() =>
-    leads.filter(l => isStaff ? l.entered_by === currentUserName : true).filter(l => l.appointment_at),
+    leads.filter(l => l.appointment_at),
     [leads, currentUserName, isStaff])
 
   const leadsByDay = useMemo(() => {
@@ -725,7 +725,6 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
 function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMap }) {
   const stale = useMemo(() =>
     leads
-      .filter(l => isStaff ? l.entered_by === currentUserName : true)
       .map(l => ({ lead: l, s: staleness(l, noteCountMap[l.id] || 0) }))
       .filter(x => x.s && x.s.level !== 'cold')
       .sort((a, b) => b.s.days - a.s.days),
@@ -2290,7 +2289,9 @@ export function PanelApp() {
   const activeBranches = branches.filter(b => b.active !== false)
 
   const scopedLeads = isSuperAdmin ? (filterBranch === 'all' ? leads : leads.filter(l => l.branch_id === filterBranch)) : leads.filter(l => l.branch_id === currentUser.branch_id)
-  const visibleLeads = canSeeOwnDataOnly ? scopedLeads.filter(l => l.entered_by === currentUser.username) : scopedLeads
+  // Not: Personel artık şubedeki TÜM kayıtları görebiliyor (eskiden sadece kendi girdiğini görürdü).
+  // Düzenleme yetkisi hâlâ ayrı kontrol ediliyor (bkz. canEditLead) - görme ve düzenleme farklı izinler.
+  const visibleLeads = scopedLeads
   const scopedAds = isSuperAdmin ? (filterBranch === 'all' ? adsData : adsData.filter(a => a.branch_id === filterBranch)) : adsData.filter(a => a.branch_id === currentUser.branch_id)
 
   function canEditLead(lead) {
@@ -2462,7 +2463,7 @@ export function PanelApp() {
             )}
             <div style={{ marginTop: '1.5rem' }}>
               <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 10px' }}>
-                {canSeeOwnDataOnly ? 'Senin girdiğin kayıtlar' : (isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları')}
+                {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları'}
               </p>
               {visibleLeads.length === 0 ? (
                 <p style={{ fontSize: 13, color: T.textSoft }}>Henüz kayıt yok.</p>
