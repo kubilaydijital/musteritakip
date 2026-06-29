@@ -82,6 +82,28 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section className="container booking-feature">
+          <div className="booking-feature-copy">
+            <span className="booking-badge"><span></span>Yeni özellik</span>
+            <h2>Müşterileriniz artık sizi aramadan<br/><strong>randevu alabilir.</strong></h2>
+            <p>Kendi randevu sayfanızla, müşterileriniz 7/24 size uygun saati görüp anında randevu oluşturabilir. Siz hiçbir şey yapmadan, panel otomatik dolar.</p>
+            <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
+          </div>
+          <div className="booking-mock">
+            <p className="booking-mock-title">Aris Balıkesir</p>
+            <p className="booking-mock-sub">Aşağıdan size uygun bir gün ve saat seçin.</p>
+            <p className="booking-mock-label">Müsait saatler</p>
+            <div className="booking-mock-slots">
+              <span>10:00</span><span className="active">11:30</span><span>13:00</span><span>14:30</span>
+            </div>
+            <div className="booking-mock-fields">
+              <span>Ad Soyad</span>
+              <span>Telefon</span>
+              <div className="booking-mock-cta">11:30 için randevu al</div>
+            </div>
+          </div>
+        </section>
+
         <section className="container device-section">
           <div><h2>Her yerden, her cihazdan erişin.</h2><p>Bilgileriniz güvende, siz işinize odaklanın. Web ekranı, mobil uyum ve güvenli altyapı ile süreçlerinizi daha net yönetin.</p><div className="device-badges"><span><Monitor/>Web</span><span><Smartphone/>Mobil uyumlu</span><span><ShieldCheck/>Güvenli altyapı</span></div></div>
           <DashboardMock compact />
