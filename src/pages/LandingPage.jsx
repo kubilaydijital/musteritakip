@@ -90,7 +90,7 @@ export default function LandingPage() {
             <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
           </div>
           <div className="booking-mock">
-            <p className="booking-mock-title">Aris Balıkesir</p>
+            <p className="booking-mock-title">İşletmeniz</p>
             <p className="booking-mock-sub">Aşağıdan size uygun bir gün ve saat seçin.</p>
             <p className="booking-mock-label">Müsait saatler</p>
             <div className="booking-mock-slots">
