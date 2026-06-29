@@ -63,11 +63,15 @@ export async function handler(event) {
       return { statusCode: 200, body: JSON.stringify({ slots: [], reason: 'Bu gün kapalı' }) }
     }
 
-    // 3) O güne ait mevcut randevuları çek (appointment_at dolu olan leads)
-    const dayStart = `${date}T00:00:00`
-    const dayEnd = `${date}T23:59:59`
+    // 3) O güne ait mevcut randevuları çek (appointment_at dolu olan leads).
+    // "date" parametresi Türkiye günü olarak verildiği için, bu günün Türkiye saatiyle
+    // 00:00-23:59 aralığını UTC'ye çevirip sorguluyoruz (Türkiye 00:00 = UTC -3 saat önceki gün 21:00).
+    const dayStart = new Date(`${date}T00:00:00.000Z`)
+    dayStart.setUTCHours(dayStart.getUTCHours() - 3)
+    const dayEnd = new Date(`${date}T23:59:59.000Z`)
+    dayEnd.setUTCHours(dayEnd.getUTCHours() - 3)
     const leadsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/leads?branch_id=eq.${encodeURIComponent(branch_id)}&appointment_at=gte.${dayStart}&appointment_at=lte.${dayEnd}&select=appointment_at`,
+      `${SUPABASE_URL}/rest/v1/leads?branch_id=eq.${encodeURIComponent(branch_id)}&appointment_at=gte.${dayStart.toISOString()}&appointment_at=lte.${dayEnd.toISOString()}&select=appointment_at`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     )
     const existingLeads = await leadsRes.json()
@@ -75,8 +79,12 @@ export async function handler(event) {
       (Array.isArray(existingLeads) ? existingLeads : [])
         .filter(l => l.appointment_at)
         .map(l => {
-          const d = new Date(l.appointment_at)
-          return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+          // Veritabanında appointment_at UTC olarak saklanıyor (panel .toISOString() ile kaydediyor).
+          // Çalışma saatleri Türkiye saatiyle ifade edildiği için, karşılaştırmadan önce
+          // UTC zamanını da +3 saat ekleyerek Türkiye saatine çeviriyoruz.
+          const dUtc = new Date(l.appointment_at)
+          const dTurkey = new Date(dUtc.getTime() + 3 * 60 * 60 * 1000)
+          return `${dTurkey.getUTCHours().toString().padStart(2, '0')}:${dTurkey.getUTCMinutes().toString().padStart(2, '0')}`
         })
     )
 
