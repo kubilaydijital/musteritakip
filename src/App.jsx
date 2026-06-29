@@ -752,6 +752,27 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMa
   )
 }
 
+// Danışanın sonuç durumuna göre kişiselleştirilmiş WhatsApp mesaj şablonu üretir.
+const WHATSAPP_TEMPLATES = {
+  'Randevu aldı': (name, service) =>
+    `Merhaba ${name}, randevunuzu hatırlatmak istedik${service ? ` (${service})` : ''}. Sizi görmeyi bekliyoruz! 😊`,
+  'Randevuya gelmedi': (name) =>
+    `Merhaba ${name}, geçtiğimiz randevunuza gelemediğinizi fark ettik. Size uygun yeni bir gün ayarlamak isteriz, ne zaman uygun olur?`,
+  'Satın almadı': (name, service) =>
+    `Merhaba ${name}, ${service ? `${service} ile ilgili ` : ''}görüşmemizin ardından aklınızda kalan sorular varsa size yardımcı olmak isteriz. Ne zaman uygun olursunuz?`,
+  'Cevap yazıldı, müşteriden dönüş gelmedi': (name) =>
+    `Merhaba ${name}, daha önce yazmıştık, size hâlâ yardımcı olmak isteriz. Müsait olduğunuzda bize ulaşabilirsiniz.`,
+  'Müşteri oldu': (name) =>
+    `Merhaba ${name}, bizi tercih ettiğiniz için çok mutluyuz! Her zaman buradayız, görüşmek üzere. 💜`,
+}
+
+function buildWhatsappUrl(lead) {
+  const template = WHATSAPP_TEMPLATES[lead.result] || WHATSAPP_TEMPLATES['Randevu aldı']
+  const message = template(lead.name, lead.service)
+  const digits = (lead.phone || '').replace(/[^\d]/g, '') // wa.me formatı: sadece rakamlar, + işareti olmadan
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+}
+
 function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile, noteCount = 0 }) {
   const s = staleness(lead, noteCount)
 
@@ -766,9 +787,16 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
               {showBranch && ` · ${branchName}`}
             </p>
           </div>
-          {canEdit && (
-            <button onClick={() => onEdit(lead)} style={{ fontSize: 12, padding: '5px 9px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, flexShrink: 0 }}>✎</button>
-          )}
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {canSeePhone && lead.phone && (
+              <a href={buildWhatsappUrl(lead)} target="_blank" rel="noopener noreferrer" style={{
+                fontSize: 12, padding: '5px 9px', borderRadius: 8, border: `1px solid #1D9E75`, background: 'transparent', color: '#1D9E75', textDecoration: 'none'
+              }}>📱</a>
+            )}
+            {canEdit && (
+              <button onClick={() => onEdit(lead)} style={{ fontSize: 12, padding: '5px 9px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, flexShrink: 0 }}>✎</button>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
           <span style={{ fontSize: 11.5, fontWeight: 600, color: RESULT_COLOR[lead.result], background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>{lead.result}</span>
@@ -790,7 +818,14 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
     }}>
       {showBranch && <span style={{ fontSize: 12, color: T.textSoft }}>{branchName}</span>}
       <span style={{ fontWeight: 600 }}>{lead.name}</span>
-      <span style={{ color: T.textSoft }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
+      <span style={{ color: T.textSoft, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {canSeePhone ? lead.phone : '••• gizli'}
+        {canSeePhone && lead.phone && (
+          <a href={buildWhatsappUrl(lead)} target="_blank" rel="noopener noreferrer" title="WhatsApp'tan yaz" style={{
+            fontSize: 13, color: '#1D9E75', textDecoration: 'none', flexShrink: 0
+          }}>📱</a>
+        )}
+      </span>
       <span>{lead.channel}</span>
       <span style={{ color: T.textSoft, fontSize: 12 }}>{lead.service || '—'}</span>
       <span style={{ fontSize: 12, color: T.textSoft }}>{lead.note ? lead.note.slice(0, 30) : '—'}</span>
