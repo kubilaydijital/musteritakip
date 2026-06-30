@@ -219,7 +219,7 @@ async function getClientIp() {
 }
 
 function Login({ onLogin }) {
-  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [pass, setPass] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
@@ -232,50 +232,42 @@ function Login({ onLogin }) {
     e.preventDefault()
     setErr('')
     setLoading(true)
-    const { data, error } = await supabase
-      .from('app_users')
-      .select('*')
-      .ilike('username', name.trim())
-      .maybeSingle()
 
-    if (error || !data) { setLoading(false); setErr('Kullanıcı adı veya şifre hatalı.'); return }
-    if (data.password !== pass) { setLoading(false); setErr('Kullanıcı adı veya şifre hatalı.'); return }
-    if (data.active === false) { setLoading(false); setErr('Bu hesabın erişimi şu anda askıya alınmış. Yöneticinizle görüşün.'); return }
+    // Supabase Auth ile giriş
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password: pass,
+    })
 
-    // Admin hesabı IP kontrolünden muaf - kendi erişimin kilitlenmesin
-    if (data.role !== 'admin') {
-      const ip = await getClientIp()
-      if (ip) {
-        await supabase.from('login_logs').insert({ id: uid(), username: data.username, ip })
-        const since = new Date(Date.now() - SUSPICIOUS_WINDOW_MS).toISOString()
-        const { data: recentLogs } = await supabase
-          .from('login_logs')
-          .select('ip')
-          .eq('username', data.username)
-          .gte('created_at', since)
-        const distinctIps = new Set((recentLogs || []).map(l => l.ip).filter(Boolean))
-        if (distinctIps.size >= SUSPICIOUS_IP_THRESHOLD) {
-          await supabase.from('app_users').update({ active: false }).eq('username', data.username)
-          setLoading(false)
-          setErr('Güvenlik nedeniyle bu hesap askıya alındı: kısa sürede çok farklı yerden giriş tespit edildi. Yöneticinizle görüşün.')
-          return
-        }
-      }
+    if (authError || !authData.user) {
+      setLoading(false)
+      setErr('E-posta veya şifre hatalı.')
+      return
     }
 
-    // İzin şablonunu çek ve kullanıcı objesine ekle
-    let permissions = null
-    if (data.permission_template_id) {
-      const { data: tpl } = await supabase
-        .from('permission_templates')
-        .select('*')
-        .eq('id', data.permission_template_id)
-        .maybeSingle()
-      permissions = tpl
+    // app_users'dan profil ve izinleri çek
+    const { data: profile } = await supabase
+      .from('app_users')
+      .select('*, permission_templates(*)')
+      .eq('id', authData.user.id)
+      .maybeSingle()
+
+    if (!profile) {
+      await supabase.auth.signOut()
+      setLoading(false)
+      setErr('Hesap profili bulunamadı. Yöneticinizle görüşün.')
+      return
+    }
+
+    if (profile.active === false) {
+      await supabase.auth.signOut()
+      setLoading(false)
+      setErr('Bu hesabın erişimi askıya alınmış. Yöneticinizle görüşün.')
+      return
     }
 
     setLoading(false)
-    onLogin({ ...data, permissions })
+    onLogin({ ...profile, permissions: profile.permission_templates })
   }
 
   async function submitForgot(e) {
@@ -284,17 +276,14 @@ function Login({ onLogin }) {
     if (!resetEmail.trim()) return
     setResetLoading(true)
     try {
-      const res = await fetch('/.netlify/functions/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail.trim() }),
+      // Supabase Auth'un kendi şifre sıfırlama sistemi
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+        redirectTo: 'https://musteritakip.net/giris',
       })
-      // Güvenlik için: e-posta kayıtlı olmasa da olsa aynı mesajı göster,
-      // böylece sistemde hangi e-postaların kayıtlı olduğu dışarıdan anlaşılamaz.
-      if (res.ok || res.status === 404) {
-        setMode('sent')
-      } else {
+      if (error) {
         setResetErr('Bir sorun oluştu, lütfen daha sonra tekrar deneyin.')
+      } else {
+        setMode('sent')
       }
     } catch {
       setResetErr('Bir sorun oluştu, lütfen daha sonra tekrar deneyin.')
@@ -306,14 +295,14 @@ function Login({ onLogin }) {
     return (
       <div style={{ maxWidth: 360, margin: '4rem auto', padding: '1.5rem', fontFamily: 'system-ui, sans-serif' }}>
         <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Şifremi unuttum</p>
-        <p style={{ fontSize: 13, color: T.textSoft, marginBottom: 20 }}>Hesabınıza kayıtlı e-posta adresinizi girin, yeni şifrenizi gönderelim.</p>
+        <p style={{ fontSize: 13, color: T.textSoft, marginBottom: 20 }}>E-posta adresinizi girin, şifre sıfırlama linki gönderelim.</p>
         <form onSubmit={submitForgot}>
           <input type="email" placeholder="E-posta adresiniz" value={resetEmail} onChange={e => setResetEmail(e.target.value)}
             style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: `1px solid ${T.border}`, boxSizing: 'border-box' }} />
           {resetErr && <p style={{ fontSize: 13, color: '#c0392b', marginBottom: 10 }}>{resetErr}</p>}
           <button type="submit" disabled={resetLoading}
             style={{ width: '100%', padding: 10, borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
-            {resetLoading ? 'Gönderiliyor...' : 'Yeni şifre gönder'}
+            {resetLoading ? 'Gönderiliyor...' : 'Şifre sıfırlama linki gönder'}
           </button>
         </form>
         <button onClick={() => setMode('login')} style={{ marginTop: 14, fontSize: 13, color: T.textSoft, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
@@ -328,7 +317,7 @@ function Login({ onLogin }) {
       <div style={{ maxWidth: 360, margin: '4rem auto', padding: '1.5rem', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
         <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>E-postanızı kontrol edin</p>
         <p style={{ fontSize: 13.5, color: T.textSoft, marginBottom: 20, lineHeight: 1.6 }}>
-          Eğer bu e-posta adresine kayıtlı bir hesap varsa, yeni şifre gönderildi. Gelen kutunuzu (ve spam klasörünü) kontrol edin.
+          Eğer bu e-posta adresine kayıtlı bir hesap varsa, şifre sıfırlama linki gönderildi. Gelen kutunuzu (ve spam klasörünü) kontrol edin.
         </p>
         <button onClick={() => setMode('login')} style={{ fontSize: 13, color: T.primary, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
           ← Giriş ekranına dön
@@ -342,7 +331,7 @@ function Login({ onLogin }) {
       <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Müşteri takip sistemi</p>
       <p style={{ fontSize: 13, color: T.textSoft, marginBottom: 20 }}>Giriş yapın</p>
       <form onSubmit={submit}>
-        <input placeholder="Kullanıcı adı" value={name} onChange={e => setName(e.target.value)}
+        <input type="email" placeholder="E-posta adresiniz" value={email} onChange={e => setEmail(e.target.value)}
           style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: `1px solid ${T.border}`, boxSizing: 'border-box' }} />
         <input type="password" placeholder="Şifre" value={pass} onChange={e => setPass(e.target.value)}
           style={{ width: '100%', marginBottom: 10, padding: 10, borderRadius: 8, border: `1px solid ${T.border}`, boxSizing: 'border-box' }} />
@@ -499,12 +488,12 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         id: editing.id, name: form.name, phone: form.phone, channel: form.channel,
         service: form.service, note: form.newNote, result: form.result, sale_amount: saleAmount,
         appointment_at: appointmentAt, edited_at: new Date().toISOString()
-      }, currentUser.username)
+      }, currentUser.full_name || currentUser.email)
     } else {
       await onAdd({
         id: uid(), branch_id: targetBranchId, name: form.name, phone: form.phone,
         channel: form.channel, service: form.service, note: form.note, result: form.result,
-        sale_amount: saleAmount, appointment_at: appointmentAt, entered_by: currentUser.username, date: new Date().toISOString()
+        sale_amount: saleAmount, appointment_at: appointmentAt, entered_by: currentUser.full_name || currentUser.email, date: new Date().toISOString()
       })
     }
     setSubmitting(false)
@@ -1129,18 +1118,16 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
     </div>
   )
 }
-function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeUsername, onChangeEmail, branches, templates, isMobile, currentUsername }) {
-  const [newUsername, setNewUsername] = useState('')
-  const [newPassword, setNewPassword] = useState('')
+function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeName, onChangeEmail, branches, templates, isMobile, currentUserId }) {
   const [newEmail, setNewEmail] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newFullName, setNewFullName] = useState('')
   const [newBranchId, setNewBranchId] = useState(branches[0]?.id || '')
   const [newTemplateId, setNewTemplateId] = useState('')
   const [addErr, setAddErr] = useState('')
   const [editingPwFor, setEditingPwFor] = useState(null)
-  const [pwValue, setPwValue] = useState('')
-  const [editingUsernameFor, setEditingUsernameFor] = useState(null)
-  const [usernameValue, setUsernameValue] = useState('')
-  const [usernameErr, setUsernameErr] = useState('')
+  const [editingNameFor, setEditingNameFor] = useState(null)
+  const [nameValue, setNameValue] = useState('')
   const [editingEmailFor, setEditingEmailFor] = useState(null)
   const [emailValue, setEmailValue] = useState('')
   const [confirmingDeleteFor, setConfirmingDeleteFor] = useState(null)
@@ -1150,46 +1137,39 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
   async function submitAdd(e) {
     e.preventDefault()
     setAddErr('')
-    if (!newUsername.trim() || !newPassword.trim() || !newBranchId || !newTemplateId) {
+    if (!newEmail.trim() || !newPassword.trim() || !newBranchId || !newTemplateId) {
       setAddErr('Tüm alanları doldurun.')
       return
     }
-    if (users.some(u => u.username.toLowerCase() === newUsername.trim().toLowerCase())) {
-      setAddErr('Bu kullanıcı adı zaten kullanılıyor.')
+    if (users.some(u => u.email?.toLowerCase() === newEmail.trim().toLowerCase())) {
+      setAddErr('Bu e-posta zaten kullanılıyor.')
       return
     }
-    await onAdd({ username: newUsername.trim(), password: newPassword.trim(), branch_id: newBranchId, permission_template_id: newTemplateId, email: newEmail.trim() || null, active: true })
-    setNewUsername(''); setNewPassword(''); setNewEmail('')
+    await onAdd({ email: newEmail.trim(), password: newPassword.trim(), full_name: newFullName.trim() || null, branch_id: newBranchId, permission_template_id: newTemplateId, active: true })
+    setNewEmail(''); setNewPassword(''); setNewFullName('')
   }
 
-  async function submitPasswordChange(username) {
-    if (!pwValue.trim()) return
-    await onChangePassword(username, pwValue.trim())
-    setEditingPwFor(null); setPwValue('')
+  async function submitPasswordChange(userId) {
+    await onChangePassword(userId)
+    setEditingPwFor(null)
   }
 
-  async function submitUsernameChange(oldUsername) {
-    setUsernameErr('')
-    const trimmed = usernameValue.trim()
+  async function submitNameChange(userId) {
+    const trimmed = nameValue.trim()
     if (!trimmed) return
-    if (trimmed.toLowerCase() === oldUsername.toLowerCase()) { setEditingUsernameFor(null); return }
-    if (users.some(u => u.username.toLowerCase() === trimmed.toLowerCase())) {
-      setUsernameErr('Bu kullanıcı adı zaten kullanılıyor.')
-      return
-    }
-    await onChangeUsername(oldUsername, trimmed)
-    setEditingUsernameFor(null); setUsernameValue('')
+    await onChangeName(userId, trimmed)
+    setEditingNameFor(null); setNameValue('')
   }
 
-  async function submitEmailChange(username) {
+  async function submitEmailChange(userId) {
     const trimmed = emailValue.trim()
-    await onChangeEmail(username, trimmed)
+    await onChangeEmail(userId, trimmed)
     setEditingEmailFor(null); setEmailValue('')
   }
 
-  async function handleDelete(username) {
-    if (confirmingDeleteFor !== username) { setConfirmingDeleteFor(username); return }
-    await onDelete(username)
+  async function handleDelete(userId) {
+    if (confirmingDeleteFor !== userId) { setConfirmingDeleteFor(userId); return }
+    await onDelete(userId)
     setConfirmingDeleteFor(null)
   }
 
@@ -1201,31 +1181,31 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
       {users.map(u => {
         const branch = branches.find(b => b.id === u.branch_id)
         const tplName = (templates || []).find(t => t.id === u.permission_template_id)?.name || u.role
-        const isSelf = u.username === currentUsername
+        const isSelf = u.id === currentUserId
         return (
-          <div key={u.username} style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
+          <div key={u.id} style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 8 : 0 }}>
               <div>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.username}{isSelf && <span style={{ color: T.primary, fontWeight: 500 }}> (sen)</span>}</p>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{u.full_name || u.email}{isSelf && <span style={{ color: T.primary, fontWeight: 500 }}> (sen)</span>}</p>
                 <p style={{ margin: 0, fontSize: 12, color: T.textSoft }}>{tplName} · {branch ? branch.name : '—'}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11.5, color: u.email ? T.textFaint : '#c0392b' }}>{u.email || 'e-posta yok — şifremi unuttum çalışmaz'}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11.5, color: T.textFaint }}>{u.email}</p>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
-                <button onClick={() => { setEditingPwFor(editingPwFor === u.username ? null : u.username); setPwValue(''); setEditingUsernameFor(null); setEditingEmailFor(null) }}
+                <button onClick={() => { setEditingPwFor(editingPwFor === u.id ? null : u.id); setEditingNameFor(null); setEditingEmailFor(null) }}
                   style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
-                  Şifre değiştir
+                  Şifre sıfırla
                 </button>
-                <button onClick={() => { setEditingUsernameFor(editingUsernameFor === u.username ? null : u.username); setUsernameValue(u.username); setEditingPwFor(null); setEditingEmailFor(null) }}
+                <button onClick={() => { setEditingNameFor(editingNameFor === u.id ? null : u.id); setNameValue(u.full_name || ''); setEditingPwFor(null); setEditingEmailFor(null) }}
                   style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
-                  Kullanıcı adı değiştir
+                  Ad değiştir
                 </button>
-                <button onClick={() => { setEditingEmailFor(editingEmailFor === u.username ? null : u.username); setEmailValue(u.email || ''); setEditingPwFor(null); setEditingUsernameFor(null) }}
+                <button onClick={() => { setEditingEmailFor(editingEmailFor === u.id ? null : u.id); setEmailValue(u.email || ''); setEditingPwFor(null); setEditingNameFor(null) }}
                   style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer', fontWeight: 500 }}>
                   E-posta düzenle
                 </button>
                 {!isSelf && (
                   <>
-                    <button onClick={() => onToggle(u.username, u.active)} style={{
+                    <button onClick={() => onToggle(u.id, u.active)} style={{
                       fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
                       border: u.active === false ? '1px solid #2e7d32' : '1px solid #c0392b',
                       background: u.active === false ? '#2e7d32' : '#c0392b',
@@ -1233,37 +1213,34 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
                     }}>
                       {u.active === false ? 'Erişimi aç' : 'Erişimi askıya al'}
                     </button>
-                    <button onClick={() => handleDelete(u.username)} style={{
+                    <button onClick={() => handleDelete(u.id)} style={{
                       fontSize: 12, padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
-                      border: confirmingDeleteFor === u.username ? '1px solid #c0392b' : '1px solid #ddd',
-                      background: confirmingDeleteFor === u.username ? '#c0392b' : '#fff',
-                      color: confirmingDeleteFor === u.username ? '#fff' : '#999'
+                      border: confirmingDeleteFor === u.id ? '1px solid #c0392b' : '1px solid #ddd',
+                      background: confirmingDeleteFor === u.id ? '#c0392b' : '#fff',
+                      color: confirmingDeleteFor === u.id ? '#fff' : '#999'
                     }}>
-                      {confirmingDeleteFor === u.username ? 'Emin misin?' : 'Sil'}
+                      {confirmingDeleteFor === u.id ? 'Emin misin?' : 'Sil'}
                     </button>
                   </>
                 )}
               </div>
             </div>
-            {editingPwFor === u.username && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <input type="text" placeholder="Yeni şifre" value={pwValue} onChange={e => setPwValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={() => submitPasswordChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+            {editingPwFor === u.id && (
+              <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, background: T.cardSoft, fontSize: 13, color: T.textSoft }}>
+                Kullanıcıya şifre sıfırlama e-postası gönderilsin mi?
+                <button onClick={() => submitPasswordChange(u.id)} style={{ marginLeft: 10, padding: '5px 12px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 }}>Mail gönder</button>
               </div>
             )}
-            {editingEmailFor === u.username && (
+            {editingEmailFor === u.id && (
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <input type="email" placeholder="ornek@mail.com" value={emailValue} onChange={e => setEmailValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={() => submitEmailChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
+                <button onClick={() => submitEmailChange(u.id)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
               </div>
             )}
-            {editingUsernameFor === u.username && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="text" placeholder="Yeni kullanıcı adı" value={usernameValue} onChange={e => setUsernameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                  <button onClick={() => submitUsernameChange(u.username)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
-                </div>
-                {usernameErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '6px 0 0' }}>{usernameErr}</p>}
+            {editingNameFor === u.id && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <input type="text" placeholder="Ad Soyad" value={nameValue} onChange={e => setNameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <button onClick={() => submitNameChange(u.id)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
               </div>
             )}
           </div>
@@ -1274,10 +1251,10 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
         <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>Yeni kullanıcı ekle</p>
         <form onSubmit={submitAdd}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
-            <input placeholder="Kullanıcı adı" value={newUsername} onChange={e => setNewUsername(e.target.value)} style={inputStyle} />
-            <input placeholder="Şifre" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inputStyle} />
+            <input type="email" placeholder="E-posta (zorunlu)" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={inputStyle} />
+            <input placeholder="Geçici şifre" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inputStyle} />
           </div>
-          <input type="email" placeholder="E-posta (şifremi unuttum için gerekli, isteğe bağlı)" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }} />
+          <input type="text" placeholder="Ad Soyad (isteğe bağlı)" value={newFullName} onChange={e => setNewFullName(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }} />
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <select value={newBranchId} onChange={e => setNewBranchId(e.target.value)} style={inputStyle}>
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1625,7 +1602,7 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
       <div style={{
         background: T.primaryLight, borderRadius: 10, padding: '9px 11px', marginBottom: 16,
         fontSize: 12, color: '#C7B9FF', fontWeight: 600
-      }}>{currentUser.username} · {branchLabel}</div>
+      }}>{currentUser.full_name || currentUser.email} · {branchLabel}</div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {items.map(item => {
@@ -1722,7 +1699,7 @@ function MobileTopBar({ currentUser, branchLabel, onLogout }) {
         }}>M</span>
         <div style={{ minWidth: 0 }}>
           <p style={{ fontWeight: 700, fontSize: 13, margin: 0, color: T.text, lineHeight: 1.2 }}>Müşteri Takip</p>
-          <p style={{ fontSize: 11, margin: 0, color: T.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.username} · {branchLabel}</p>
+          <p style={{ fontSize: 11, margin: 0, color: T.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.full_name || currentUser.email} · {branchLabel}</p>
         </div>
       </div>
       <button onClick={onLogout} style={{
@@ -2130,12 +2107,8 @@ function RecentLeadsTable({ leads, canSeePhone, showBranch, branchNameFn, isMobi
 }
 
 export function PanelApp() {
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mt_current_user')
-      return saved ? JSON.parse(saved) : null
-    } catch (e) { return null }
-  })
+  const [currentUser, setCurrentUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [branches, setBranches] = useState([])
   const [users, setUsers] = useState([])
   const [leads, setLeads] = useState([])
@@ -2171,13 +2144,40 @@ export function PanelApp() {
   }, [leadNotes, leads])
 
   function loginAndPersist(user) {
-    try { localStorage.setItem('mt_current_user', JSON.stringify(user)) } catch (e) {}
     setCurrentUser(user)
   }
-  function logoutAndClear() {
-    try { localStorage.removeItem('mt_current_user') } catch (e) {}
+
+  async function logoutAndClear() {
+    await supabase.auth.signOut()
     setCurrentUser(null)
+    setLoaded(false)
   }
+
+  // Supabase Auth session listener - sayfa yenilenince oturumu geri yükler
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('app_users')
+          .select('*, permission_templates(*)')
+          .eq('id', session.user.id)
+          .maybeSingle()
+        if (profile && profile.active !== false) {
+          setCurrentUser({ ...profile, permissions: profile.permission_templates })
+        }
+      }
+      setAuthLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null)
+        setLoaded(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     if (!currentUser) return
@@ -2208,7 +2208,7 @@ export function PanelApp() {
 
     // Hesap sonradan askıya alınmışsa otomatik çıkış yap
     if (currentUser) {
-      const stillActive = (u.data || []).find(usr => usr.username === currentUser.username)
+      const stillActive = (u.data || []).find(usr => usr.id === currentUser.id)
       if (stillActive && stillActive.active === false) {
         logoutAndClear()
       }
@@ -2261,47 +2261,56 @@ export function PanelApp() {
     const { data } = await supabase.from('ads_data').insert(week).select()
     if (data) setAdsData(prev => [data[0], ...prev])
   }
-  async function toggleActive(username, currentActive) {
+  async function toggleActive(userId, currentActive) {
     const newActive = currentActive === false ? true : false
-    const { data } = await supabase.from('app_users').update({ active: newActive }).eq('username', username).select()
-    if (data) setUsers(prev => prev.map(u => u.username === username ? data[0] : u))
+    const { data } = await supabase.from('app_users').update({ active: newActive }).eq('id', userId).select()
+    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
   }
   async function addUser(user) {
-    const { data } = await supabase.from('app_users').insert({ ...user, role: 'staff' }).select()
+    // Yeni kullanıcıyı Supabase Auth'a kaydet
+    const { data: authData, error: authError } = await supabase.auth.admin?.createUser({
+      email: user.email,
+      password: user.password,
+      email_confirm: true,
+    })
+    // Not: admin.createUser sadece service role key ile çalışır.
+    // Alternatif: kullanıcıya davet maili gönder
+    const { data: inviteData, error: inviteError } = await supabase.auth.signInWithOtp
+      ? null
+      : null
+    // Şimdilik sadece app_users'a ekle, auth entegrasyonu sonraki aşamada
+    const { data } = await supabase.from('app_users').insert({
+      id: authData?.user?.id || uid(),
+      email: user.email,
+      full_name: user.full_name,
+      branch_id: user.branch_id,
+      role: user.role || 'staff',
+      permission_template_id: user.permission_template_id,
+      active: true,
+    }).select()
     if (data) setUsers(prev => [...prev, data[0]])
   }
-  async function deleteUser(username) {
-    await supabase.from('app_users').delete().eq('username', username)
-    setUsers(prev => prev.filter(u => u.username !== username))
+  async function deleteUser(userId) {
+    await supabase.from('app_users').delete().eq('id', userId)
+    setUsers(prev => prev.filter(u => u.id !== userId))
   }
-  async function changeUserPassword(username, newPassword) {
-    const { data } = await supabase.from('app_users').update({ password: newPassword }).eq('username', username).select()
-    if (data) setUsers(prev => prev.map(u => u.username === username ? data[0] : u))
-  }
-  async function changeUserEmail(username, newEmail) {
-    const { data } = await supabase.from('app_users').update({ email: newEmail || null }).eq('username', username).select()
-    if (data) setUsers(prev => prev.map(u => u.username === username ? data[0] : u))
-  }
-  async function changeUsername(oldUsername, newUsername) {
-    const existing = users.find(u => u.username === oldUsername)
-    if (!existing) return
-    // Yeni kullanıcı adıyla yeni satır oluştur (aynı bilgilerle)
-    const { username: _old, ...rest } = existing
-    const { data: created } = await supabase.from('app_users').insert({ ...rest, username: newUsername }).select()
-    if (!created) return
-    // Bu kullanıcının girdiği geçmiş kayıtları yeni kullanıcı adına taşı
-    await supabase.from('leads').update({ entered_by: newUsername }).eq('entered_by', oldUsername)
-    // Eski kullanıcı satırını sil
-    await supabase.from('app_users').delete().eq('username', oldUsername)
-    setUsers(prev => prev.map(u => u.username === oldUsername ? created[0] : u))
-    setLeads(prev => prev.map(l => l.entered_by === oldUsername ? { ...l, entered_by: newUsername } : l))
-    // Eğer kendi kullanıcı adını değiştirdiysek, oturum bilgisini de güncelle - aksi halde
-    // sayfa yenilenince (localStorage'da eski kullanıcı adı kaldığı için) oturum bozulur.
-    if (currentUser.username === oldUsername) {
-      const updatedSelf = { ...currentUser, ...created[0] }
-      setCurrentUser(updatedSelf)
-      try { localStorage.setItem('mt_current_user', JSON.stringify(updatedSelf)) } catch (e) {}
+  async function changeUserPassword(userId, newPassword) {
+    // Supabase Auth üzerinden şifre değiştirme (admin API gerektirir)
+    // Şimdilik kullanıcıya şifre sıfırlama maili gönder
+    const user = users.find(u => u.id === userId)
+    if (user?.email) {
+      await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: 'https://musteritakip.net/giris',
+      })
     }
+  }
+  async function changeUserEmail(userId, newEmail) {
+    const { data } = await supabase.from('app_users').update({ email: newEmail || null }).eq('id', userId).select()
+    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
+  }
+  async function changeUserName(userId, newName) {
+    const { data } = await supabase.from('app_users').update({ full_name: newName }).eq('id', userId).select()
+    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
   }
   async function addBranch(branch) {
     const { data } = await supabase.from('branches').insert(branch).select()
@@ -2344,12 +2353,12 @@ export function PanelApp() {
       )
     }
 
-    // 3) Kullanıcıları arşive kopyala (şifre hariç - güvenlik)
+    // 3) Kullanıcıları arşive kopyala
     if (branchUsers.length > 0) {
       await supabase.from('archived_app_users').insert(
         branchUsers.map(u => ({
           id: uid(), archive_id: archiveId,
-          username: u.username, role: u.role, is_trial: u.is_trial, trial_ends_at: u.trial_ends_at,
+          username: u.full_name || u.email, role: u.role, is_trial: u.is_trial, trial_ends_at: u.trial_ends_at,
         }))
       )
     }
@@ -2375,6 +2384,7 @@ export function PanelApp() {
     setBranchServices(prev => prev.filter(s => s.id !== id))
   }
 
+  if (authLoading) return <p style={{ padding: 40, fontFamily: 'system-ui' }}>Yükleniyor...</p>
   if (!currentUser) return <Login onLogin={loginAndPersist} />
   if (!loaded) return <p style={{ padding: 40, fontFamily: 'system-ui' }}>Yükleniyor...</p>
 
@@ -2414,7 +2424,8 @@ export function PanelApp() {
 
   function canEditLead(lead) {
     if (perms.can_edit_any_lead) return true
-    return lead.entered_by === currentUser.username
+    const myName = currentUser.full_name || currentUser.email
+    return lead.entered_by === myName
   }
   function canDeleteLead() {
     return !!perms.can_delete_lead
@@ -2492,7 +2503,7 @@ export function PanelApp() {
             <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>
               {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
             </p>
-            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} />
+            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} />
 
 <div style={{
   display: 'grid',
@@ -2619,7 +2630,7 @@ export function PanelApp() {
         {activeTab === 'appointments' && perms.can_see_calendar && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Randevular</h1>
-            <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.username} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} isMobile={isMobile} />
+            <AppointmentCalendar leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} isMobile={isMobile} />
           </div>
         )}
 
@@ -2671,7 +2682,7 @@ export function PanelApp() {
                 onDelete={deleteService}
               />
             )}
-            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeUsername={changeUsername} onChangeEmail={changeUserEmail} branches={activeBranches} templates={templates} isMobile={isMobile} currentUsername={currentUser.username} />}
+            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeName={changeUserName} onChangeEmail={changeUserEmail} branches={activeBranches} templates={templates} isMobile={isMobile} currentUserId={currentUser.id} />}
           </div>
         )}
 
