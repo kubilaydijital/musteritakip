@@ -937,6 +937,137 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
   )
 }
 
+const META_APP_ID_PUBLIC = '2419489471794373' // Public App ID, gizli değil - OAuth URL'inde kullanılır
+const META_REDIRECT_URI = 'https://musteritakip.net/.netlify/functions/meta-oauth-callback'
+
+function MetaConnectionPanel({ branchId, branchName }) {
+  const [connection, setConnection] = useState(null) // null: yükleniyor, false: bağlı değil, obje: bağlı
+  const [accounts, setAccounts] = useState(null)
+  const [selecting, setSelecting] = useState(false)
+  const [fetching, setFetching] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    if (!branchId) return
+    loadConnection()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchId])
+
+  async function loadConnection() {
+    setConnection(null)
+    const { data } = await supabase.from('meta_connections').select('branch_id, ad_account_id, ad_account_name, token_expires_at').eq('branch_id', branchId).maybeSingle()
+    setConnection(data || false)
+  }
+
+  function connectMeta() {
+    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID_PUBLIC}&redirect_uri=${encodeURIComponent(META_REDIRECT_URI)}&scope=ads_read&state=${branchId}`
+    window.location.href = authUrl
+  }
+
+  async function loadAccounts() {
+    setSelecting(true)
+    setMsg('')
+    try {
+      const res = await fetch(`/.netlify/functions/meta-list-accounts?branch_id=${branchId}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setAccounts(data.accounts || [])
+    } catch (err) {
+      setMsg('Hesaplar alınamadı: ' + err.message)
+    }
+  }
+
+  async function selectAccount(acc) {
+    setMsg('')
+    try {
+      const res = await fetch('/.netlify/functions/meta-select-account', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch_id: branchId, ad_account_id: acc.id, ad_account_name: acc.name }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setSelecting(false)
+      setAccounts(null)
+      loadConnection()
+    } catch (err) {
+      setMsg('Hesap kaydedilemedi: ' + err.message)
+    }
+  }
+
+  async function fetchInsights() {
+    setFetching(true)
+    setMsg('')
+    try {
+      const res = await fetch('/.netlify/functions/fetch-meta-insights', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch_id: branchId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setMsg(`✅ ${data.inserted || 0} günlük veri çekildi.`)
+    } catch (err) {
+      setMsg('Veri çekilemedi: ' + err.message)
+    }
+    setFetching(false)
+  }
+
+  if (connection === null) {
+    return <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem', marginBottom: 16 }}>
+      <p style={{ fontSize: 13, color: T.textSoft }}>Meta bağlantı durumu kontrol ediliyor...</p>
+    </div>
+  }
+
+  return (
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.1rem', marginBottom: 16 }}>
+      <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 4px' }}>📊 Meta Reklam Hesabı — {branchName}</p>
+
+      {!connection && (
+        <>
+          <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Meta (Facebook/Instagram) reklam hesabınızı bağlayın, harcama ve mesaj verileri otomatik çekilsin.</p>
+          <button onClick={connectMeta} style={{ padding: '9px 16px', borderRadius: 8, background: '#1877F2', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
+            Meta ile Bağlan
+          </button>
+        </>
+      )}
+
+      {connection && !connection.ad_account_id && !selecting && (
+        <>
+          <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Bağlantı kuruldu, şimdi hangi reklam hesabını kullanacağınızı seçin.</p>
+          <button onClick={loadAccounts} style={{ padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
+            Reklam Hesabı Seç
+          </button>
+        </>
+      )}
+
+      {selecting && accounts && (
+        <div>
+          <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 10px' }}>Bir reklam hesabı seçin:</p>
+          {accounts.length === 0 && <p style={{ fontSize: 13, color: '#c0392b' }}>Erişilebilir reklam hesabı bulunamadı.</p>}
+          {accounts.map(acc => (
+            <button key={acc.id} onClick={() => selectAccount(acc)} style={{
+              display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8,
+              border: `1px solid ${T.border}`, background: 'transparent', color: T.text, cursor: 'pointer', marginBottom: 6, fontSize: 13.5,
+            }}>
+              {acc.name} <span style={{ color: T.textSoft, fontSize: 12 }}>({acc.id})</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {connection && connection.ad_account_id && (
+        <>
+          <p style={{ fontSize: 13, color: '#2e7d32', margin: '0 0 4px' }}>✅ Bağlı: {connection.ad_account_name}</p>
+          <button onClick={fetchInsights} disabled={fetching} style={{ padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13.5, marginTop: 6 }}>
+            {fetching ? 'Veriler çekiliyor...' : 'Meta Verilerini Çek (Son 7 Gün)'}
+          </button>
+        </>
+      )}
+
+      {msg && <p style={{ fontSize: 12.5, color: msg.startsWith('✅') ? '#2e7d32' : '#c0392b', marginTop: 10 }}>{msg}</p>}
+    </div>
+  )
+}
+
 function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch, isMobile }) {
   const [form, setForm] = useState({ channel: CHANNELS[0], spend: '', impressions: '', messages: '', manualAdjustment: '' })
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
@@ -2697,6 +2828,9 @@ export function PanelApp() {
         {activeTab === 'ads' && perms.can_enter_ads_data && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Reklam Kaynakları</h1>
+            {adsSelectedBranch && (
+              <MetaConnectionPanel branchId={adsSelectedBranch} branchName={branchName(adsSelectedBranch)} />
+            )}
             <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} isMobile={isMobile} />
           </div>
         )}
