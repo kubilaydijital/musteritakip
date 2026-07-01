@@ -14,9 +14,9 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Geçersiz istek gövdesi' }) }
   }
 
-  const { email, contactName, businessName, username, password } = payload
+  const { email, contactName, businessName } = payload
 
-  if (!email || !username || !password) {
+  if (!email) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Eksik alanlar' }) }
   }
 
@@ -30,15 +30,9 @@ export async function handler(event) {
       <h2 style="color: #7C5CFC; margin: 0 0 16px;">Müşteri Takip'e Hoş Geldiniz!</h2>
       <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
         Merhaba ${contactName || ''},<br/><br/>
-        <strong>${businessName || 'İşletmeniz'}</strong> için 14 günlük ücretsiz deneme hesabınız oluşturuldu. Giriş bilgileriniz aşağıdadır:
+        <strong>${businessName || 'İşletmeniz'}</strong> için 14 günlük ücretsiz deneme hesabınız oluşturuldu. Kayıt sırasında belirlediğiniz e-posta ve şifre ile hemen giriş yapabilirsiniz.
       </p>
-      <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 16px 20px; margin: 20px 0;">
-        <p style="font-size: 12px; color: #94A3B8; margin: 0 0 4px;">Kullanıcı adı</p>
-        <p style="font-size: 16px; font-weight: 700; margin: 0 0 14px; color: #ffffff;">${username}</p>
-        <p style="font-size: 12px; color: #94A3B8; margin: 0 0 4px;">Şifre</p>
-        <p style="font-size: 16px; font-weight: 700; margin: 0; color: #ffffff;">${password}</p>
-      </div>
-      <a href="https://musteritakip.net/giris" style="display: inline-block; background: #7C5CFC; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px;">
+      <a href="https://musteritakip.net/giris" style="display: inline-block; background: #7C5CFC; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px; margin-top: 8px;">
         Panele Giriş Yap
       </a>
       <p style="font-size: 12.5px; color: #64748B; margin-top: 24px;">
@@ -55,7 +49,7 @@ export async function handler(event) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'Müşteri Takip <info@musteritakip.net>',
+        from: 'Müşteri Takip <onboarding@resend.dev>',
         to: [email],
         subject: 'Müşteri Takip - Deneme Hesabınız Hazır',
         html,
