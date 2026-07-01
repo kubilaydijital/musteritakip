@@ -1011,6 +1011,17 @@ function MetaConnectionPanel({ branchId, branchName }) {
     setFetching(false)
   }
 
+  async function disconnectMeta() {
+    if (!window.confirm('Meta bağlantısını kesmek istediğinize emin misiniz? Yeniden bağlanmanız gerekecek.')) return
+    setMsg('')
+    try {
+      await supabase.from('meta_connections').delete().eq('branch_id', branchId)
+      loadConnection()
+    } catch (err) {
+      setMsg('Bağlantı kesilemedi: ' + err.message)
+    }
+  }
+
   if (connection === null) {
     return <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1rem', marginBottom: 16 }}>
       <p style={{ fontSize: 13, color: T.textSoft }}>Meta bağlantı durumu kontrol ediliyor...</p>
@@ -1033,9 +1044,14 @@ function MetaConnectionPanel({ branchId, branchName }) {
       {connection && !connection.ad_account_id && !selecting && (
         <>
           <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Bağlantı kuruldu, şimdi hangi reklam hesabını kullanacağınızı seçin.</p>
-          <button onClick={loadAccounts} style={{ padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
-            Reklam Hesabı Seç
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={loadAccounts} style={{ padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
+              Reklam Hesabı Seç
+            </button>
+            <button onClick={disconnectMeta} style={{ padding: '9px 16px', borderRadius: 8, background: 'transparent', color: '#c0392b', border: '1px solid #c0392b', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
+              Bağlantıyı Kes
+            </button>
+          </div>
         </>
       )}
 
@@ -1057,9 +1073,14 @@ function MetaConnectionPanel({ branchId, branchName }) {
       {connection && connection.ad_account_id && (
         <>
           <p style={{ fontSize: 13, color: '#2e7d32', margin: '0 0 4px' }}>✅ Bağlı: {connection.ad_account_name}</p>
-          <button onClick={fetchInsights} disabled={fetching} style={{ padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13.5, marginTop: 6 }}>
-            {fetching ? 'Veriler çekiliyor...' : 'Meta Verilerini Çek (Son 7 Gün)'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+            <button onClick={fetchInsights} disabled={fetching} style={{ padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
+              {fetching ? 'Veriler çekiliyor...' : 'Meta Verilerini Çek (Son 7 Gün)'}
+            </button>
+            <button onClick={disconnectMeta} style={{ padding: '9px 16px', borderRadius: 8, background: 'transparent', color: '#c0392b', border: '1px solid #c0392b', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
+              Bağlantıyı Kes
+            </button>
+          </div>
         </>
       )}
 
