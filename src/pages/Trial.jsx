@@ -6,56 +6,28 @@ import usePageMeta from '../usePageMeta.js'
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
 
-// Basit, akılda kalıcı kullanıcı adı tabanı üretir: isletmeadi (rastgele sayı sonra eklenir).
-function usernameBase(businessName) {
-  return (businessName || 'isletme')
-    .toLocaleLowerCase('tr-TR')
-    .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c')
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 14) || 'isletme'
-}
-
-// Veritabanında benzersiz olduğu doğrulanmış bir kullanıcı adı üretir.
-// 10 denemede benzersiz bulunamazsa (pratikte olmaz), zaman damgası tabanlı garantili bir ad kullanılır.
-async function generateUniqueUsername(businessName) {
-  const base = usernameBase(businessName)
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const suffix = Math.floor(100 + Math.random() * 900)
-    const candidate = `${base}${suffix}`
-    const { data } = await supabase.from('app_users').select('username').eq('username', candidate).maybeSingle()
-    if (!data) return candidate
-  }
-  return `${base}${Date.now().toString(36).slice(-5)}`
-}
-
-function generatePassword() {
-  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'
-  let out = ''
-  for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)]
-  return out
-}
-
 const BUSINESS_TYPES = ['Güzellik salonu', 'Kuaför', 'Diş kliniği', 'Gayrimenkul', 'Hukuk bürosu', 'Diğer']
-
-// E.164 formatına uygun Türkiye cep telefonu: +90 ardından 5 ile başlayan 9 hane.
-// Bu format, Meta/Google Ads gibi platformlara müşteri listesi yüklerken eşleşme oranını maksimize eder.
+// +90 ile başlayıp ardından 5 ile başlayan 10 haneli Türkiye cep telefonu formatı.
 const PHONE_RE = /^\+905\d{9}$/
 
 export default function Trial() {
   usePageMeta('Ücretsiz 14 Gün Dene', 'Kredi kartı gerekmez. Hesabınızı hemen oluşturun, 14 gün boyunca Müşteri Takip sistemini ücretsiz deneyin.')
-  const [form, setForm] = useState({ businessName: '', contactName: '', phone: '+90', email: '', businessType: '' })
+  const [form, setForm] = useState({ businessName: '', contactName: '', phone: '+90', email: '', password: '', businessType: '' })
   const [status, setStatus] = useState('idle') // idle | submitting | done | error
   const [errorMsg, setErrorMsg] = useState('')
   const [phoneErr, setPhoneErr] = useState('')
-  const [credentials, setCredentials] = useState(null)
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
 
   async function submit(e) {
     e.preventDefault()
-    if (!form.businessName.trim() || !form.contactName.trim() || !form.email.trim()) return
+    if (!form.businessName.trim() || !form.contactName.trim() || !form.email.trim() || !form.password.trim()) return
     if (!PHONE_RE.test(form.phone.trim())) {
-      setPhoneErr('Telefon numarası +90 ile başlayıp 5 ile devam eden, toplam 10 haneli olmalı. Örnek: +905551234567')
+      setPhoneErr('Telefon numarası +90 ile başlayıp 5 ile devam eden 10 haneli olmalı. Örnek: +905551234567')
+      return
+    }
+    if (form.password.trim().length < 6) {
+      setErrorMsg('Şifre en az 6 karakter olmalı.')
       return
     }
     setPhoneErr('')
@@ -63,48 +35,55 @@ export default function Trial() {
     setErrorMsg('')
 
     try {
-      const branchId = uid()
-      const username = await generateUniqueUsername(form.businessName)
-      const password = generatePassword()
-      const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      // 1) Supabase Auth'a kayıt ol. "Confirm email" kapalı olduğu için bu işlem
+      // doğrudan bir oturum (session) döndürür - kullanıcı anında giriş yapmış olur.
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email.trim().toLowerCase(),
+        password: form.password.trim(),
+        options: { data: { full_name: form.contactName.trim() } },
+      })
+      if (authError) throw new Error(authError.message === 'User already registered' ? 'Bu e-posta adresi zaten kayıtlı. Giriş yapmayı deneyin.' : authError.message)
+      if (!authData.user) throw new Error('Hesap oluşturulamadı, lütfen tekrar deneyin.')
 
-      // 1) Yeni şube oluştur
+      const userId = authData.user.id
+      const branchId = uid()
+
+      // 2) Yeni şube oluştur
       const { error: branchErr } = await supabase.from('branches').insert({
         id: branchId, name: form.businessName.trim(), active: true,
       })
       if (branchErr) throw new Error('Şube oluşturulamadı: ' + branchErr.message)
 
-      // 2) Kendi şubesinde tam yetkili ama süper admin olmayan "Şube Sahibi" şablonuyla kullanıcı oluştur.
-      // Bu şablon panelde önceden mevcut olan "Şube Sahibi" şablonudur (id: tpl_admin).
-      const { error: userErr } = await supabase.from('app_users').insert({
-        username, password, branch_id: branchId, role: 'admin',
-        permission_template_id: 'tpl_admin',
-        active: true, is_trial: true, trial_ends_at: trialEndsAt,
-      })
-      if (userErr) throw new Error('Kullanıcı oluşturulamadı: ' + userErr.message)
+      // 3) handle_new_user() trigger'ı otomatik olarak app_users'a bir satır ekledi
+      // (role='admin', is_trial=true, trial_ends_at=+14gün). Bu satırı gerçek şube ve
+      // izin şablonuyla güncelliyoruz.
+      const { error: profileErr } = await supabase.from('app_users')
+        .update({ branch_id: branchId, permission_template_id: 'tpl_admin', full_name: form.contactName.trim() })
+        .eq('id', userId)
+      if (profileErr) throw new Error('Profil güncellenemedi: ' + profileErr.message)
 
-      // 3) Talep kaydı (geçmiş takibi için)
+      // 4) Talep kaydı (geçmiş takibi için)
       await supabase.from('trial_requests').insert({
         id: uid(), business_name: form.businessName.trim(), contact_name: form.contactName.trim(),
         phone: form.phone.trim(), email: form.email.trim(), business_type: form.businessType || null,
-        status: 'created', generated_username: username, generated_branch_id: branchId,
+        status: 'created', generated_branch_id: branchId,
       })
 
-      // 4) Bilgilendirme maili (Netlify Function üzerinden, Resend ile)
+      // 5) Hoş geldin maili (Netlify Function üzerinden, Resend ile) - artık şifre içermiyor,
+      // kullanıcı zaten kendi şifresini belirledi.
       try {
         await fetch('/.netlify/functions/send-trial-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: form.email.trim(), contactName: form.contactName.trim(),
-            businessName: form.businessName.trim(), username, password,
+            businessName: form.businessName.trim(),
           }),
         })
       } catch {
-        // Mail gönderimi başarısız olsa da hesap zaten oluştu, kullanıcıya bilgileri ekranda göstereceğiz.
+        // Mail gönderimi başarısız olsa da hesap zaten oluştu, sorun değil.
       }
 
-      setCredentials({ username, password })
       setStatus('done')
     } catch (err) {
       setErrorMsg(err.message || 'Bir şeyler ters gitti, lütfen tekrar deneyin.')
@@ -112,20 +91,14 @@ export default function Trial() {
     }
   }
 
-  if (status === 'done' && credentials) {
+  if (status === 'done') {
     return (
       <Layout>
         <main className="page">
           <section className="container trial-card">
             <span className="page-no">🎉 Hazır</span>
             <h1>Hesabınız oluşturuldu!</h1>
-            <p>14 günlük deneme süreniz başladı. Giriş bilgilerinizi not edin — ayrıca e-posta adresinize de gönderdik.</p>
-            <div style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: '20px 22px', margin: '8px 0 24px' }}>
-              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 4px' }}>Kullanıcı adı</p>
-              <p style={{ fontSize: 18, fontWeight: 800, margin: '0 0 14px', color: '#fff' }}>{credentials.username}</p>
-              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 4px' }}>Şifre</p>
-              <p style={{ fontSize: 18, fontWeight: 800, margin: 0, color: '#fff' }}>{credentials.password}</p>
-            </div>
+            <p>14 günlük deneme süreniz başladı. Az önce belirlediğiniz e-posta ve şifre ile doğrudan giriş yapabilirsiniz.</p>
             <Link to="/giris" className="btn btn-primary big">Panele Giriş Yap</Link>
           </section>
         </main>
@@ -140,10 +113,12 @@ export default function Trial() {
           <span className="page-no">Ücretsiz Deneme</span>
           <h1>14 gün boyunca sistemi deneyin.</h1>
           <p>Kredi kartı gerekmez. Bilgilerinizi girin, hesabınız anında oluşturulsun.</p>
+
           <form onSubmit={submit}>
             <input placeholder="İşletme adı" value={form.businessName} onChange={(e) => set('businessName', e.target.value)} required/>
             <input placeholder="Ad Soyad" value={form.contactName} onChange={(e) => set('contactName', e.target.value)} required/>
             <input placeholder="E-posta" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required/>
+            <input placeholder="Şifre (en az 6 karakter)" type="password" value={form.password} onChange={(e) => set('password', e.target.value)} required/>
             <input placeholder="Telefon" value={form.phone} onChange={(e) => {
               let v = e.target.value
               if (!v.startsWith('+90')) v = '+90' + v.replace(/^\+?90?/, '')
