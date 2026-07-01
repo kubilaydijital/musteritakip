@@ -367,6 +367,12 @@ function Login({ onLogin }) {
       <button onClick={() => setMode('forgot')} style={{ marginTop: 14, fontSize: 13, color: T.textSoft, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
         Şifremi unuttum
       </button>
+      <p style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${T.border}`, fontSize: 13.5, color: T.textSoft, textAlign: 'center' }}>
+        Hesabınız yok mu?{' '}
+        <a href="/deneme" style={{ color: T.primary, fontWeight: 600, textDecoration: 'underline' }}>
+          Ücretsiz 14 gün deneyin
+        </a>
+      </p>
     </div>
   )
 }
