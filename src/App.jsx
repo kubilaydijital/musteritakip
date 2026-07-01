@@ -1145,8 +1145,12 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
       setAddErr('Bu e-posta zaten kullanılıyor.')
       return
     }
-    await onAdd({ email: newEmail.trim(), password: newPassword.trim(), full_name: newFullName.trim() || null, branch_id: newBranchId, permission_template_id: newTemplateId, active: true })
-    setNewEmail(''); setNewPassword(''); setNewFullName('')
+    try {
+      await onAdd({ email: newEmail.trim(), password: newPassword.trim(), full_name: newFullName.trim() || null, branch_id: newBranchId, permission_template_id: newTemplateId, active: true })
+      setNewEmail(''); setNewPassword(''); setNewFullName('')
+    } catch (err) {
+      setAddErr(err.message || 'Kullanıcı oluşturulamadı, lütfen tekrar deneyin.')
+    }
   }
 
   async function submitPasswordChange(userId) {
@@ -2267,28 +2271,26 @@ export function PanelApp() {
     if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
   }
   async function addUser(user) {
-    // Yeni kullanıcıyı Supabase Auth'a kaydet
-    const { data: authData, error: authError } = await supabase.auth.admin?.createUser({
-      email: user.email,
-      password: user.password,
-      email_confirm: true,
+    // Kullanıcı oluşturma admin API gerektirdiği için (service role key), bu işlem
+    // güvenli sunucu tarafında (Netlify Function) yapılıyor, tarayıcıda değil.
+    const res = await fetch('/.netlify/functions/create-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user.email,
+        password: user.password,
+        full_name: user.full_name,
+        branch_id: user.branch_id,
+        role: user.role || 'staff',
+        permission_template_id: user.permission_template_id,
+      }),
     })
-    // Not: admin.createUser sadece service role key ile çalışır.
-    // Alternatif: kullanıcıya davet maili gönder
-    const { data: inviteData, error: inviteError } = await supabase.auth.signInWithOtp
-      ? null
-      : null
-    // Şimdilik sadece app_users'a ekle, auth entegrasyonu sonraki aşamada
-    const { data } = await supabase.from('app_users').insert({
-      id: authData?.user?.id || uid(),
-      email: user.email,
-      full_name: user.full_name,
-      branch_id: user.branch_id,
-      role: user.role || 'staff',
-      permission_template_id: user.permission_template_id,
-      active: true,
-    }).select()
-    if (data) setUsers(prev => [...prev, data[0]])
+    const result = await res.json()
+    if (!res.ok) {
+      throw new Error(result.error || 'Kullanıcı oluşturulamadı')
+    }
+    if (result.user) setUsers(prev => [...prev, result.user])
+    return result
   }
   async function deleteUser(userId) {
     await supabase.from('app_users').delete().eq('id', userId)
