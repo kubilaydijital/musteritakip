@@ -2395,15 +2395,16 @@ export function PanelApp() {
 
   // Geriye dönük uyumluluk: izin objesi yoksa (eski veri) role alanına göre varsayılan izinler uygula
   const perms = currentUser.permissions || {
-    can_see_phone: currentUser.role === 'admin' || currentUser.role === 'manager',
-    can_see_revenue: currentUser.role === 'admin' || currentUser.role === 'manager',
-    can_see_all_branches: currentUser.role === 'admin',
+    can_see_phone: currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'manager',
+    can_see_revenue: currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'manager',
+    can_see_all_branches: currentUser.role === 'super_admin',
     can_add_lead: true,
-    can_edit_any_lead: currentUser.role === 'admin' || currentUser.role === 'manager',
-    can_delete_lead: currentUser.role === 'admin',
-    can_manage_users: currentUser.role === 'admin',
-    can_manage_branches: currentUser.role === 'admin',
-    can_enter_ads_data: currentUser.role === 'admin',
+    can_edit_any_lead: currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'manager',
+    can_delete_lead: currentUser.role === 'super_admin' || currentUser.role === 'admin',
+    can_manage_users: currentUser.role === 'super_admin' || currentUser.role === 'admin',
+    can_manage_branches: currentUser.role === 'super_admin' || currentUser.role === 'admin',
+    can_enter_ads_data: currentUser.role === 'super_admin' || currentUser.role === 'admin',
+    can_export_data: currentUser.role === 'super_admin',
     can_see_calendar: true
   }
 
