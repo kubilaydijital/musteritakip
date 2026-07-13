@@ -53,8 +53,9 @@ export default function GizlilikPolitikasi() {
             <li>Şifreler hash'lenerek saklanır, düz metin şifre saklanmaz.</li>
           </ul>
 
-          <h2>5. Veri Saklama Süresi</h2>
+          <h2>5. Veri Saklama Süresi ve Veri Silme Talebi</h2>
           <p>Veriler, hesabınız aktif olduğu sürece ve yasal saklama yükümlülükleri (varsa) süresince saklanır. Hesap kapatma talebinde verileriniz 30 gün içinde silinir.</p>
+          <p><strong>Verilerinizin silinmesini talep etmek için:</strong> <a href="mailto:info@musteritakip.net">info@musteritakip.net</a> adresine, hesabınıza kayıtlı e-posta adresinizden "Veri Silme Talebi" konulu bir e-posta gönderin. Talebiniz en geç 30 gün içinde işleme alınır ve size e-posta ile onay bildirilir. Meta (Facebook/Instagram) entegrasyonunuzu kaldırmak isterseniz, panelinizdeki "Reklam Kaynakları" sekmesinden ilgili bağlantıyı doğrudan kaldırabilirsiniz; bu işlem Meta'dan çekilen tüm verilerinizin sistemimizden silinmesini sağlar.</p>
 
           <h2>6. KVKK Kapsamındaki Haklarınız</h2>
           <p>6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) uyarınca:</p>
