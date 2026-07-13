@@ -20,10 +20,10 @@ export default function LandingPage() {
               <h1>Kağıt defter devri bitti.<br/><strong>Müşteriniz kaçmasın,</strong><br/>işiniz büyüsün.</h1>
               <p>Kağıda yazılan müşteri unutulur. Müşteri Takip; randevuları, gelen mesajları, satışları ve kaçan müşterileri tek ekranda toplar. Sistem zamanı geldiğinde sizi uyarır, hiçbir potansiyel müşteri arada kaybolmaz.</p>
               <div className="hero-actions">
-                <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
+                <Link to="/deneme" className="btn btn-primary big">Ücretsiz 7 Gün Dene <ArrowRight size={18}/></Link>
                 <Link to="/iletisim" className="btn btn-ghost big"><Mail size={18}/> Sorularınız mı var?</Link>
               </div>
-              <div className="hero-checks"><span><CheckCircle2/>14 gün ücretsiz</span><span><CheckCircle2/>Kredi kartı gerekmez</span><span><CheckCircle2/>Kurulum gerektirmez</span></div>
+              <div className="hero-checks"><span><CheckCircle2/>7 gün ücretsiz</span><span><CheckCircle2/>Kredi kartı gerekmez</span><span><CheckCircle2/>Kurulum gerektirmez</span></div>
             </div>
             <div className="hero-visual"><DashboardMock /><MobileReminderMock /></div>
           </div>
@@ -87,7 +87,7 @@ export default function LandingPage() {
             <span className="booking-badge"><span></span>Yeni özellik</span>
             <h2>Müşterileriniz artık sizi aramadan<br/><strong>randevu alabilir.</strong></h2>
             <p>Kendi randevu sayfanızla, müşterileriniz 7/24 size uygun saati görüp anında randevu oluşturabilir. Siz hiçbir şey yapmadan, panel otomatik dolar.</p>
-            <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
+            <Link to="/deneme" className="btn btn-primary big">Ücretsiz 7 Gün Dene <ArrowRight size={18}/></Link>
           </div>
           <div className="booking-mock">
             <p className="booking-mock-title">İşletmeniz</p>
@@ -109,7 +109,7 @@ export default function LandingPage() {
           <DashboardMock compact />
         </section>
 
-        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz deneyebilir veya bize ulaşabilirsiniz.</p><div><Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene</Link><Link to="/iletisim" className="btn btn-ghost big">Bize Ulaşın</Link></div></section>
+        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz deneyebilir veya bize ulaşabilirsiniz.</p><div><Link to="/deneme" className="btn btn-primary big">Ücretsiz 7 Gün Dene</Link><Link to="/iletisim" className="btn btn-ghost big">Bize Ulaşın</Link></div></section>
       </main>
     </Layout>
   )
