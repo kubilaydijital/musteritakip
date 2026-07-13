@@ -149,29 +149,29 @@ function staleness(lead, noteCount = 0) {
 }
 function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
-// Tasarım sistemi token'ları — koyu tema
+// Tasarım sistemi token'ları — yeni açık SaaS arayüzü
 const T = {
-  primary: '#7C5CFC',
-  primaryDark: '#6C3FFC',
-  primaryLight: 'rgba(124,92,252,0.16)',
-  bg: '#070D18',
-  card: '#0C1626',
-  cardSoft: 'rgba(255,255,255,0.04)',
-  border: 'rgba(255,255,255,0.08)',
-  text: '#FFFFFF',
-  textSoft: '#94A3B8',
-  textFaint: '#64748B',
-  green: '#22C55E',
-  greenBg: 'rgba(34,197,94,0.14)',
-  orange: '#F59E0B',
-  orangeBg: 'rgba(245,158,11,0.14)',
+  primary: '#6D4AFF',
+  primaryDark: '#5530E8',
+  primaryLight: 'rgba(109,74,255,0.10)',
+  bg: '#F6F7FC',
+  card: '#FFFFFF',
+  cardSoft: '#F8F9FD',
+  border: '#E7E9F2',
+  text: '#11182F',
+  textSoft: '#66708A',
+  textFaint: '#98A0B5',
+  green: '#18B76A',
+  greenBg: 'rgba(24,183,106,0.10)',
+  orange: '#FF9700',
+  orangeBg: 'rgba(255,151,0,0.11)',
   red: '#EF4444',
-  redBg: 'rgba(239,68,68,0.14)',
-  blue: '#3B82F6',
-  blueBg: 'rgba(59,130,246,0.14)',
+  redBg: 'rgba(239,68,68,0.10)',
+  blue: '#3478F6',
+  blueBg: 'rgba(52,120,246,0.10)',
 }
-const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: T.cardSoft, color: T.text, colorScheme: 'dark' }
-const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }
+const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: T.card, color: T.text, colorScheme: 'light', outline: 'none' }
+const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 8px 28px rgba(39,45,77,0.06)' }
 const quickBtnStyle = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9,
   border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, fontSize: 12.5, cursor: 'pointer', textAlign: 'left'
@@ -179,7 +179,8 @@ const quickBtnStyle = {
 function getPageWrapStyle(isMobile) {
   return {
     flex: 1,
-    padding: isMobile ? '16px 14px 84px' : '28px 32px',
+    padding: isMobile ? '16px 14px 84px' : '30px 32px',
+    background: T.bg,
     width: '100%',
     maxWidth: 'none',
     overflowX: 'hidden'
@@ -656,22 +657,24 @@ const STAT_COLOR_MAP = {
 function StatCard({ icon, label, value, color = 'violet', trend, trendLabel }) {
   const c = STAT_COLOR_MAP[color] || STAT_COLOR_MAP.violet
   return (
-    <div style={{ ...cardStyle, padding: '18px 18px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ ...cardStyle, padding: '18px 20px', minHeight: 132, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
         <span style={{
           width: 44, height: 44, borderRadius: '50%', background: c.solid, color: '#fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          boxShadow: `0 8px 18px ${c.soft}`
         }}>{icon}</span>
         <div style={{ minWidth: 0 }}>
-          <p style={{ fontSize: 12.5, color: T.textSoft, margin: '0 0 2px', fontWeight: 500 }}>{label}</p>
-          <p style={{ fontSize: 22, fontWeight: 700, margin: 0, color: T.text, lineHeight: 1.15 }}>{value}</p>
-          {trend != null && (
-            <p style={{ fontSize: 11.5, margin: '3px 0 0', color: T.green, fontWeight: 600 }}>
-              ↗ {trend}{trendLabel ? <span style={{ color: T.textFaint, fontWeight: 500 }}> · {trendLabel}</span> : null}
-            </p>
-          )}
+          <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 1px', fontWeight: 500 }}>{label}</p>
+          <p style={{ fontSize: 27, fontWeight: 900, margin: 0, color: T.text, lineHeight: 1.05, letterSpacing: '-.035em' }}>{value}</p>
         </div>
       </div>
+      <div style={{ height: 23, marginTop: 12, position: 'relative', overflow: 'hidden' }}>
+        <svg viewBox="0 0 180 24" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
+          <path d="M0 17 C12 16,16 5,27 14 S43 20,52 12 S68 19,79 11 S96 3,106 13 S122 19,134 11 S153 14,180 8" fill="none" stroke={c.solid} strokeWidth="1.8" />
+        </svg>
+      </div>
+      {trend != null && <p style={{ fontSize: 10.5, margin: '5px 0 0', color: T.green, fontWeight: 700 }}>↗ {trend} <span style={{ color: T.textFaint, fontWeight: 500 }}>{trendLabel || '(önceki dönem)'}</span></p>}
     </div>
   )
 }
@@ -1771,36 +1774,44 @@ const NAV_ITEMS = [
 
 function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout, onQuickAction }) {
   return (
-    <div style={{
-      width: 248, flexShrink: 0, background: T.card, borderRight: `1px solid ${T.border}`,
-      minHeight: '100vh', padding: '22px 16px', display: 'flex', flexDirection: 'column'
+    <aside style={{
+      width: 278, flexShrink: 0, background: '#FFFFFF', borderRight: `1px solid ${T.border}`,
+      minHeight: '100vh', padding: '24px 24px 20px', display: 'flex', flexDirection: 'column',
+      position: 'sticky', top: 0, height: '100vh', overflowY: 'auto'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 6px 18px', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '0 2px 24px' }}>
         <span style={{
-          width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${T.primary}, #A78BFA)`,
-          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 17
+          width: 42, height: 42, borderRadius: 13, background: 'linear-gradient(145deg,#7C5CFC,#5B38E8)',
+          clipPath: 'polygon(50% 0, 93% 23%, 93% 77%, 50% 100%, 7% 77%, 7% 23%)',
+          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 22
         }}>M</span>
-        <div>
-          <p style={{ fontWeight: 800, fontSize: 14.5, margin: 0, color: T.text, lineHeight: 1.25, letterSpacing: '0.01em' }}>MÜŞTERİ<br />TAKİP</p>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontWeight: 900, fontSize: 17, margin: 0, color: T.text, letterSpacing: '-0.035em' }}>müşteritakip.net</p>
+          <p style={{ fontSize: 9.5, margin: '3px 0 0', color: T.textSoft }}>Müşteri Takip ve Randevu Yönetim Sistemi</p>
         </div>
       </div>
-      <div style={{
-        background: T.primaryLight, borderRadius: 10, padding: '9px 11px', marginBottom: 16,
-        fontSize: 12, color: '#C7B9FF', fontWeight: 600
-      }}>{currentUser.full_name || currentUser.email} · {branchLabel}</div>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div style={{ ...cardStyle, borderRadius: 12, padding: '12px 14px', marginBottom: 18, boxShadow: '0 4px 16px rgba(39,45,77,.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div>
+            <p style={{ margin: 0, color: T.text, fontSize: 14.5, fontWeight: 800 }}>{branchLabel}</p>
+            <p style={{ margin: '4px 0 0', color: T.textSoft, fontSize: 11.5 }}>{isSuperAdmin ? 'Şube görünümü' : 'Aktif şube'}</p>
+          </div>
+          <ChevronDown size={16} color={T.textSoft} />
+        </div>
+      </div>
+
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {items.map(item => {
           const active = activeTab === item.key
           return (
             <button key={item.key} onClick={() => onSelect(item.key)} style={{
-              display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10,
-              border: 'none', background: active ? T.primary : 'transparent',
-              color: active ? '#fff' : T.textSoft,
-              fontWeight: active ? 600 : 500, fontSize: 14, cursor: 'pointer',
-              textAlign: 'left', width: '100%', transition: 'background 0.15s ease'
+              display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 9,
+              border: 'none', background: active ? 'linear-gradient(90deg,#5C38E8,#7962F4)' : 'transparent',
+              color: active ? '#fff' : '#24304C', boxShadow: active ? '0 7px 16px rgba(91,56,232,.22)' : 'none',
+              fontWeight: active ? 700 : 500, fontSize: 13.5, cursor: 'pointer', textAlign: 'left', width: '100%'
             }}>
-              <span style={{ display: 'flex', opacity: active ? 1 : 0.8 }}>{item.icon}</span>
+              <span style={{ display: 'flex', opacity: active ? 1 : .9 }}>{item.icon}</span>
               {item.label}
             </button>
           )
@@ -1808,25 +1819,29 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
       </nav>
 
       {onQuickAction && (
-        <div style={{ marginTop: 22 }}>
-          <p style={{ fontSize: 11, color: T.textFaint, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px', fontWeight: 700 }}>Hızlı İşlemler</p>
+        <div style={{ marginTop: 28 }}>
+          <p style={{ fontSize: 10.5, color: T.textFaint, textTransform: 'uppercase', letterSpacing: '.07em', margin: '0 0 10px', fontWeight: 800 }}>Hızlı İşlemler</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <button onClick={() => onQuickAction('clients')} style={quickBtnStyle}><Plus size={14} /> Yeni Görüşme</button>
-            <button onClick={() => onQuickAction('appointments')} style={quickBtnStyle}><Plus size={14} /> Randevu Oluştur</button>
+            <button onClick={() => onQuickAction('clients')} style={quickBtnStyle}><UserRound size={14} /> Yeni Danışan Ekle</button>
+            <button onClick={() => onQuickAction('appointments')} style={quickBtnStyle}><CalendarDays size={14} /> Randevu Oluştur</button>
             <button onClick={() => onQuickAction('ads')} style={quickBtnStyle}><Plus size={14} /> Reklam Verisi Gir</button>
           </div>
         </div>
       )}
 
-      <div style={{ marginTop: 'auto', paddingTop: 18 }}>
-        <button onClick={onLogout} style={{
-          width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`,
-          background: 'transparent', color: T.textSoft, fontWeight: 500, fontSize: 13, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-        }}><LogOut size={14} /> Çıkış yap</button>
-        <p style={{ fontSize: 11, color: T.textFaint, margin: '14px 0 0', textAlign: 'center' }}>Müşteri Takip v2.0.0</p>
+      <div style={{ marginTop: 'auto', paddingTop: 22 }}>
+        <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 10, padding: '11px', borderRadius: 12, boxShadow: 'none' }}>
+          <div style={{ width: 38, height: 38, borderRadius: '50%', background: T.primaryLight, color: T.primary, display: 'grid', placeItems: 'center', fontWeight: 800 }}>
+            {(currentUser.full_name || currentUser.email || 'K').charAt(0).toUpperCase()}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ margin: 0, fontWeight: 800, color: T.text, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser.full_name || currentUser.email}</p>
+            <p style={{ margin: '3px 0 0', color: T.textSoft, fontSize: 10.5 }}>{isSuperAdmin ? 'Süper Admin' : 'Kullanıcı'}</p>
+          </div>
+          <button onClick={onLogout} title="Çıkış yap" style={{ border: 0, background: 'transparent', color: T.textSoft, cursor: 'pointer', padding: 4 }}><LogOut size={16} /></button>
+        </div>
       </div>
-    </div>
+    </aside>
   )
 }
 
@@ -2654,7 +2669,7 @@ export function PanelApp() {
         *, *::before, *::after { box-sizing: border-box; }
         html, body { overflow-x: hidden; max-width: 100%; }
         select, input, textarea { font-family: 'Inter', system-ui, sans-serif; max-width: 100%; }
-        select option { background: #0C1626; color: #fff; }
+        select option { background: #fff; color: #11182F; }
         button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid ${T.primary}; outline-offset: 1px; }
         ::placeholder { color: ${T.textFaint}; }
         img, svg, canvas { max-width: 100%; }
@@ -2672,7 +2687,7 @@ export function PanelApp() {
           <MobileMoreSheet items={visibleNavItems} onSelect={(key) => { setActiveTab(key); setShowMobileMore(false) }} onLogout={logoutAndClear} />
         ) : (
         <>
-        {isSuperAdmin && (
+        {isSuperAdmin && activeTab !== 'overview' && (
           <div style={{ marginBottom: '1.5rem' }}>
             <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, width: isMobile ? '100%' : 240, fontWeight: 600 }}>
               <option value="all">Tüm şubeler (toplu rapor)</option>
@@ -2683,85 +2698,93 @@ export function PanelApp() {
 
         {activeTab === 'overview' && (
           <div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Genel Bakış</h1>
-            <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>
-              {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: 14, marginBottom: 24 }}>
+              <div>
+                <h1 style={{ fontSize: isMobile ? 23 : 27, fontWeight: 900, color: T.text, margin: '0 0 5px', letterSpacing: '-.035em' }}>
+                  Merhaba, {(currentUser.full_name || currentUser.email || 'Kullanıcı').split(' ')[0]} 👋
+                </h1>
+                <p style={{ fontSize: 13.5, color: T.textSoft, margin: 0 }}>İşletmenizin güncel özetini aşağıda görebilirsiniz.</p>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                {isSuperAdmin && (
+                  <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ ...inputStyle, minWidth: isMobile ? '100%' : 220, fontWeight: 700, height: 44 }}>
+                    <option value="all">Tüm şubeler</option>
+                    {branches.filter(b => b.active !== false).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                )}
+                <div style={{ ...cardStyle, height: 44, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 9, borderRadius: 10, color: T.text, fontSize: 12.5, fontWeight: 650 }}>
+                  <CalendarDays size={16} color={T.primary} />
+                  {new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                </div>
+                {(isSuperAdmin || perms.can_export_data) && (
+                  <button onClick={() => exportToExcel(leadsToExportRows(visibleLeads, branchName, isSuperAdmin && filterBranch === 'all'), `genel-rapor-${new Date().toISOString().slice(0,10)}.xlsx`, 'Genel Rapor')} style={{
+                    height: 44, padding: '0 17px', borderRadius: 10, border: 0, cursor: 'pointer',
+                    background: 'linear-gradient(135deg,#6540E9,#7B65F4)', color: '#fff', fontWeight: 800,
+                    display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 20px rgba(101,64,233,.22)'
+                  }}><Download size={16} /> Raporu Dışa Aktar</button>
+                )}
+              </div>
+            </div>
+
             <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} />
 
-<div style={{
-  display: 'grid',
-  gridTemplateColumns: perms.can_see_revenue
-    ? 'repeat(auto-fit, minmax(180px, 1fr))'
-    : 'repeat(auto-fit, minmax(190px, 1fr))',
-  gap: 14,
-  marginBottom: 18
-}}>
-  <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet" />
+            <div style={{
+              display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, minmax(145px, 1fr))',
+              gap: 12, marginBottom: 18
+            }}>
+              <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet" />
               <StatCard icon={<CalendarDays size={20} />} label="Randevu Verilen" value={stats.appointed} color="blue" />
               <StatCard icon={<UserRound size={20} />} label="Gelen Müşteri" value={stats.arrived} color="green" />
               <StatCard icon={<ShoppingCart size={20} />} label="Satış Olan" value={stats.customers} color="amber" />
-              {perms.can_see_revenue && (
-                <>
-                  <StatCard icon={<TrendingUp size={20} />} label="Dönüşüm Oranı" value={`%${stats.rate}`} color="violet" />
-                  <StatCard icon={<Wallet size={20} />} label="Toplam Ciro" value={fmtTL(stats.revenue)} color="blue" />
-                </>
-              )}
+              <StatCard icon={<TrendingUp size={20} />} label="Dönüşüm Oranı" value={`%${stats.rate}`} color="violet" />
             </div>
 
-<div style={{ ...sectionGridStyle, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-  <FunnelSection stats={stats} isMobile={isMobile} />
-</div>
-
-<div style={{ ...sectionGridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-  <LossAnalysis stats={stats} />
-</div>
-
-<div style={{
-  display: 'grid',
-  gridTemplateColumns: perms.can_see_revenue
-    ? 'repeat(auto-fit, minmax(260px, 1fr))'
-    : 'repeat(auto-fit, minmax(320px, 1fr))',
-  gap: 16,
-  marginBottom: 16
-}}>              <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Lead Kaynak Dağılımı</p>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.25fr .9fr .95fr', gap: 14, marginBottom: 14 }}>
+              <FunnelSection stats={stats} isMobile={isMobile} />
+              <div style={{ ...cardStyle, padding: 20, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <p style={{ fontSize: 15, color: T.text, margin: 0, fontWeight: 850 }}>Lead Kaynak Dağılımı</p>
+                  <span style={{ fontSize: 11, color: T.textSoft, border: `1px solid ${T.border}`, padding: '6px 9px', borderRadius: 8 }}>Tüm dönem</span>
+                </div>
                 <ChannelDonut leads={scopedLeads} />
               </div>
-              <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Aylık Trend</p>
+              <div style={{ ...cardStyle, padding: 20, minWidth: 0 }}>
+                <p style={{ fontSize: 15, color: T.text, margin: '0 0 16px', fontWeight: 850 }}>Günlük Trend</p>
                 <MonthlyTrendChart leads={scopedLeads} />
               </div>
-              {perms.can_see_revenue && (
-                <>
-                  <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                    <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Hizmete Göre Ciro</p>
-                    <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
-                  </div>
-                  {perms.can_enter_ads_data && (
-                    <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                      <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Reklam Performansı (Bu Ay)</p>
-                      <AdsPerformanceTable adsData={scopedAds} leads={scopedLeads} isMobile={isMobile} />
-                    </div>
-                  )}
-                </>
-              )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: (isSuperAdmin && filterBranch === 'all' && !isMobile) ? '2fr 1fr' : '1fr', gap: 16 }}>
-              <div style={{ ...cardStyle, padding: '1.1rem', minWidth: 0, overflow: 'hidden' }}>
-                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Son Görüşmeler</p>
-                <RecentLeadsTable leads={visibleLeads} canSeePhone={perms.can_see_phone} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} isMobile={isMobile} />
-              </div>
-              {isSuperAdmin && filterBranch === 'all' && (
-                <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                  <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Şubeler</p>
-                  <BranchesOverview branches={branches} leads={leads} />
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(280px,.7fr) minmax(0,1.3fr)', gap: 14, marginBottom: 14 }}>
+              <LossAnalysis stats={stats} />
+              {perms.can_see_revenue && (
+                <div style={{ ...cardStyle, padding: 20, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+                    <div>
+                      <p style={{ fontSize: 15, color: T.text, margin: 0, fontWeight: 850 }}>Reklam ve Gelir Özeti</p>
+                      <p style={{ fontSize: 11.5, color: T.textSoft, margin: '4px 0 0' }}>Seçili şubenin güncel performansı</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ background: T.cardSoft, border: `1px solid ${T.border}`, borderRadius: 9, padding: '9px 12px', fontSize: 12, color: T.textSoft }}>Harcama <b style={{ color: T.text, marginLeft: 5 }}>{fmtTL(totalSpend)}</b></span>
+                      <span style={{ background: T.cardSoft, border: `1px solid ${T.border}`, borderRadius: 9, padding: '9px 12px', fontSize: 12, color: T.textSoft }}>Ciro <b style={{ color: T.text, marginLeft: 5 }}>{fmtTL(stats.revenue)}</b></span>
+                    </div>
+                  </div>
+                  {perms.can_enter_ads_data ? <AdsPerformanceTable adsData={scopedAds} leads={scopedLeads} isMobile={isMobile} /> : <RevenueByServiceChart leads={scopedLeads} services={currentBranchServices} />}
                 </div>
               )}
             </div>
+
+            <div style={{ ...cardStyle, padding: 20, minWidth: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div>
+                  <p style={{ fontSize: 15, color: T.text, margin: 0, fontWeight: 850 }}>Son Görüşmeler</p>
+                  <p style={{ fontSize: 11.5, color: T.textSoft, margin: '4px 0 0' }}>En son eklenen danışan hareketleri</p>
+                </div>
+                <button onClick={() => setActiveTab('clients')} style={{ border: 0, background: 'transparent', color: T.primary, fontWeight: 750, cursor: 'pointer', fontSize: 12 }}>Tümünü Gör</button>
+              </div>
+              <RecentLeadsTable leads={visibleLeads} canSeePhone={perms.can_see_phone} showBranch={isSuperAdmin && filterBranch === 'all'} branchNameFn={branchName} isMobile={isMobile} />
+            </div>
           </div>
-               )}
+        )}
 
         {activeTab === 'clients' && (
           <div>
