@@ -1,4 +1,4 @@
-// Netlify Function: 14 günlük deneme hesabı oluştuğunda, kullanıcıya giriş bilgilerini
+// Netlify Function: 7 günlük deneme hesabı oluştuğunda, kullanıcıya giriş bilgilerini
 // e-posta ile gönderir. Resend API key'i Netlify environment variable olarak saklanır
 // (RESEND_API_KEY), frontend'e asla açık edilmez.
 
@@ -30,7 +30,7 @@ export async function handler(event) {
       <h2 style="color: #7C5CFC; margin: 0 0 16px;">Müşteri Takip'e Hoş Geldiniz!</h2>
       <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
         Merhaba ${contactName || ''},<br/><br/>
-        <strong>${businessName || 'İşletmeniz'}</strong> için 14 günlük ücretsiz deneme hesabınız oluşturuldu. Kayıt sırasında belirlediğiniz e-posta ve şifre ile hemen giriş yapabilirsiniz.
+        <strong>${businessName || 'İşletmeniz'}</strong> için 7 günlük ücretsiz deneme hesabınız oluşturuldu. Kayıt sırasında belirlediğiniz e-posta ve şifre ile hemen giriş yapabilirsiniz.
       </p>
       <a href="https://musteritakip.net/giris" style="display: inline-block; background: #7C5CFC; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px; margin-top: 8px;">
         Panele Giriş Yap
