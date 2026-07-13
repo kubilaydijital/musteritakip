@@ -1,214 +1,137 @@
 import { Link } from 'react-router-dom'
-import { SiteHeader, SiteFooter } from './SiteLayout'
-import { T, cardStyle, btnPrimary, btnSecondary, GLOBAL_CSS, PAGE_MAX } from './theme'
-
-const FEATURES_PREVIEW = [
-  { icon: '📅', title: 'Akıllı Randevu Yönetimi', desc: 'Çakışma yok, hatırlatma var. Zamanınızı verimli kullanın.' },
-  { icon: '🔔', title: 'Otomatik Hatırlatmalar', desc: 'SMS, e-posta ve arama ile otomatik hatırlatma yapın.' },
-  { icon: '👥', title: 'Müşteri Takibi', desc: 'Tüm müşteri bilgilerini tek yerde düzenli tutun.' },
-  { icon: '🎯', title: 'Potansiyel Müşteri Uyarıları', desc: 'Kayıtlarda yer alan potansiyel müşteriler için uyarılar görün.' },
-]
-
-const FUNNEL_STAGES = [
-  { label: 'Randevu Aldı\n(Geçti)', sub: '1g', icon: '📅', color: T.blue },
-  { label: 'Randevuya Gelmedi', sub: '3g', icon: '👤', color: T.red },
-  { label: 'Cevap Yazdı\nDönüş Gelmedi', sub: '3g', icon: '💬', color: T.orange },
-  { label: 'Satın Almadı', sub: '15g', icon: '🛒', color: '#EAB308' },
-  { label: 'Müşteri Oldu', sub: 'Takip Yok', icon: '✅', color: T.green },
-]
+import { CheckCircle2, ArrowRight, Mail, Monitor, Smartphone, ShieldCheck, RefreshCw } from 'lucide-react'
+import Layout from '../components/Layout.jsx'
+import DashboardMock, { MobileReminderMock } from '../components/DashboardMock.jsx'
+import ReferenceLogo from '../components/ReferenceLogo.jsx'
+import ReminderTable from '../components/ReminderTable.jsx'
+import { features, references } from '../data/siteData.js'
+import usePageMeta from '../usePageMeta.js'
 
 export default function LandingPage() {
+  usePageMeta(null, 'Güzellik salonları, klinikler ve randevu bazlı hizmet işletmeleri için lead ve randevu takip sistemi. Instagram, WhatsApp ve telefon görüşmelerini tek panelde topla, kaybı durdur.')
+  const preview = features.slice(0, 6)
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: T.bg, color: T.text, minHeight: '100vh' }}>
-      <style>{GLOBAL_CSS}</style>
-      <SiteHeader />
-
-      {/* HERO */}
-      <section style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '72px 20px 56px' }}>
-        <div className="mt-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: 56, alignItems: 'center' }}>
-          <div>
-            <p className="mt-fade-up" style={{ fontSize: 13, fontWeight: 700, color: T.primary, letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 18px' }}>
-              Randevu bazlı hizmet işletmeleri için
-            </p>
-            <h1 className="mt-fade-up" style={{ fontSize: 'clamp(32px, 4.4vw, 48px)', lineHeight: 1.12, fontWeight: 900, margin: '0 0 22px', letterSpacing: '-0.02em', animationDelay: '0.05s' }}>
-              Kağıt defter devri bitti.<br />
-              <span style={{ color: T.primary }}>Müşteriniz kaçmasın,</span><br />
-              işiniz büyüsün.
-            </h1>
-            <p className="mt-fade-up" style={{ fontSize: 16.5, lineHeight: 1.65, color: T.textSoft, maxWidth: 480, margin: '0 0 32px', animationDelay: '0.1s' }}>
-              Randevu alan, hatırlatma yapan, kaçan müşterinin peşinden giden tek sistem. Aradığınız her şeyi tek ekranda, tek yerde.
-            </p>
-            <div className="mt-fade-up" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20, animationDelay: '0.15s' }}>
-              <Link to="/deneme" className="mt-btn-primary" style={btnPrimary}>Ücretsiz 14 Gün Dene →</Link>
-              <Link to="/demo" className="mt-btn-secondary" style={btnSecondary}>Demo Talep Et</Link>
-            </div>
-            <div className="mt-fade-up" style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 13, color: T.textSoft, animationDelay: '0.2s' }}>
-              <span>✓ 14 gün ücretsiz</span>
-              <span>✓ Kredi kartı gerekmez</span>
-              <span>✓ Kurulum gerektirmez</span>
-            </div>
-          </div>
-
-          <div className="mt-fade-up" style={{ animationDelay: '0.1s' }}>
-            <HeroPanelMock />
-          </div>
-        </div>
-      </section>
-
-      {/* ÖZELLİK ÖNİZLEME */}
-      <section style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '32px 20px 64px' }}>
-        <div className="mt-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }}>
-          {FEATURES_PREVIEW.map(f => (
-            <div key={f.title} style={{ ...cardStyle, padding: '22px 20px' }}>
-              <span style={{ fontSize: 26, display: 'block', marginBottom: 12 }}>{f.icon}</span>
-              <p style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 6px', color: T.text }}>{f.title}</p>
-              <p style={{ fontSize: 13, color: T.textSoft, margin: 0, lineHeight: 1.55 }}>{f.desc}</p>
-            </div>
-          ))}
-        </div>
-        <div style={{ textAlign: 'center', marginTop: 24 }}>
-          <Link to="/ozellikler" style={{ fontSize: 14.5, fontWeight: 600, color: T.primary, textDecoration: 'none' }}>
-            Tüm özellikleri gör →
-          </Link>
-        </div>
-      </section>
-
-      {/* NASIL ÇALIŞIR - HATIRLATMA SİSTEMİ */}
-      <section style={{ background: T.card, borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '64px 20px' }}>
-          <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto 44px' }}>
-            <h2 style={{ fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: 800, margin: '0 0 14px', letterSpacing: '-0.01em' }}>
-              Sistem sizi uyarır, siz de doğru kişiye ulaşırsınız
-            </h2>
-            <p style={{ fontSize: 15.5, color: T.textSoft, margin: 0, lineHeight: 1.6 }}>
-              Müşterinizden gelen sonuca göre doğru zamanda hatırlatma yapar ve kaçan müşterinin peşinden gider. Unutmaz, unutturmaz, kazandırır.
-            </p>
-          </div>
-
-          <div className="mt-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20, alignItems: 'center', marginBottom: 36 }}>
-            <div style={{ overflowX: 'auto' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, minWidth: 560 }}>
-                {FUNNEL_STAGES.map((stage, i) => (
-                  <div key={stage.label} style={{ display: 'flex', alignItems: 'flex-start' }}>
-                    <div style={{ width: 102, textAlign: 'center' }}>
-                      <span style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: 52, height: 52, borderRadius: '50%', background: `${stage.color}22`,
-                        border: `2px solid ${stage.color}`, fontSize: 20, margin: '0 auto 10px'
-                      }}>{stage.icon}</span>
-                      <p style={{ fontSize: 11.5, fontWeight: 700, color: T.textSoft, margin: '0 0 4px', whiteSpace: 'pre-line', lineHeight: 1.3, minHeight: 30 }}>{stage.label}</p>
-                      <p style={{ fontSize: 12.5, fontWeight: 800, color: stage.color, margin: 0 }}>{stage.sub}</p>
-                    </div>
-                    {i < FUNNEL_STAGES.length - 1 && (
-                      <span style={{ color: T.textFaint, fontSize: 16, margin: '16px 2px 0' }}>→</span>
-                    )}
-                  </div>
-                ))}
+    <Layout>
+      <main>
+        <section className="hero section-glow">
+          <div className="container hero-grid">
+            <div className="hero-copy">
+              <span className="eyebrow"><span></span>Hizmet sektörü için müşteri takip sistemi</span>
+              <h1>Kağıt defter devri bitti.<br/><strong>Müşteriniz kaçmasın,</strong><br/>işiniz büyüsün.</h1>
+              <p>Kağıda yazılan müşteri unutulur. Müşteri Takip; randevuları, gelen mesajları, satışları ve reklam harcamanızı tek ekranda toplar. Sistem zamanı geldiğinde sizi uyarır, hiçbir potansiyel müşteri arada kaybolmaz.</p>
+              <div className="hero-actions">
+                <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
+                <Link to="/iletisim" className="btn btn-ghost big"><Mail size={18}/> Sorularınız mı var?</Link>
               </div>
+              <div className="hero-checks"><span><CheckCircle2/>14 gün ücretsiz</span><span><CheckCircle2/>Kredi kartı gerekmez</span><span><CheckCircle2/>Kurulum gerektirmez</span></div>
             </div>
+            <div className="hero-visual"><DashboardMock /><MobileReminderMock /></div>
+          </div>
+        </section>
 
-            <div style={{ ...cardStyle, padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <span style={{ fontSize: 18 }}>👥</span>
-                <span style={{ fontSize: 18 }}>🔔</span>
-              </div>
-              <p style={{ fontSize: 12.5, color: T.textSoft, margin: 0, lineHeight: 1.5 }}>
-                Sistem sizi uyarır, siz de doğru zamanda doğru kişiye ulaşırsınız.
-              </p>
-              <p style={{ fontSize: 11.5, color: T.textFaint, margin: 0 }}>Unutmaz, unutturmaz, kazandırır.</p>
+        <section className="container references-strip">
+          <p>Bize güvenen işletmeler</p>
+          <div className="reference-row">{references.map((item) => <ReferenceLogo key={item.name} item={item} />)}</div>
+        </section>
+
+        <section className="container feature-strip">
+          {preview.map((item) => {
+            const Icon = item.icon
+            return <article key={item.title} className="feature-mini"><Icon size={28}/><h3>{item.title}</h3><p>{item.desc}</p></article>
+          })}
+        </section>
+
+        <section className="container compare-section">
+          <div className="problem-card">
+            <h2>Hâlâ kağıt defter mi kullanıyorsunuz?</h2>
+            <ul>
+              <li>Müşteriler kayboluyor, notlar karışıyor.</li>
+              <li>Randevu çakışmaları ve iptaller yaşanıyor.</li>
+              <li>Hangi kaynaktan müşteri geldiğini bilmiyorsunuz.</li>
+              <li>Günlük, haftalık rapor almak imkansızlaşıyor.</li>
+              <li>İşiniz büyüdükçe kontrolü kaybediyorsunuz.</li>
+            </ul>
+          </div>
+          <div className="compare-arrow"><ArrowRight size={34}/></div>
+          <div className="solution-card">
+            <h2>Müşteri Takip ile her şey kontrol altında</h2>
+            <ul>
+              <li>Tüm müşteri bilgileri tek yerde, güvenle saklanır.</li>
+              <li>Randevular, hatırlatmalar ve iptaller düzenli yönetilir.</li>
+              <li>Reklam ve kaynak performansınızı net görün.</li>
+              <li>Gerçek zamanlı raporlarla işinizi büyütün.</li>
+              <li>Kaçan müşterinin peşinden gidin, kazancınızı artırın.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section className="container reminder-flow-card">
+          <div className="reminder-text"><h2>Unutsanız da sistem unutmaz.</h2><p>Hatırlatma sistemi müşterinizin sonucuna göre çalışır. Sistem doğru zamanda uyarır, ekip doğru kişiye ulaşır.</p></div>
+          <div className="flow"><span>1. Hatırlatma<small>1g / 3g / 15g</small></span><ArrowRight/><span>2. Hatırlatma<small>+14g / +30g</small></span><ArrowRight/><span>3. Hatırlatma<small>+30g / +60g</small></span><ArrowRight/><b>Geri kazanılan müşteri</b></div>
+        </section>
+
+        <section className="reminder-section">
+          <div className="container split-grid">
+            <div>
+              <span className="eyebrow"><span></span>Nasıl çalışır?</span>
+              <h2>Sonuca göre kademeli hatırlatma sistemi</h2>
+              <p>Randevu geçti, randevuya gelmedi, cevap yazıldı ama dönüş olmadı veya satın almadı. Her sonuç kategorisi için hatırlatma süresi farklıdır. 3 hatırlatma sonrası müşteri soğuk kabul edilir.</p>
+              <ReminderTable />
+            </div>
+            <div className="notice-card"><h3>Sistem sizi uyarır.</h3><p>Personel her gün kimi arayacağını ezberlemek zorunda kalmaz. Uyarılar sayesinde doğru müşteriye, doğru zamanda ulaşılır.</p><Link to="/ozellikler" className="btn btn-primary">Özellikleri İncele</Link></div>
+          </div>
+        </section>
+
+        <section className="container booking-feature">
+          <div className="booking-feature-copy">
+            <span className="booking-badge"><span></span>Yeni özellik</span>
+            <h2>Reklamınıza verdiğiniz para<br/><strong>artık kendini raporluyor.</strong></h2>
+            <p>Meta (Facebook & Instagram) reklam hesabınızı bağlayın; harcama, gösterim ve mesaj verisi her gün otomatik olarak panelinize işlenir. Manuel veri girmeye gerek kalmaz.</p>
+            <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
+          </div>
+          <div className="booking-mock">
+            <p className="booking-mock-title"><RefreshCw size={14} style={{display:'inline',marginRight:6,verticalAlign:-2}}/>Bağlı: İşletmeniz</p>
+            <p className="booking-mock-sub">Meta reklam verileri her gün otomatik güncellenir.</p>
+            <p className="booking-mock-label">Bu ayki performans</p>
+            <div className="booking-mock-slots" style={{gridTemplateColumns:'repeat(2,1fr)'}}>
+              <span>Harcama: ₺12.400</span><span>Gösterim: 45.250</span>
+              <span>Mesaj: 312</span><span>CPM: ₺39,7</span>
+            </div>
+            <div className="booking-mock-fields">
+              <div className="booking-mock-cta">Son güncelleme: bugün 06:00</div>
             </div>
           </div>
+        </section>
 
-          <ReminderTable />
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section style={{ maxWidth: PAGE_MAX, margin: '0 auto', padding: '72px 20px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: 800, margin: '0 0 14px' }}>
-          Hemen başlayın, işinizi kolaylaştırın!
-        </h2>
-        <p style={{ fontSize: 15.5, color: T.textSoft, maxWidth: 460, margin: '0 auto 32px', lineHeight: 1.6 }}>
-          14 gün ücretsiz deneyin, kredi kartı gerekmez. Sorularınız için doğrudan iletişime geçebilirsiniz.
-        </p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Link to="/deneme" className="mt-btn-primary" style={btnPrimary}>Ücretsiz 14 Gün Dene →</Link>
-          <Link to="/demo" className="mt-btn-secondary" style={btnSecondary}>Demo Talep Et</Link>
-        </div>
-      </section>
-
-      <SiteFooter />
-    </div>
-  )
-}
-
-function ReminderTable() {
-  const rows = [
-    ['Randevu aldı (randevu geçti)', '1g', '+14g (~15g)', '+30g (~45g)', 'Soğuk'],
-    ['Randevuya gelmedi', '3g', '+14g (~17g)', '+30g (~47g)', 'Soğuk'],
-    ['Cevap yazdı, müşteriden dönüş gelmedi', '3g', '+14g (~17g)', '+30g (~47g)', 'Soğuk'],
-    ['Satın almadı', '15g', '+30g (~45g)', '+60g (~105g)', 'Soğuk'],
-    ['Müşteri oldu', 'takip yok', '—', '—', '—'],
-  ]
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <div style={{ minWidth: 640 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 0.9fr 1fr 1fr 0.8fr', gap: 8, padding: '10px 4px', borderBottom: `1px solid ${T.border}`, fontSize: 11.5, color: T.textFaint, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          <span>Süre tabloları (gün)</span><span>1. hatırlatma</span><span>2. hatırlatma</span><span>3. hatırlatma</span><span>Sonrası</span>
-        </div>
-        {rows.map((r, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 0.9fr 1fr 1fr 0.8fr', gap: 8, padding: '13px 4px', borderBottom: i < rows.length - 1 ? `1px solid ${T.border}` : 'none', fontSize: 13.5 }}>
-            <span style={{ color: T.text, fontWeight: 600 }}>{r[0]}</span>
-            <span style={{ color: T.textSoft }}>{r[1]}</span>
-            <span style={{ color: T.textSoft }}>{r[2]}</span>
-            <span style={{ color: T.textSoft }}>{r[3]}</span>
-            <span style={{ color: r[4] === 'Soğuk' ? T.textFaint : T.textSoft, fontWeight: r[4] === 'Soğuk' ? 600 : 400 }}>{r[4]}</span>
+        <section className="container booking-feature">
+          <div className="booking-feature-copy">
+            <span className="booking-badge"><span></span>Yeni özellik</span>
+            <h2>Müşterileriniz artık sizi aramadan<br/><strong>randevu alabilir.</strong></h2>
+            <p>Kendi randevu sayfanızla, müşterileriniz 7/24 size uygun saati görüp anında randevu oluşturabilir. Siz hiçbir şey yapmadan, panel otomatik dolar.</p>
+            <Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene <ArrowRight size={18}/></Link>
           </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function HeroPanelMock() {
-  return (
-    <div style={{ ...cardStyle, padding: 20, position: 'relative' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: T.text }}>Genel Bakış</p>
-        <span style={{ fontSize: 11, color: T.textFaint, background: T.cardSoft, padding: '3px 9px', borderRadius: 6 }}>Bu Ay</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-        {[
-          { label: 'Toplam mesaj', value: '24', color: T.primary },
-          { label: 'Gelen müşteri', value: '18', color: T.green },
-          { label: 'Satış', value: '7', color: T.orange },
-          { label: 'Ciro', value: '12.450 TL', color: T.blue },
-        ].map(s => (
-          <div key={s.label} style={{ background: T.cardSoft, borderRadius: 10, padding: '10px 8px' }}>
-            <p style={{ fontSize: 10.5, color: T.textFaint, margin: '0 0 4px' }}>{s.label}</p>
-            <p style={{ fontSize: 15, fontWeight: 800, margin: 0, color: s.color }}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-      <div style={{ background: T.cardSoft, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
-        <p style={{ fontSize: 11.5, fontWeight: 700, color: T.textSoft, margin: '0 0 10px' }}>Hatırlatma Performansı</p>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-          {[['1. hatırlatma', 14], ['2. hatırlatma', 30], ['3. hatırlatma', 60]].map(([label, val]) => (
-            <div key={label} style={{ textAlign: 'center' }}>
-              <p style={{ margin: '0 0 2px', color: T.textFaint }}>{label}</p>
-              <p style={{ margin: 0, fontWeight: 800, color: T.text }}>{val}</p>
+          <div className="booking-mock">
+            <p className="booking-mock-title">İşletmeniz</p>
+            <p className="booking-mock-sub">Aşağıdan size uygun bir gün ve saat seçin.</p>
+            <p className="booking-mock-label">Müsait saatler</p>
+            <div className="booking-mock-slots">
+              <span>10:00</span><span className="active">11:30</span><span>13:00</span><span>14:30</span>
             </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ background: T.cardSoft, borderRadius: 10, padding: '12px 14px' }}>
-        <p style={{ fontSize: 11.5, fontWeight: 700, color: T.textSoft, margin: '0 0 8px' }}>Yakın Randevular</p>
-        {[['11:00', 'Ayşe Yılmaz'], ['12:30', 'Mehmet Demir'], ['14:00', 'Elif Kaya']].map(([time, name]) => (
-          <div key={time} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', color: T.textSoft }}>
-            <span>{time}</span><span>{name}</span>
+            <div className="booking-mock-fields">
+              <span>Ad Soyad</span>
+              <span>Telefon</span>
+              <div className="booking-mock-cta">11:30 için randevu al</div>
+            </div>
           </div>
-        ))}
-      </div>
-    </div>
+        </section>
+
+        <section className="container device-section">
+          <div><h2>Her yerden, her cihazdan erişin.</h2><p>Bilgileriniz güvende, siz işinize odaklanın. Web ekranı, mobil uyum ve güvenli altyapı ile süreçlerinizi daha net yönetin.</p><div className="device-badges"><span><Monitor/>Web</span><span><Smartphone/>Mobil uyumlu</span><span><ShieldCheck/>Güvenli altyapı</span></div></div>
+          <DashboardMock compact />
+        </section>
+
+        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz deneyebilir veya bize ulaşabilirsiniz.</p><div><Link to="/deneme" className="btn btn-primary big">Ücretsiz 14 Gün Dene</Link><Link to="/iletisim" className="btn btn-ghost big">Bize Ulaşın</Link></div></section>
+      </main>
+    </Layout>
   )
 }
