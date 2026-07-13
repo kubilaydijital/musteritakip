@@ -370,7 +370,7 @@ function Login({ onLogin }) {
       <p style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${T.border}`, fontSize: 13.5, color: T.textSoft, textAlign: 'center' }}>
         Hesabınız yok mu?{' '}
         <a href="/deneme" style={{ color: T.primary, fontWeight: 600, textDecoration: 'underline' }}>
-          Ücretsiz 14 gün deneyin
+          Ücretsiz 7 gün deneyin
         </a>
       </p>
     </div>
@@ -385,7 +385,7 @@ function TrialExpired({ onLogout, trialEndsAt }) {
   return (
     <div style={{ maxWidth: 420, margin: '4rem auto', padding: '2rem', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
       <p style={{ fontSize: 40, margin: '0 0 12px' }}>⏰</p>
-      <p style={{ fontSize: 19, fontWeight: 700, margin: '0 0 10px', color: T.text }}>14 günlük deneme süreniz doldu</p>
+      <p style={{ fontSize: 19, fontWeight: 700, margin: '0 0 10px', color: T.text }}>7 günlük deneme süreniz doldu</p>
       <p style={{ fontSize: 14, color: T.textSoft, lineHeight: 1.6, margin: '0 0 4px' }}>
         {endedDate ? `Deneme süreniz ${endedDate} tarihinde sona erdi.` : 'Deneme süreniz sona erdi.'}
       </p>
