@@ -153,25 +153,25 @@ function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 const T = {
   primary: '#7C5CFC',
   primaryDark: '#6C3FFC',
-  primaryLight: 'rgba(124,92,252,0.16)',
-  bg: '#070D18',
-  card: '#0C1626',
-  cardSoft: 'rgba(255,255,255,0.04)',
-  border: 'rgba(255,255,255,0.08)',
-  text: '#FFFFFF',
-  textSoft: '#94A3B8',
-  textFaint: '#64748B',
-  green: '#22C55E',
-  greenBg: 'rgba(34,197,94,0.14)',
-  orange: '#F59E0B',
-  orangeBg: 'rgba(245,158,11,0.14)',
-  red: '#EF4444',
-  redBg: 'rgba(239,68,68,0.14)',
-  blue: '#3B82F6',
-  blueBg: 'rgba(59,130,246,0.14)',
+  primaryLight: 'rgba(124,92,252,0.1)',
+  bg: '#FFFFFF',
+  card: '#FFFFFF',
+  cardSoft: 'rgba(124,92,252,0.04)',
+  border: 'rgba(0,0,0,0.08)',
+  text: '#1A1A2E',
+  textSoft: '#6B7280',
+  textFaint: '#9CA3AF',
+  green: '#16A34A',
+  greenBg: 'rgba(22,163,74,0.1)',
+  orange: '#D97706',
+  orangeBg: 'rgba(217,119,6,0.1)',
+  red: '#DC2626',
+  redBg: 'rgba(220,38,38,0.1)',
+  blue: '#2563EB',
+  blueBg: 'rgba(37,99,235,0.1)',
 }
-const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: T.cardSoft, color: T.text, colorScheme: 'dark' }
-const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }
+const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: '#faf9fc', color: T.text, colorScheme: 'light' }
+const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 4px 20px rgba(124,92,252,0.06)' }
 const quickBtnStyle = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9,
   border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, fontSize: 12.5, cursor: 'pointer', textAlign: 'left'
@@ -589,7 +589,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         <>
           <NoteHistory notes={notesForLead} />
           <textarea placeholder="Yeni not ekle (isteğe bağlı)" value={form.newNote} onChange={e => set('newNote', e.target.value)} rows={2}
-            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
+            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
           <p style={{ fontSize: 11, color: '#888', margin: '4px 0 10px' }}>Not eklemek, bu kaydın "takip bekliyor" sayacını sıfırlar.</p>
           {(() => {
             // Yeni not yazılmadıysa, geçmişteki en son notu kullan - kullanıcı zaten girdiği
@@ -611,7 +611,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       ) : (
         <>
           <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => set('note', e.target.value)} rows={2}
-            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'dark' }} />
+            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
           {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
           <button type="button" disabled={aiLoading || !form.note.trim()} onClick={() => getAiTip(form.note)} style={{
             fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
@@ -2632,7 +2632,7 @@ export function PanelApp() {
         *, *::before, *::after { box-sizing: border-box; }
         html, body { overflow-x: hidden; max-width: 100%; }
         select, input, textarea { font-family: 'Inter', system-ui, sans-serif; max-width: 100%; }
-        select option { background: #0C1626; color: #fff; }
+        select option { background: #fff; color: ${T.text}; }
         button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid ${T.primary}; outline-offset: 1px; }
         ::placeholder { color: ${T.textFaint}; }
         img, svg, canvas { max-width: 100%; }
