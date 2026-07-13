@@ -29,7 +29,7 @@ export default function KullanimSartlari() {
           <p>Hizmet, isteğe bağlı olarak Meta (Facebook/Instagram) reklam hesabı bağlantısı sunar. Bu bağlantıyı kurmak tamamen sizin tercihinizdir; bağlantıyı istediğiniz zaman panelden kaldırabilirsiniz. Meta entegrasyonu yalnızca kendi reklam hesabınıza ait performans verilerini görüntülemenizi sağlar; başka hiçbir işletmenin verisine erişim sağlamaz.</p>
 
           <h2>4. Ödeme ve Deneme Süresi</h2>
-          <p>Hizmet, 14 günlük ücretsiz deneme süresi ile sunulur. Deneme süresi sonunda hizmete devam etmek için ücretli bir plana geçiş yapmanız gerekir. Ücretlendirme ve paket detayları musteritakip.net üzerinden duyurulur.</p>
+          <p>Hizmet, 7 günlük ücretsiz deneme süresi ile sunulur. Deneme süresi sonunda hizmete devam etmek için ücretli bir plana geçiş yapmanız gerekir. Ücretlendirme ve paket detayları musteritakip.net üzerinden duyurulur.</p>
 
           <h2>5. Hizmetin Kullanılamaması</h2>
           <p>Hizmet Sağlayıcı, bakım, güncelleme veya öngörülemeyen teknik sorunlar nedeniyle hizmette geçici kesintiler yaşanabileceğini bildirir. Hizmet Sağlayıcı, planlı bakım çalışmalarını önceden duyurmaya çalışır.</p>
