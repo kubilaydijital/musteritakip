@@ -11,7 +11,7 @@ const BUSINESS_TYPES = ['Güzellik salonu', 'Kuaför', 'Diş kliniği', 'Gayrime
 const PHONE_RE = /^\+905\d{9}$/
 
 export default function Trial() {
-  usePageMeta('Ücretsiz 14 Gün Dene', 'Kredi kartı gerekmez. Hesabınızı hemen oluşturun, 14 gün boyunca Müşteri Takip sistemini ücretsiz deneyin.')
+  usePageMeta('Ücretsiz 7 Gün Dene', 'Kredi kartı gerekmez. Hesabınızı hemen oluşturun, 7 gün boyunca Müşteri Takip sistemini ücretsiz deneyin.')
   const [form, setForm] = useState({ businessName: '', contactName: '', phone: '+90', email: '', password: '', businessType: '' })
   const [status, setStatus] = useState('idle') // idle | submitting | done | error
   const [errorMsg, setErrorMsg] = useState('')
@@ -55,7 +55,7 @@ export default function Trial() {
       if (branchErr) throw new Error('Şube oluşturulamadı: ' + branchErr.message)
 
       // 3) handle_new_user() trigger'ı otomatik olarak app_users'a bir satır ekledi
-      // (role='admin', is_trial=true, trial_ends_at=+14gün). Bu satırı gerçek şube ve
+      // (role='admin', is_trial=true, trial_ends_at=+7gün). Bu satırı gerçek şube ve
       // izin şablonuyla güncelliyoruz.
       const { error: profileErr } = await supabase.from('app_users')
         .update({ branch_id: branchId, permission_template_id: 'tpl_admin', full_name: form.contactName.trim() })
@@ -98,7 +98,7 @@ export default function Trial() {
           <section className="container trial-card">
             <span className="page-no">🎉 Hazır</span>
             <h1>Hesabınız oluşturuldu!</h1>
-            <p>14 günlük deneme süreniz başladı. Az önce belirlediğiniz e-posta ve şifre ile doğrudan giriş yapabilirsiniz.</p>
+            <p>7 günlük deneme süreniz başladı. Az önce belirlediğiniz e-posta ve şifre ile doğrudan giriş yapabilirsiniz.</p>
             <Link to="/giris" className="btn btn-primary big">Panele Giriş Yap</Link>
           </section>
         </main>
@@ -111,7 +111,7 @@ export default function Trial() {
       <main className="page">
         <section className="container trial-card">
           <span className="page-no">Ücretsiz Deneme</span>
-          <h1>14 gün boyunca sistemi deneyin.</h1>
+          <h1>7 gün boyunca sistemi deneyin.</h1>
           <p>Kredi kartı gerekmez. Bilgilerinizi girin, hesabınız anında oluşturulsun.</p>
 
           <form onSubmit={submit}>
