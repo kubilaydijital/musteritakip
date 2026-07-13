@@ -17,7 +17,7 @@ export function Header() {
         </nav>
         <div className="header-actions desktop-actions">
           <Link className="btn btn-ghost" to="/giris">Giriş Yap</Link>
-          <Link className="btn btn-primary" to="/deneme">Ücretsiz 14 Gün Dene</Link>
+          <Link className="btn btn-primary" to="/deneme">Ücretsiz 7 Gün Dene</Link>
         </div>
         <button className="menu-button" onClick={() => setOpen(!open)} aria-label="Menüyü aç/kapat">☰</button>
       </div>
@@ -27,7 +27,7 @@ export function Header() {
             <NavLink key={item.to} to={item.to} onClick={() => setOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>{item.label}</NavLink>
           ))}
           <Link className="btn btn-ghost" to="/giris" onClick={() => setOpen(false)}>Giriş Yap</Link>
-          <Link className="btn btn-primary" to="/deneme" onClick={() => setOpen(false)}>Ücretsiz 14 Gün Dene</Link>
+          <Link className="btn btn-primary" to="/deneme" onClick={() => setOpen(false)}>Ücretsiz 7 Gün Dene</Link>
         </div>
       )}
     </header>
@@ -57,7 +57,7 @@ export function Footer() {
           <h4>İletişim</h4>
           <a href={`mailto:${EMAIL}`}><Mail size={15} /> {EMAIL}</a>
           <span className="footer-contact"><MapPin size={15} /> {LOCATION}</span>
-          <Link className="btn btn-primary footer-cta" to="/deneme">Ücretsiz 14 Gün Dene</Link>
+          <Link className="btn btn-primary footer-cta" to="/deneme">Ücretsiz 7 Gün Dene</Link>
         </div>
       </div>
       <div className="container footer-bottom">© 2026 Müşteri Takip. Tüm hakları saklıdır.</div>
