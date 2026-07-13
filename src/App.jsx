@@ -1089,36 +1089,14 @@ function MetaConnectionPanel({ branchId, branchName }) {
   )
 }
 
-function WeeklyAdsForm({ onAdd, branches, selectedBranch, onSelectBranch, isMobile }) {
-  const [form, setForm] = useState({ channel: CHANNELS[0], spend: '', impressions: '', messages: '', manualAdjustment: '' })
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
-  async function submit(e) {
-    e.preventDefault()
-    await onAdd({
-      id: uid(), branch_id: selectedBranch, date: new Date().toISOString(), channel: form.channel,
-      spend: Number(form.spend) || 0, impressions: Number(form.impressions) || 0, messages: Number(form.messages) || 0,
-      manual_adjustment: Number(form.manualAdjustment) || 0
-    })
-    setForm({ channel: CHANNELS[0], spend: '', impressions: '', messages: '', manualAdjustment: '' })
-  }
+function AdsBranchSelector({ branches, selectedBranch, onSelectBranch, isMobile }) {
   return (
-    <form onSubmit={submit} style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem' : '1.25rem', marginTop: isMobile ? '1rem' : '1.5rem' }}>
-      <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 12px' }}>Haftalık reklam verisi gir (admin)</p>
-      <select value={selectedBranch} onChange={e => onSelectBranch(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
+    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem' : '1.25rem', marginBottom: 16 }}>
+      <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 10px' }}>Şube seçin</p>
+      <select value={selectedBranch} onChange={e => onSelectBranch(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
         {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
-      <select value={form.channel} onChange={e => set('channel', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
-        {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
-      </select>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
-        <input placeholder="Harcama (TL)" value={form.spend} onChange={e => set('spend', e.target.value)} style={inputStyle} />
-        <input placeholder="Gösterim" value={form.impressions} onChange={e => set('impressions', e.target.value)} style={inputStyle} />
-        <input placeholder="Mesaj sayısı (Meta)" value={form.messages} onChange={e => set('messages', e.target.value)} style={inputStyle} />
-      </div>
-      <input placeholder="Manuel düzeltme (kayıt eksikliği — örn. 5)" value={form.manualAdjustment} onChange={e => set('manualAdjustment', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 6 }} />
-      <p style={{ fontSize: 11, color: '#888', margin: '0 0 12px' }}>Sosyal medya personeli kaçırdığı mesajlar varsa, eksik kalan sayıyı buraya yaz — rapor bu sayıyı da hesaba katar.</p>
-      <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>Haftalık veriyi kaydet</button>
-    </form>
+    </div>
   )
 }
 
@@ -2849,10 +2827,10 @@ export function PanelApp() {
         {activeTab === 'ads' && perms.can_enter_ads_data && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Reklam Kaynakları</h1>
+            <AdsBranchSelector branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} isMobile={isMobile} />
             {adsSelectedBranch && (
               <MetaConnectionPanel branchId={adsSelectedBranch} branchName={branchName(adsSelectedBranch)} />
             )}
-            <WeeklyAdsForm onAdd={addAdsWeek} branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} isMobile={isMobile} />
           </div>
         )}
 
