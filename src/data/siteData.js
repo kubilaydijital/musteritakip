@@ -1,6 +1,7 @@
 import {
   CalendarDays, BellRing, UsersRound, Target, BarChart3, Megaphone,
-  FileClock, ShieldCheck, UserCog, Building2, Scale, Scissors, SmilePlus
+  FileClock, ShieldCheck, UserCog, Building2, Scale, Scissors, SmilePlus,
+  CalendarCheck, MessageCircle, RefreshCw, Download
 } from 'lucide-react'
 
 export const EMAIL = 'info@musteritakip.net'
@@ -41,15 +42,19 @@ export const testimonials = [
 ]
 
 export const features = [
+  { icon: CalendarCheck, title: 'Online Randevu Sayfası', desc: 'Müşterileriniz, size ait özel bir linkten 7/24 kendi randevusunu oluşturabilir. Siz hiçbir şey yapmadan panel otomatik dolar.' },
+  { icon: MessageCircle, title: 'WhatsApp Entegrasyonu', desc: 'Danışan kartındaki tek tuşla, o kişinin durumuna özel hazırlanmış mesajla WhatsApp anında açılır.' },
+  { icon: RefreshCw, title: 'Meta Reklam Entegrasyonu', desc: 'Facebook ve Instagram reklam hesabınızı bağlayın; harcama, gösterim ve mesaj verisi her gün otomatik olarak panelinize işlenir.' },
   { icon: CalendarDays, title: 'Akıllı Randevu Yönetimi', desc: 'Tüm randevuları tek takvimde görün, çakışmaları ve iptalleri daha kolay yönetin.' },
   { icon: BellRing, title: 'Hatırlatma Uyarıları', desc: 'Sonuç kategorisine göre 1., 2. ve 3. hatırlatma zamanı geldiğinde sistem sizi uyarır.' },
   { icon: UsersRound, title: 'Müşteri Takibi', desc: 'Her müşterinin süreci, notları, randevuları ve geçmiş işlemleri tek ekranda tutulur.' },
   { icon: Target, title: 'Potansiyel Müşteri Uyarıları', desc: 'Kayıtlarda yer alan potansiyel müşteriler için zamanında uyarılar alın.' },
   { icon: Megaphone, title: 'Reklam Kaynak Takibi', desc: 'Müşterinin hangi kanaldan geldiğini ve hangi kaynağın satışa döndüğünü görün.' },
   { icon: BarChart3, title: 'Raporlar & Analiz', desc: 'Randevu, gelen müşteri, satış, ciro ve kaynak performansını anlık takip edin.' },
+  { icon: Download, title: 'Excel/CSV Dışa Aktarma', desc: 'Danışan kayıtlarınızı tek tıkla Excel veya CSV olarak indirin, izin bazlı erişimle kontrolü elinizde tutun.' },
   { icon: FileClock, title: 'Notlar & Geçmiş Kayıtlar', desc: 'Görüşme notları ve geçmiş süreçler kaybolmaz, her ekip üyesi doğru bilgiye ulaşır.' },
   { icon: UserCog, title: 'Ekip Yönetimi', desc: 'Danışmanları ve süreçleri tek yerden takip ederek performans görünürlüğü kazanın.' },
-  { icon: ShieldCheck, title: 'Güvenli Altyapı', desc: 'Verilerinizi düzenli, güvenli ve erişilebilir bir sistem üzerinde saklayın.' },
+  { icon: ShieldCheck, title: 'Güvenli Altyapı', desc: 'Verileriniz Supabase Auth ile korunur, her kullanıcı sadece yetkili olduğu bilgiye erişir.' },
 ]
 
 export const reminderRows = [
