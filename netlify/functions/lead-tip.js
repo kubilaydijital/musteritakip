@@ -1,6 +1,6 @@
 // Netlify Function: Bir görüşme notunu okuyup, personele kısa bir iletişim/satış
-// ipucu önerir. Gemini API key'i Netlify environment variable olarak saklanır
-// (GEMINI_API_KEY), frontend'e asla açık edilmez.
+// ipucu önerir. Groq API key'i Netlify environment variable olarak saklanır
+// (GROQ_API_KEY), frontend'e asla açık edilmez.
 //
 // Bu özellik TIBBİ veya teknik tavsiye vermez - sadece iletişim/satış yaklaşımı
 // önerir (örn. "müşteri tereddütlü görünüyor, ek bilgi vererek güven oluşturabilirsin").
@@ -39,12 +39,11 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Not metni gerekli' }) }
   }
 
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Sunucu yapılandırma hatası: GEMINI_API_KEY eksik' }) }
+    return { statusCode: 500, body: JSON.stringify({ error: 'Sunucu yapılandırma hatası: GROQ_API_KEY eksik' }) }
   }
 
-  // Notu kısaltarak gönderiyoruz (maliyet ve gizlilik için gereksiz uzun metin yollamıyoruz)
   const trimmedNote = note.trim().slice(0, 500)
   const contextLine = [
     service ? `Hizmet: ${service}` : null,
@@ -54,18 +53,22 @@ export async function handler(event) {
   const userMessage = `${contextLine ? contextLine + '\n' : ''}Not: ${trimmedNote}`
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: userMessage }] }],
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          generationConfig: { maxOutputTokens: 120, temperature: 0.6 },
-        }),
-      }
-    )
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userMessage },
+        ],
+        max_tokens: 120,
+        temperature: 0.6,
+      }),
+    })
 
     if (!res.ok) {
       const errText = await res.text()
@@ -73,7 +76,7 @@ export async function handler(event) {
     }
 
     const data = await res.json()
-    const tip = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+    const tip = data?.choices?.[0]?.message?.content?.trim()
 
     if (!tip) {
       return { statusCode: 502, body: JSON.stringify({ error: 'AI servisi boş yanıt döndürdü' }) }
