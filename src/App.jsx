@@ -8,7 +8,7 @@ import {
 import {
   MessageCircle, CalendarDays, UserRound, ShoppingCart, TrendingUp, Wallet,
   Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
-  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Download, Camera, X, Check, Loader2
+  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Download, Camera, X, Check, Loader2, Flame
 } from 'lucide-react'
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
@@ -105,40 +105,43 @@ const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F7
 // Bu format, Meta/Google Ads gibi platformlara müşteri listesi yüklerken eşleşme oranını maksimize eder
 // (boşluksuz, tire/parantez yok, ülke kodu dahil, sabit 12 karakter).
 const PHONE_RE = /^\+905\d{9}$/
-// Her sonuç kategorisi için kademeli hatırlatma eşikleri (gün).
-// Dizinin uzunluğu = "soğumadan önce" kaç hatırlatma yapılacağı.
-// Sayaç, o leade eklenen not sayısına (lead_notes) göre ilerler.
-const REMINDER_SCHEDULE = {
-  'Randevu aldı': [1, 15, 45],
-  'Randevuya gelmedi': [3, 17, 47],
-  'Cevap yazıldı, müşteriden dönüş gelmedi': [3, 17, 47],
-  'Satın almadı': [15, 45, 105],
+// Her sonuç kategorisi için varsayılan (şubeye özel kural bulunamazsa kullanılan) eşikler.
+const DEFAULT_REMINDER_SCHEDULE = {
+  'Randevu aldı': [1, 1, 1],
+  'Randevuya gelmedi': [1, 4, 10],
+  'Cevap yazıldı, müşteriden dönüş gelmedi': [1, 3, 7],
+  'Satın almadı': [2, 7, 18],
+}
+const DEFAULT_COLD_AFTER = {
+  'Randevu aldı': 1, 'Randevuya gelmedi': 30, 'Cevap yazıldı, müşteriden dönüş gelmedi': 20, 'Satın almadı': 35,
 }
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
 function daysSince(dateStr) { return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000) }
 function lastTouch(lead) { return lead.last_note_at || lead.edited_at || lead.date }
 
-// noteCount: leadin MEVCUT sonuç kategorisinde şu ana kadar eklenmiş not sayısı.
-// Sonuç değiştiğinde bu sayaç otomatik sıfırlanır (PanelApp'teki noteCountByLeadId hesaplamasına bak).
-// Süre, "Randevu aldı" için randevu tarihinden, diğerleri için son temas tarihinden işler.
-function staleness(lead, noteCount = 0) {
-  const schedule = REMINDER_SCHEDULE[lead.result]
-  if (!schedule) return null // Müşteri oldu -> takip yok
+// rule: { day_1, day_2, day_3, cold_after } — o şubeye ve sonuç kategorisine özel,
+// reminder_rules tablosundan gelir. Bulunamazsa DEFAULT_* değerlerine düşer.
+// noteCount: leadin MEVCUT sonuç kategorisinde, kayıt oluşturma notu HARİÇ, şu ana kadar
+// eklenmiş TAKİP notu sayısı (bkz. PanelApp'teki noteCountByLeadId — ilk not sayılmaz).
+// Süre, "Randevu aldı" için randevu tarihinden, diğerleri için kayıt/son temas tarihinden işler.
+function staleness(lead, noteCount = 0, rule = null) {
+  const schedule = rule ? [rule.day_1, rule.day_2, rule.day_3] : DEFAULT_REMINDER_SCHEDULE[lead.result]
+  const coldAfter = rule ? rule.cold_after : DEFAULT_COLD_AFTER[lead.result]
+  if (!schedule || lead.result === 'Müşteri oldu') return null // Müşteri oldu -> takip yok
 
   let anchorDate
   if (lead.result === 'Randevu aldı') {
     if (!lead.appointment_at) return null
     anchorDate = lead.appointment_at
   } else {
-    anchorDate = lastTouch(lead)
+    anchorDate = noteCount === 0 ? lead.date : lastTouch(lead)
   }
 
   const d = daysSince(anchorDate)
   if (d < 0) return null // randevu henüz geçmedi
 
-  // noteCount, son hatırlatmadan sonra kaçıncı temasta olduğumuzu gösterir.
-  // Şimdiye kadar yapılan temas sayısı schedule.length'e ulaştıysa -> soğuk, artık uyarma.
+  if (coldAfter != null && d >= coldAfter) return { level: 'cold', days: d }
   if (noteCount >= schedule.length) return { level: 'cold', days: d }
 
   const threshold = schedule[noteCount]
@@ -997,13 +1000,13 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
   )
 }
 
-function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMap }) {
+function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMap, ruleMap }) {
   const stale = useMemo(() =>
     leads
-      .map(l => ({ lead: l, s: staleness(l, noteCountMap[l.id] || 0) }))
+      .map(l => ({ lead: l, s: staleness(l, noteCountMap[l.id] || 0, ruleMap ? ruleMap[`${l.branch_id}__${l.result}`] : null) }))
       .filter(x => x.s && x.s.level !== 'cold')
       .sort((a, b) => b.s.days - a.s.days),
-    [leads, currentUserName, isStaff, noteCountMap])
+    [leads, currentUserName, isStaff, noteCountMap, ruleMap])
 
   if (stale.length === 0) return null
 
@@ -1027,7 +1030,159 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMa
   )
 }
 
-// Danışanın sonuç durumuna göre kişiselleştirilmiş WhatsApp mesaj şablonu üretir.
+const REMINDER_RULE_LABELS = {
+  'Randevuya gelmedi': { title: 'Randevuya Gelmedi', color: '#E24B4A' },
+  'Cevap yazıldı, müşteriden dönüş gelmedi': { title: 'Cevap Yazıldı, Dönüş Gelmedi', color: '#9CA3AF' },
+  'Satın almadı': { title: 'Satın Almadı', color: '#EF9F27' },
+  'Randevu aldı': { title: 'Randevu Aldı (hatırlatma)', color: '#1D9E75' },
+}
+const REMINDER_RULE_ORDER = ['Randevuya gelmedi', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Satın almadı', 'Randevu aldı']
+
+function OpportunitiesTab({ leads, noteCountMap, rules, ruleMap, canEditRules, isSuperAdmin, filterBranch, activeBranches, branchName, onSaveRule, canSeePhone, onOpenLead }) {
+  const [ruleBranchId, setRuleBranchId] = useState(
+    isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || '')) : null
+  )
+  const [editValues, setEditValues] = useState({})
+  const [savingKey, setSavingKey] = useState(null)
+
+  const opportunities = useMemo(() =>
+    leads
+      .map(l => ({ lead: l, s: staleness(l, noteCountMap[l.id] || 0, ruleMap[`${l.branch_id}__${l.result}`] || null) }))
+      .filter(x => x.s && x.s.level !== 'cold')
+      .sort((a, b) => {
+        if (a.s.level !== b.s.level) return a.s.level === 'critical' ? -1 : 1
+        return b.s.days - a.s.days
+      }),
+    [leads, noteCountMap, ruleMap])
+
+  const targetBranchId = isSuperAdmin ? ruleBranchId : (leads[0]?.branch_id || null)
+  const branchRules = rules.filter(r => r.branch_id === targetBranchId)
+
+  function fieldKey(ruleId, field) { return `${ruleId}__${field}` }
+  function getValue(rule, field) {
+    const k = fieldKey(rule.id, field)
+    return editValues[k] !== undefined ? editValues[k] : rule[field]
+  }
+  function setValue(rule, field, value) {
+    setEditValues(prev => ({ ...prev, [fieldKey(rule.id, field)]: value }))
+  }
+  async function saveRule(rule) {
+    setSavingKey(rule.id)
+    await onSaveRule({
+      id: rule.id,
+      day_1: Number(getValue(rule, 'day_1')) || 1,
+      day_2: Number(getValue(rule, 'day_2')) || 1,
+      day_3: Number(getValue(rule, 'day_3')) || 1,
+      cold_after: Number(getValue(rule, 'cold_after')) || 1,
+    })
+    setSavingKey(null)
+  }
+
+  return (
+    <div>
+      <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Fırsatlar</h1>
+      <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>Takip bekleyen danışanlar ve hatırlatma kuralları</p>
+
+      {/* AKSİYON LİSTESİ */}
+      <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '1.25rem', marginBottom: 24 }}>
+        <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 14px' }}>
+          🔥 {opportunities.length} danışan sizi bekliyor
+        </p>
+        {opportunities.length === 0 && (
+          <p style={{ fontSize: 13.5, color: T.textSoft }}>Şu anda takip bekleyen bir danışan yok, harika iş!</p>
+        )}
+        {opportunities.map(({ lead, s }) => {
+          const waUrl = buildWhatsappUrl(lead)
+          return (
+            <div key={lead.id} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10,
+              padding: '12px 0', borderTop: `1px solid ${T.border}`,
+            }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{lead.name}</div>
+                <div style={{ fontSize: 12.5, color: T.textSoft, marginTop: 2 }}>
+                  {canSeePhone ? lead.phone : '••• gizli'} · {lead.result}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{
+                  fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
+                  background: s.level === 'critical' ? '#FCEAEA' : '#FCF3E1',
+                  color: s.level === 'critical' ? '#E5615F' : '#E5A536',
+                }}>
+                  {s.days} gün önce · {s.reminderNumber}. temas
+                </span>
+                {waUrl && (
+                  <a href={waUrl} target="_blank" rel="noreferrer" style={{
+                    fontSize: 12.5, fontWeight: 600, color: '#1FAA6D', textDecoration: 'none',
+                    border: '1px solid #1FAA6D', borderRadius: 8, padding: '6px 10px',
+                  }}>WhatsApp</a>
+                )}
+                <button onClick={() => onOpenLead(lead)} style={{
+                  fontSize: 12.5, fontWeight: 600, color: '#fff', background: '#7C5CFC', border: 'none',
+                  borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+                }}>Not Ekle</button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* HATIRLATMA KURALLARI */}
+      <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+          <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>⚙️ Hatırlatma Kuralları</p>
+          {isSuperAdmin && (
+            <select value={ruleBranchId || ''} onChange={e => setRuleBranchId(e.target.value)}
+              style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13 }}>
+              {activeBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
+        </div>
+
+        {!canEditRules && <p style={{ fontSize: 12.5, color: T.textSoft, marginBottom: 10 }}>Bu kuralları sadece şube yöneticisi değiştirebilir.</p>}
+
+        {REMINDER_RULE_ORDER.map(resultKey => {
+          const rule = branchRules.find(r => r.result === resultKey)
+          if (!rule) return null
+          const meta = REMINDER_RULE_LABELS[resultKey]
+          return (
+            <div key={rule.id} style={{ padding: '12px 0', borderTop: `1px solid ${T.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: meta.color }} />
+                <span style={{ fontWeight: 600, fontSize: 13.5 }}>{meta.title}</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                {['day_1', 'day_2', 'day_3', 'cold_after'].map((field, i) => (
+                  <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <label style={{ fontSize: 10.5, color: T.textSoft }}>
+                      {i < 3 ? `${i + 1}. temas (gün)` : 'Soğuma (gün)'}
+                    </label>
+                    <input type="number" min={1} disabled={!canEditRules}
+                      value={getValue(rule, field)}
+                      onChange={e => setValue(rule, field, e.target.value)}
+                      style={{ width: 70, padding: '6px 8px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13 }} />
+                  </div>
+                ))}
+                {canEditRules && (
+                  <button onClick={() => saveRule(rule)} disabled={savingKey === rule.id} style={{
+                    alignSelf: 'flex-end', padding: '7px 14px', borderRadius: 8, border: 'none',
+                    background: '#7C5CFC', color: '#fff', fontWeight: 600, fontSize: 12.5,
+                    cursor: 'pointer', marginBottom: 1,
+                  }}>
+                    {savingKey === rule.id ? 'Kaydediliyor...' : 'Kaydet'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+
 // "Müşteri oldu" durumu kasıtlı olarak yok - zaten takip gerektirmeyen, sonuçlanmış bir durum.
 const WHATSAPP_TEMPLATES = {
   'Randevu aldı': (name, service) =>
@@ -1048,8 +1203,8 @@ function buildWhatsappUrl(lead) {
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
 }
 
-function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile, noteCount = 0 }) {
-  const s = staleness(lead, noteCount)
+function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile, noteCount = 0, rule = null }) {
+  const s = staleness(lead, noteCount, rule)
 
   if (isMobile) {
     return (
@@ -1914,6 +2069,7 @@ function PermissionTemplateManager({ isMobile }) {
 
 const NAV_ITEMS = [
   { key: 'overview', label: 'Genel Bakış', icon: <Home size={18} />, show: () => true },
+  { key: 'opportunities', label: 'Fırsatlar', icon: <Flame size={18} />, show: () => true },
   { key: 'clients', label: 'Danışanlar', icon: <Users size={18} />, show: () => true },
   { key: 'appointments', label: 'Randevular', icon: <CalendarDays size={18} />, show: perms => perms.can_see_calendar },
   { key: 'reports', label: 'Raporlar', icon: <BarChart3 size={18} />, show: perms => perms.can_see_revenue },
@@ -2450,6 +2606,7 @@ export function PanelApp() {
   const [branches, setBranches] = useState([])
   const [users, setUsers] = useState([])
   const [leads, setLeads] = useState([])
+  const [reminderRules, setReminderRules] = useState([])
   const [leadNotes, setLeadNotes] = useState([])
   const [adsData, setAdsData] = useState([])
   const [templates, setTemplates] = useState([])
@@ -2478,8 +2635,28 @@ export function PanelApp() {
       if (n.result_at_time && n.result_at_time !== lead.result) return
       map[n.lead_id] = (map[n.lead_id] || 0) + 1
     })
+    // Kayıt oluşturulurken zorunlu olarak eklenen ilk not, "1. temas" sayılmaz —
+    // sadece kaydı açmak için gereken bir not, gerçek bir takip/hatırlatma değil.
+    // Bu yüzden her lead için ham sayıdan 1 çıkarıyoruz (Seçenek A tasarım kararı).
+    Object.keys(map).forEach(id => { map[id] = Math.max(0, map[id] - 1) })
     return map
   }, [leadNotes, leads])
+
+  // branch_id + result -> rule objesi, hızlı erişim için.
+  const reminderRuleMap = useMemo(() => {
+    const m = {}
+    reminderRules.forEach(r => { m[`${r.branch_id}__${r.result}`] = r })
+    return m
+  }, [reminderRules])
+  function getReminderRule(lead) { return reminderRuleMap[`${lead.branch_id}__${lead.result}`] || null }
+
+  async function saveReminderRule(rule) {
+    const { data } = await supabase.from('reminder_rules').update({
+      day_1: rule.day_1, day_2: rule.day_2, day_3: rule.day_3, cold_after: rule.cold_after,
+      updated_at: new Date().toISOString(),
+    }).eq('id', rule.id).select()
+    if (data) setReminderRules(prev => prev.map(r => r.id === rule.id ? data[0] : r))
+  }
 
   function loginAndPersist(user) {
     setCurrentUser(user)
@@ -2525,14 +2702,15 @@ export function PanelApp() {
 
   async function loadAll() {
     setLoaded(false)
-    const [b, u, l, a, t, bs, ln] = await Promise.all([
+    const [b, u, l, a, t, bs, ln, rr] = await Promise.all([
       supabase.from('branches').select('*').order('name'),
       supabase.from('app_users').select('*'),
       supabase.from('leads').select('*').order('date', { ascending: false }),
       supabase.from('ads_data').select('*').order('date', { ascending: false }),
       supabase.from('permission_templates').select('*'),
       supabase.from('branch_services').select('*').order('name'),
-      supabase.from('lead_notes').select('*').order('created_at', { ascending: false })
+      supabase.from('lead_notes').select('*').order('created_at', { ascending: false }),
+      supabase.from('reminder_rules').select('*')
     ])
     setBranches(b.data || [])
     setUsers(u.data || [])
@@ -2541,6 +2719,7 @@ export function PanelApp() {
     setTemplates(t.data || [])
     setBranchServices(bs.data || [])
     setLeadNotes(ln.data || [])
+    setReminderRules(rr.data || [])
     if (b.data && b.data.length > 0) setAdsSelectedBranch(b.data[0].id)
     setLoaded(true)
 
@@ -2740,6 +2919,7 @@ export function PanelApp() {
     can_manage_users: currentUser.role === 'super_admin' || currentUser.role === 'admin',
     can_manage_branches: currentUser.role === 'super_admin' || currentUser.role === 'admin',
     can_enter_ads_data: currentUser.role === 'super_admin' || currentUser.role === 'admin',
+    can_edit_reminder_rules: currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'manager',
     can_export_data: currentUser.role === 'super_admin',
     can_see_calendar: true
   }
@@ -2840,7 +3020,7 @@ export function PanelApp() {
             <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>
               {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
             </p>
-            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} />
+            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} ruleMap={reminderRuleMap} />
 
 <div style={{
   display: 'grid',
@@ -2916,6 +3096,23 @@ export function PanelApp() {
           </div>
                )}
 
+        {activeTab === 'opportunities' && (
+          <OpportunitiesTab
+            leads={visibleLeads}
+            noteCountMap={noteCountByLeadId}
+            rules={reminderRules}
+            ruleMap={reminderRuleMap}
+            canEditRules={perms.can_edit_reminder_rules}
+            isSuperAdmin={isSuperAdmin}
+            filterBranch={filterBranch}
+            activeBranches={activeBranches}
+            branchName={branchName}
+            onSaveRule={saveReminderRule}
+            canSeePhone={perms.can_see_phone}
+            onOpenLead={(lead) => { setEditingLead(lead); setActiveTab('clients') }}
+          />
+        )}
+
         {activeTab === 'clients' && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Danışanlar</h1>
@@ -2961,7 +3158,7 @@ export function PanelApp() {
                   )}
                   {visibleLeads.map(l => (
                     <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
-                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} isMobile={isMobile} noteCount={noteCountByLeadId[l.id] || 0} />
+                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} isMobile={isMobile} noteCount={noteCountByLeadId[l.id] || 0} rule={reminderRuleMap[`${l.branch_id}__${l.result}`] || null} />
                   ))}
                 </div>
               )}
