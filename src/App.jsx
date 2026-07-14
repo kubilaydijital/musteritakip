@@ -8,7 +8,7 @@ import {
 import {
   MessageCircle, CalendarDays, UserRound, ShoppingCart, TrendingUp, Wallet,
   Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
-  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Download
+  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Download, Camera, X, Check, Loader2
 } from 'lucide-react'
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
@@ -94,7 +94,7 @@ function ExportButtons({ rows, baseFilename, sheetName }) {
   )
 }
 
-const CHANNELS = ['Instagram', 'WhatsApp', 'Telefon', 'Google Ads', 'Facebook Ads', 'TikTok', 'Online Randevu', 'Organik']
+const CHANNELS = ['Instagram', 'WhatsApp', 'Telefon', 'Google Ads', 'Facebook Ads', 'TikTok', 'Online Randevu', 'Organik', 'Kağıt Not']
 const RESULTS = ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
 const OPEN_RESULTS = []
 const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D', 'Satın almadı': '#854F0B', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#6B6B6B', 'Müşteri oldu': '#3B6D11' }
@@ -437,6 +437,181 @@ function NoteHistory({ notes }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// Kağıda elle yazılmış görüşme notlarının fotoğrafını çekip AI ile okutan ve
+// kullanıcı onayından sonra danışan kaydı olarak ekleyen bileşen.
+// Not: veriyi asla otomatik kaydetmez — her satır kullanıcı gözden geçirip
+// "Kaydet" demeden veritabanına yazılmaz.
+const RESULT_OPTIONS = ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
+
+function PhotoScanCapture({ onAdd, currentUser, services, targetBranchId }) {
+  const fileInputRef = useRef(null)
+  const [scanning, setScanning] = useState(false)
+  const [scanErr, setScanErr] = useState('')
+  const [entries, setEntries] = useState(null) // null: henüz taranmadı, []: taramada kayıt yok
+  const [savingIndex, setSavingIndex] = useState(null)
+  const [savedIndexes, setSavedIndexes] = useState([])
+
+  function openCamera() {
+    setScanErr('')
+    fileInputRef.current?.click()
+  }
+
+  function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setScanning(true)
+    setScanErr('')
+    setEntries(null)
+    setSavedIndexes([])
+
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        const res = await fetch('/.netlify/functions/scan-note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: reader.result, mimeType: file.type || 'image/jpeg' }),
+        })
+        const data = await res.json()
+        if (res.ok && Array.isArray(data.entries)) {
+          setEntries(data.entries.map(en => ({ ...en, phone: en.phone || '+90' })))
+        } else {
+          setScanErr(data.error === 'AI servisi boş yanıt döndürdü' || data.error === 'AI yanıtı geçerli JSON değil'
+            ? 'Fotoğraf okunamadı, lütfen daha net bir fotoğraf ile tekrar deneyin.'
+            : 'Tarama başarısız oldu, lütfen tekrar deneyin.')
+        }
+      } catch {
+        setScanErr('Tarama başarısız oldu, lütfen tekrar deneyin.')
+      }
+      setScanning(false)
+    }
+    reader.onerror = () => { setScanErr('Fotoğraf okunamadı.'); setScanning(false) }
+    reader.readAsDataURL(file)
+    e.target.value = '' // aynı fotoğrafı tekrar seçebilmek için input'u sıfırla
+  }
+
+  function updateEntry(i, field, value) {
+    setEntries(prev => prev.map((en, idx) => idx === i ? { ...en, [field]: value } : en))
+  }
+
+  async function saveEntry(i) {
+    const en = entries[i]
+    if (!en.name || !en.name.trim()) return
+    if (!PHONE_RE.test((en.phone || '').trim())) return
+
+    setSavingIndex(i)
+    await onAdd({
+      id: uid(),
+      branch_id: targetBranchId,
+      name: en.name.trim(),
+      phone: en.phone.trim(),
+      channel: 'Diğer',
+      service: services && services[0] ? services[0].name : '',
+      note: en.note && en.note.trim() ? en.note.trim() : 'Kağıt defterden fotoğrafla tarandı.',
+      result: en.result,
+      date: new Date().toISOString(),
+      entered_by: currentUser.full_name || currentUser.email,
+    })
+    setSavingIndex(null)
+    setSavedIndexes(prev => [...prev, i])
+  }
+
+  function reset() {
+    setEntries(null)
+    setScanErr('')
+    setSavedIndexes([])
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <style>{'@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'}</style>
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: 'none' }} />
+
+      {!entries && !scanning && (
+        <button onClick={openCamera} style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10,
+          border: '1px solid #7C5CFC', background: '#F3F0FF', color: '#6743F0', fontWeight: 600,
+          fontSize: 13.5, cursor: 'pointer',
+        }}>
+          <Camera size={16} /> Kağıttan Fotoğrafla Ekle
+        </button>
+      )}
+
+      {scanning && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#6743F0', fontSize: 13.5, padding: '10px 0' }}>
+          <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} /> Fotoğraf okunuyor, birkaç saniye sürebilir...
+        </div>
+      )}
+
+      {scanErr && (
+        <div style={{ color: '#E5615F', fontSize: 13, marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {scanErr}
+          <button onClick={openCamera} style={{ color: '#6743F0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}>Tekrar Dene</button>
+        </div>
+      )}
+
+      {entries && entries.length === 0 && (
+        <div style={{ fontSize: 13, color: '#8A8794', marginTop: 8 }}>
+          Fotoğrafta okunabilir bir kayıt bulunamadı.
+          <button onClick={reset} style={{ marginLeft: 8, color: '#6743F0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kapat</button>
+        </div>
+      )}
+
+      {entries && entries.length > 0 && (
+        <div style={{ marginTop: 12, border: '1px solid #EFEEEC', borderRadius: 14, padding: 14, background: '#FAFAF9' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontWeight: 700, fontSize: 13.5 }}>Taranan Kayıtlar ({entries.length})</span>
+            <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8A8794' }}><X size={16} /></button>
+          </div>
+          {entries.map((en, i) => {
+            const isSaved = savedIndexes.includes(i)
+            const phoneValid = PHONE_RE.test((en.phone || '').trim())
+            return (
+              <div key={i} style={{
+                display: 'flex', flexDirection: 'column', gap: 6, padding: 10, marginBottom: 8,
+                borderRadius: 10, background: '#fff', border: '1px solid #EFEEEC', opacity: isSaved ? 0.55 : 1,
+              }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input value={en.name} disabled={isSaved} onChange={e => updateEntry(i, 'name', e.target.value)}
+                    placeholder="Ad Soyad" style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid #EFEEEC', fontSize: 13 }} />
+                  {en.confidence === 'low' && !isSaved && (
+                    <span style={{ fontSize: 10.5, background: '#FCF3E1', color: '#E5A536', padding: '3px 8px', borderRadius: 6, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      Kontrol et
+                    </span>
+                  )}
+                </div>
+                <input value={en.phone} disabled={isSaved} onChange={e => updateEntry(i, 'phone', e.target.value)}
+                  placeholder="+905XXXXXXXXX" style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${phoneValid || !en.phone ? '#EFEEEC' : '#E5615F'}`, fontSize: 13 }} />
+                <select value={en.result} disabled={isSaved} onChange={e => updateEntry(i, 'result', e.target.value)}
+                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #EFEEEC', fontSize: 13 }}>
+                  {RESULT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+                <input value={en.note} disabled={isSaved} onChange={e => updateEntry(i, 'note', e.target.value)}
+                  placeholder="Not (isteğe bağlı)" style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #EFEEEC', fontSize: 13 }} />
+                {isSaved ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#1FAA6D', fontSize: 12.5, fontWeight: 600 }}>
+                    <Check size={14} /> Kaydedildi
+                  </div>
+                ) : (
+                  <button onClick={() => saveEntry(i)} disabled={!en.name.trim() || !phoneValid || savingIndex === i}
+                    style={{
+                      padding: '8px 12px', borderRadius: 8, border: 'none',
+                      background: (!en.name.trim() || !phoneValid) ? '#EAE4FF' : '#7C5CFC',
+                      color: (!en.name.trim() || !phoneValid) ? '#B4B1BC' : '#fff',
+                      fontWeight: 600, fontSize: 13, cursor: (!en.name.trim() || !phoneValid) ? 'not-allowed' : 'pointer',
+                    }}>
+                    {savingIndex === i ? 'Kaydediliyor...' : 'Bu Kaydı Ekle'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -2744,6 +2919,11 @@ export function PanelApp() {
         {activeTab === 'clients' && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Danışanlar</h1>
+            {perms.can_add_lead && (
+              <PhotoScanCapture onAdd={addLead} currentUser={currentUser} services={currentBranchServices}
+                targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
+              />
+            )}
             {perms.can_add_lead && (
               <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices} isMobile={isMobile}
                 targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
