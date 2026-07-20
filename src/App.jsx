@@ -381,24 +381,43 @@ function Login({ onLogin }) {
 }
 
 const TRIAL_CONTACT_EMAIL = 'info@musteritakip.net'
+const TRIAL_CONTACT_WHATSAPP = '905336153445'
+const TRIAL_PRICE_TEXT = '5.000 TL + KDV / ay'
 
-function TrialExpired({ onLogout, trialEndsAt }) {
+function TrialExpired({ onLogout, trialEndsAt, businessName }) {
   const endedDate = trialEndsAt ? new Date(trialEndsAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null
+  const waMessage = `Merhaba, ${businessName ? businessName + ' için ' : ''}Müşteri Takip ödemesini yapmak istiyorum.`
+  const waUrl = `https://wa.me/${TRIAL_CONTACT_WHATSAPP}?text=${encodeURIComponent(waMessage)}`
 
   return (
-    <div style={{ maxWidth: 420, margin: '4rem auto', padding: '2rem', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
+    <div style={{ maxWidth: 440, margin: '3rem auto', padding: '2rem', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
       <p style={{ fontSize: 40, margin: '0 0 12px' }}>⏰</p>
       <p style={{ fontSize: 19, fontWeight: 700, margin: '0 0 10px', color: T.text }}>7 günlük deneme süreniz doldu</p>
       <p style={{ fontSize: 14, color: T.textSoft, lineHeight: 1.6, margin: '0 0 4px' }}>
         {endedDate ? `Deneme süreniz ${endedDate} tarihinde sona erdi.` : 'Deneme süreniz sona erdi.'}
       </p>
-      <p style={{ fontSize: 14, color: T.textSoft, lineHeight: 1.6, margin: '0 0 26px' }}>
-        Verileriniz güvende — kullanmaya devam etmek için bizimle iletişime geçin.
+      <p style={{ fontSize: 14, color: T.textSoft, lineHeight: 1.6, margin: '0 0 22px' }}>
+        Verileriniz güvende — kullanmaya devam etmek için bizimle WhatsApp'tan iletişime geçin, size fatura ve ödeme bilgilerini ileteceğiz.
       </p>
+
+      <div style={{ background: '#F3F0FF', border: `1px solid ${T.primary}`, borderRadius: 12, padding: '16px', marginBottom: 18 }}>
+        <p style={{ fontSize: 12.5, color: T.textSoft, margin: '0 0 4px' }}>Aylık ücret</p>
+        <p style={{ fontSize: 17, fontWeight: 700, color: T.text, margin: 0 }}>{TRIAL_PRICE_TEXT}</p>
+      </div>
+
+      <a href={waUrl} target="_blank" rel="noreferrer" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px',
+        borderRadius: 10, background: '#1FAA6D', color: '#fff', fontWeight: 700, fontSize: 14.5,
+        textDecoration: 'none', marginBottom: 12, boxSizing: 'border-box',
+      }}>
+        💬 WhatsApp'tan İletişime Geç
+      </a>
+
       <a href={`mailto:${TRIAL_CONTACT_EMAIL}?subject=${encodeURIComponent('Deneme Süresi Doldu - Devam Etmek İstiyorum')}`} style={{
-        display: 'block', width: '100%', padding: '12px', borderRadius: 10, background: T.primary,
-        color: '#fff', fontWeight: 600, fontSize: 14, textDecoration: 'none', marginBottom: 18, boxSizing: 'border-box'
-      }}>{TRIAL_CONTACT_EMAIL}</a>
+        display: 'block', width: '100%', padding: '12px', borderRadius: 10, background: '#fff', border: `1px solid ${T.border}`,
+        color: T.text, fontWeight: 600, fontSize: 13.5, textDecoration: 'none', marginBottom: 18, boxSizing: 'border-box'
+      }}>ya da e-posta gönderin</a>
+
       <button onClick={onLogout} style={{
         background: 'none', border: 'none', color: T.textFaint, fontSize: 13, cursor: 'pointer', textDecoration: 'underline'
       }}>Çıkış yap</button>
@@ -1607,6 +1626,70 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
     </div>
   )
 }
+// Süper admin için: hangi işletmenin denemesinin ne zaman dolacağını/dolduğunu gösterir,
+// ödeme onaylandığında tek tıkla 30 gün uzatma imkanı sunar.
+function SubscriptionManager({ users, branches, onExtend, onGrantUnlimited }) {
+  const [busyId, setBusyId] = useState(null)
+  function branchNameFor(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
+
+  // Sadece admin/manager rolündeki (işletme sahibi/yöneticisi sayılan) kullanıcıları göster —
+  // her şubenin personeli değil, faturalandırılan asıl hesap sahiplerini listelemek yeterli.
+  const billable = users.filter(u => u.role === 'admin' || u.role === 'manager')
+    .sort((a, b) => {
+      const aEnd = a.trial_ends_at ? new Date(a.trial_ends_at).getTime() : Infinity
+      const bEnd = b.trial_ends_at ? new Date(b.trial_ends_at).getTime() : Infinity
+      return aEnd - bEnd
+    })
+
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '1.25rem', marginBottom: 20 }}>
+      <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 4px' }}>💳 Abonelik Yönetimi</p>
+      <p style={{ fontSize: 12.5, color: T.textSoft, margin: '0 0 14px' }}>Ödeme bildirimi geldiğinde ilgili işletmenin süresini uzat.</p>
+      {billable.length === 0 && <p style={{ fontSize: 13, color: T.textSoft }}>Henüz faturalandırılan bir hesap yok.</p>}
+      {billable.map(u => {
+        const isExpired = u.is_trial && u.trial_ends_at && new Date(u.trial_ends_at) < new Date()
+        const isUnlimited = !u.is_trial
+        return (
+          <div key={u.id} style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10,
+            padding: '11px 0', borderTop: `1px solid ${T.border}`,
+          }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{branchNameFor(u.branch_id)}</div>
+              <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>
+                {u.full_name || u.email}
+                {isUnlimited && <span style={{ marginLeft: 8, color: '#1FAA6D', fontWeight: 600 }}>· Sınırsız erişim</span>}
+                {!isUnlimited && u.trial_ends_at && (
+                  <span style={{ marginLeft: 8, color: isExpired ? '#E5615F' : T.textSoft, fontWeight: isExpired ? 700 : 400 }}>
+                    · {isExpired ? 'Süresi doldu: ' : 'Bitiş: '}{new Date(u.trial_ends_at).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
+            </div>
+            {!isUnlimited && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={async () => { setBusyId(u.id); await onExtend(u.id, u.trial_ends_at); setBusyId(null) }}
+                  disabled={busyId === u.id} style={{
+                    fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#7C5CFC', border: 'none',
+                    borderRadius: 8, padding: '7px 14px', cursor: 'pointer',
+                  }}>
+                  {busyId === u.id ? '...' : '+30 Gün Uzat'}
+                </button>
+                <button onClick={async () => { setBusyId(u.id); await onGrantUnlimited(u.id); setBusyId(null) }}
+                  disabled={busyId === u.id} style={{
+                    fontSize: 12.5, fontWeight: 600, color: T.textSoft, background: '#fff', border: `1px solid ${T.border}`,
+                    borderRadius: 8, padding: '7px 12px', cursor: 'pointer',
+                  }}>Sınırsız Yap</button>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+
 function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeName, onChangeEmail, branches, templates, isMobile, currentUserId }) {
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -2783,6 +2866,21 @@ export function PanelApp() {
     const { data } = await supabase.from('app_users').update({ active: newActive }).eq('id', userId).select()
     if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
   }
+  // Ödeme bildirimi onaylandığında (WhatsApp/e-posta üzerinden manuel kontrol sonrası),
+  // süper admin bu fonksiyonla kullanıcının erişimini 30 gün daha uzatır.
+  // Mevcut bitiş tarihi hâlâ ileride bir tarihse (erken ödeme yapıldıysa) o tarihten,
+  // geçmişte kaldıysa bugünden itibaren 30 gün eklenir.
+  async function extendTrial(userId, currentTrialEndsAt) {
+    const base = currentTrialEndsAt && new Date(currentTrialEndsAt) > new Date() ? new Date(currentTrialEndsAt) : new Date()
+    const newEnd = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    const { data } = await supabase.from('app_users').update({ is_trial: true, trial_ends_at: newEnd }).eq('id', userId).select()
+    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
+  }
+  // Kalıcı olarak sınırsız erişim tanımak istersen (örn. özel anlaşma), is_trial'ı kapatır.
+  async function grantUnlimitedAccess(userId) {
+    const { data } = await supabase.from('app_users').update({ is_trial: false, trial_ends_at: null }).eq('id', userId).select()
+    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
+  }
   async function addUser(user) {
     // Kullanıcı oluşturma admin API gerektirdiği için (service role key), bu işlem
     // güvenli sunucu tarafında (Netlify Function) yapılıyor, tarayıcıda değil.
@@ -2904,8 +3002,10 @@ export function PanelApp() {
   if (!loaded) return <p style={{ padding: 40, fontFamily: 'system-ui' }}>Yükleniyor...</p>
 
   // Deneme süresi dolmuşsa panele hiç erişilmesin, sadece bilgi ekranı gösterilsin.
-  if (currentUser.is_trial && currentUser.trial_ends_at && new Date(currentUser.trial_ends_at) < new Date()) {
-    return <TrialExpired onLogout={logoutAndClear} trialEndsAt={currentUser.trial_ends_at} />
+  // Süper admin (sistemin sahibi) hiçbir zaman deneme kilidine takılmaz.
+  if (currentUser.role !== 'super_admin' && currentUser.is_trial && currentUser.trial_ends_at && new Date(currentUser.trial_ends_at) < new Date()) {
+    const myBranch = branches.find(b => b.id === currentUser.branch_id)
+    return <TrialExpired onLogout={logoutAndClear} trialEndsAt={currentUser.trial_ends_at} businessName={myBranch?.name} />
   }
 
   // Geriye dönük uyumluluk: izin objesi yoksa (eski veri) role alanına göre varsayılan izinler uygula
@@ -3231,6 +3331,7 @@ export function PanelApp() {
         {activeTab === 'admin' && isSuperAdmin && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Yönetim</h1>
+            <SubscriptionManager users={users} branches={branches} onExtend={extendTrial} onGrantUnlimited={grantUnlimitedAccess} />
             <PermissionTemplateManager isMobile={isMobile} />
             <SecurityNotice isAdmin={isSuperAdmin} />
           </div>
