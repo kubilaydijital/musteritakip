@@ -1696,6 +1696,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
   const [newFullName, setNewFullName] = useState('')
   const [newBranchId, setNewBranchId] = useState(branches[0]?.id || '')
   const [newTemplateId, setNewTemplateId] = useState('')
+  const [newTrialDays, setNewTrialDays] = useState(7)
   const [addErr, setAddErr] = useState('')
   const [editingPwFor, setEditingPwFor] = useState(null)
   const [editingNameFor, setEditingNameFor] = useState(null)
@@ -1718,7 +1719,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
       return
     }
     try {
-      await onAdd({ email: newEmail.trim(), password: newPassword.trim(), full_name: newFullName.trim() || null, branch_id: newBranchId, permission_template_id: newTemplateId, active: true })
+      await onAdd({ email: newEmail.trim(), password: newPassword.trim(), full_name: newFullName.trim() || null, branch_id: newBranchId, permission_template_id: newTemplateId, active: true, trial_days: newTrialDays })
       setNewEmail(''); setNewPassword(''); setNewFullName('')
     } catch (err) {
       setAddErr(err.message || 'Kullanıcı oluşturulamadı, lütfen tekrar deneyin.')
@@ -1838,6 +1839,14 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
             <select value={newTemplateId} onChange={e => setNewTemplateId(e.target.value)} style={inputStyle}>
               <option value="">İzin şablonu seç...</option>
               {nonSuperAdminTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600, display: 'block', marginBottom: 4 }}>Deneme Süresi</label>
+            <select value={newTrialDays} onChange={e => setNewTrialDays(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 220 }}>
+              <option value={7}>7 gün (varsayılan)</option>
+              <option value={14}>14 gün</option>
+              <option value={30}>30 gün</option>
             </select>
           </div>
           {addErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{addErr}</p>}
@@ -2894,6 +2903,7 @@ export function PanelApp() {
         branch_id: user.branch_id,
         role: user.role || 'staff',
         permission_template_id: user.permission_template_id,
+        trial_days: user.trial_days,
       }),
     })
     const result = await res.json()
