@@ -10,6 +10,7 @@ export const LOCATION = 'İzmir / Türkiye'
 export const navItems = [
   { to: '/', label: 'Ana Sayfa' },
   { to: '/ozellikler', label: 'Özellikler' },
+  { to: '/fiyatlar', label: 'Fiyatlar' },
   { to: '/referanslar', label: 'Referanslar' },
   { to: '/hakkimizda', label: 'Hakkımızda' },
   { to: '/blog', label: 'Blog' },
