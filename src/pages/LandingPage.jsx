@@ -3,6 +3,7 @@ import { CheckCircle2, ArrowRight, Mail, Monitor, Smartphone, ShieldCheck, Messa
 import Layout from '../components/Layout.jsx'
 import DashboardMock, { MobileReminderMock } from '../components/DashboardMock.jsx'
 import AdsFunnelGraphic from '../components/AdsFunnelGraphic.jsx'
+import dashboardPreview from '../assets/dashboard-preview.png'
 import ReferenceLogo from '../components/ReferenceLogo.jsx'
 import ReminderTable from '../components/ReminderTable.jsx'
 import { features, references } from '../data/siteData.js'
@@ -30,7 +31,16 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="nasil-calisiyor" className="container references-strip">
+        <section id="nasil-calisiyor" className="container product-preview">
+          <span className="eyebrow"><span></span>Gerçek panel görüntüsü</span>
+          <h2>İlk kez reklamdan satışa kadar<br/><strong>tüm süreci tek panelden görün.</strong></h2>
+          <div className="browser-frame">
+            <div className="browser-bar"><span></span><span></span><span></span></div>
+            <img src={dashboardPreview} alt="Müşteri Takip panel — Genel Bakış ekranı" />
+          </div>
+        </section>
+
+        <section className="container references-strip">
           <p>Bize güvenen işletmeler</p>
           <div className="reference-row">{references.map((item) => <ReferenceLogo key={item.name} item={item} />)}</div>
         </section>
@@ -89,7 +99,7 @@ export default function LandingPage() {
             <span className="booking-badge"><span></span>Yeni özellik</span>
             <h2>Müşterileriniz artık sizi aramadan<br/><strong>randevu alabilir.</strong></h2>
             <p>Kendi randevu sayfanızla, müşterileriniz 7/24 size uygun saati görüp anında randevu oluşturabilir. Siz hiçbir şey yapmadan, panel otomatik dolar.</p>
-            <Link to="/deneme" className="btn btn-primary big">Ücretsiz 7 Gün Dene <ArrowRight size={18}/></Link>
+            <a href="https://wa.me/905336153445?text=Merhaba%2C%20M%C3%BC%C5%9Fteri%20Takip%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noreferrer" className="btn btn-primary big">Ücretsiz Canlı Demo Planla <ArrowRight size={18}/></a>
           </div>
           <div className="booking-mock">
             <p className="booking-mock-title">İşletmeniz</p>
@@ -111,7 +121,7 @@ export default function LandingPage() {
           <DashboardMock compact />
         </section>
 
-        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz deneyebilir veya bize ulaşabilirsiniz.</p><div><Link to="/deneme" className="btn btn-primary big">Ücretsiz 7 Gün Dene</Link><Link to="/iletisim" className="btn btn-ghost big">Bize Ulaşın</Link></div></section>
+        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz bir canlı demo planlayın.</p><div><a href="https://wa.me/905336153445?text=Merhaba%2C%20M%C3%BC%C5%9Fteri%20Takip%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noreferrer" className="btn btn-primary big">Ücretsiz Canlı Demo Planla</a></div></section>
       </main>
     </Layout>
   )
