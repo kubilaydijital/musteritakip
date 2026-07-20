@@ -22,11 +22,16 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Geçersiz istek gövdesi' }) }
   }
 
-  const { email, password, full_name, branch_id, role, permission_template_id } = payload
+  const { email, password, full_name, branch_id, role, permission_template_id, trial_days } = payload
 
   if (!email || !password) {
     return { statusCode: 400, body: JSON.stringify({ error: 'E-posta ve şifre gerekli' }) }
   }
+
+  // Panelden açılan hesaplar da (self-servis kayıt gibi) varsayılan olarak deneme süresiyle başlar.
+  // trial_days gönderilmezse varsayılan 7 gün; admin panelden 14 veya 30 gün de seçebilir.
+  const days = Number.isFinite(Number(trial_days)) && Number(trial_days) > 0 ? Number(trial_days) : 7
+  const trialEndsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
 
   try {
     // 1) Supabase Auth admin API ile kullanıcı oluştur (email_confirm: true -> doğrulama beklemeden aktif)
@@ -68,8 +73,8 @@ export async function handler(event) {
         branch_id: branch_id || null,
         role: role || 'staff',
         permission_template_id: permission_template_id || null,
-        is_trial: false,
-        trial_ends_at: null,
+        is_trial: true,
+        trial_ends_at: trialEndsAt,
       }),
     })
 
