@@ -5,6 +5,7 @@ import './styles.css'
 import ScrollToTop from './components/ScrollToTop.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import Features from './pages/Features.jsx'
+import Fiyatlar from './pages/Fiyatlar.jsx'
 import References from './pages/References.jsx'
 import About from './pages/About.jsx'
 import Blog from './pages/Blog.jsx'
@@ -23,6 +24,7 @@ createRoot(document.getElementById('root')).render(
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/ozellikler" element={<Features />} />
+        <Route path="/fiyatlar" element={<Fiyatlar />} />
         <Route path="/referanslar" element={<References />} />
         <Route path="/hakkimizda" element={<About />} />
         <Route path="/blog" element={<Blog />} />
