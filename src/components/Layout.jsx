@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Mail, MapPin } from 'lucide-react'
+import { Mail, MapPin, MessageCircle } from 'lucide-react'
 import Logo from './Logo.jsx'
 import { EMAIL, LOCATION, navItems } from '../data/siteData.js'
+
+const WHATSAPP_URL = 'https://wa.me/905336153445?text=Merhaba%2C%20M%C3%BC%C5%9Fteri%20Takip%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum.'
 
 export function Header() {
   const [open, setOpen] = useState(false)
@@ -17,7 +19,7 @@ export function Header() {
         </nav>
         <div className="header-actions desktop-actions">
           <Link className="btn btn-ghost" to="/giris">Giriş Yap</Link>
-          <Link className="btn btn-primary" to="/deneme">Ücretsiz 7 Gün Dene</Link>
+          <a className="btn btn-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Ücretsiz Canlı Demo Planla</a>
         </div>
         <button className="menu-button" onClick={() => setOpen(!open)} aria-label="Menüyü aç/kapat">☰</button>
       </div>
@@ -27,7 +29,7 @@ export function Header() {
             <NavLink key={item.to} to={item.to} onClick={() => setOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>{item.label}</NavLink>
           ))}
           <Link className="btn btn-ghost" to="/giris" onClick={() => setOpen(false)}>Giriş Yap</Link>
-          <Link className="btn btn-primary" to="/deneme" onClick={() => setOpen(false)}>Ücretsiz 7 Gün Dene</Link>
+          <a className="btn btn-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>Ücretsiz Canlı Demo Planla</a>
         </div>
       )}
     </header>
@@ -36,31 +38,23 @@ export function Header() {
 
 export function Footer() {
   return (
-    <footer className="site-footer">
-      <div className="container footer-grid">
-        <div>
+    <footer className="site-footer site-footer-slim">
+      <div className="container footer-grid-slim">
+        <div className="footer-slim-brand">
           <Logo small />
-          <p className="footer-text">Hizmet sektöründeki işletmeler için akıllı müşteri takip, randevu ve hatırlatma sistemi.</p>
+          <span>Reklamdan satışa kadar tüm süreci tek panelden görün.</span>
         </div>
-        <div>
-          <h4>Hızlı Linkler</h4>
+        <nav className="footer-slim-links">
           {navItems.map((item) => <Link key={item.to} to={item.to}>{item.label}</Link>)}
-        </div>
-        <div>
-          <h4>Özellikler</h4>
-          <Link to="/ozellikler">Randevu Yönetimi</Link>
-          <Link to="/ozellikler">Hatırlatma Uyarıları</Link>
-          <Link to="/ozellikler">Müşteri Takibi</Link>
-          <Link to="/ozellikler">Reklam Kaynak Takibi</Link>
-        </div>
-        <div>
-          <h4>İletişim</h4>
-          <a href={`mailto:${EMAIL}`}><Mail size={15} /> {EMAIL}</a>
-          <span className="footer-contact"><MapPin size={15} /> {LOCATION}</span>
-          <Link className="btn btn-primary footer-cta" to="/deneme">Ücretsiz 7 Gün Dene</Link>
-        </div>
+          <Link to="/gizlilik-politikasi">Gizlilik</Link>
+          <Link to="/kullanim-sartlari">Şartlar</Link>
+        </nav>
+        <a className="btn btn-primary footer-slim-cta" href={WHATSAPP_URL} target="_blank" rel="noreferrer"><MessageCircle size={15} /> Demo Planla</a>
       </div>
-      <div className="container footer-bottom">© 2026 Müşteri Takip. Tüm hakları saklıdır.</div>
+      <div className="container footer-bottom">
+        <span>© 2026 Müşteri Takip. Tüm hakları saklıdır.</span>
+        <span className="footer-bottom-contact"><Mail size={13}/> {EMAIL} · <MapPin size={13}/> {LOCATION}</span>
+      </div>
     </footer>
   )
 }
