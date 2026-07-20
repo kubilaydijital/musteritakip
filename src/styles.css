@@ -72,3 +72,17 @@
   .pricing-faq-grid{grid-template-columns:1fr}
   .pricing-roi{flex-direction:column;text-align:center}
 }
+
+/* Hero akış grafiği (Meta -> Kayıt -> Randevu -> Satış) */
+.funnel-card{background:#fff;border:1px solid rgba(124,92,255,.18);border-radius:24px;padding:32px 26px;box-shadow:0 24px 60px rgba(124,92,255,.14)}
+.funnel-steps{display:flex;flex-direction:column;align-items:center;gap:2px}
+.funnel-step{display:flex;flex-direction:column;align-items:center;width:100%}
+.funnel-step-box{width:100%;background:#faf9fc;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:14px 16px;text-align:center}
+.funnel-step-value{display:block;font-size:26px;font-weight:900;color:var(--text);letter-spacing:-.01em}
+.funnel-step-label{display:block;font-size:12.5px;font-weight:700;color:var(--purple);margin-top:2px}
+.funnel-step-sub{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+.funnel-arrow{color:var(--purple);font-size:16px;font-weight:900;margin:2px 0}
+.funnel-total{margin-top:10px;padding-top:16px;border-top:1px dashed rgba(124,92,255,.25);text-align:center}
+.funnel-total span{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:4px}
+.funnel-total b{font-size:32px;font-weight:900;color:var(--purple)}
+.funnel-caption{margin:14px 0 0;font-size:11px;color:var(--faint);text-align:center;line-height:1.5}
