@@ -14,6 +14,14 @@ const INCLUDED = [
   '1 şube, 5 kullanıcıya kadar',
 ]
 
+const SETUP_INCLUDED = [
+  'İşletmenize özel sistem kurulumu',
+  'Meta reklam bağlantısı',
+  'WhatsApp şablonlarının hazırlanması',
+  'Personel hesaplarının oluşturulması',
+  'Yönetici eğitimi',
+]
+
 const AUDIENCE = ['Güzellik Merkezi', 'Kuaför', 'Klinik', 'Diyetisyen', 'Danışmanlık']
 
 export default function Fiyatlar() {
@@ -32,13 +40,19 @@ export default function Fiyatlar() {
             <span className="pricing-badge">Tek Seferlik</span>
             <h3>İşletme Başlangıç Paketi</h3>
             <div className="pricing-amount"><b>3.000</b><span>TL + KDV</span></div>
-            <p className="pricing-desc">İşletmenize özel kurulum, entegrasyon ve ekip eğitimi.<br /><small>Reklam hesaplarının bağlanması, kullanıcı oluşturma ve sistemin devreye alınması.</small></p>
+            <p className="pricing-desc"><b>İşletmeniz kullanıma hazır hâle getirilir.</b></p>
+            <ul className="pricing-list pricing-list-setup">
+              {SETUP_INCLUDED.map(item => (
+                <li key={item}><Check size={15} /> {item}</li>
+              ))}
+            </ul>
           </div>
 
           <div className="pricing-card pricing-card-main">
             <span className="pricing-badge pricing-badge-primary"><Sparkles size={13} /> En Çok Tercih Edilen</span>
             <h3>Profesyonel Plan</h3>
             <div className="pricing-amount pricing-amount-big"><b>3.500</b><span>TL + KDV / ay</span></div>
+            <p className="pricing-diff">Meta reklamlarından gelen müşterilerin satışa dönüşümünü tek panelden takip edin.</p>
             <p className="pricing-desc">Reklamdan gelen talepleri, görüşmeleri, randevuları ve satış dönüşümünü tek panelden yönetin.</p>
             <ul className="pricing-list">
               {INCLUDED.map(item => (
@@ -49,6 +63,7 @@ export default function Fiyatlar() {
               <MessageCircle size={18} /> Ücretsiz Canlı Demo Planla
             </a>
             <p className="pricing-trial-note">İlk 7 gün ücretsiz deneyin. Memnun kalırsanız aboneliğiniz başlar.</p>
+            <p className="pricing-trust-line">Kredi kartı gerekmez • İstediğiniz zaman iptal edebilirsiniz</p>
           </div>
         </section>
 
