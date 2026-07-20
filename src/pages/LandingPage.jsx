@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { CheckCircle2, ArrowRight, Mail, Monitor, Smartphone, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, ArrowRight, Mail, Monitor, Smartphone, ShieldCheck, MessageCircle, ChevronDown } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
 import DashboardMock, { MobileReminderMock } from '../components/DashboardMock.jsx'
+import AdsFunnelGraphic from '../components/AdsFunnelGraphic.jsx'
 import ReferenceLogo from '../components/ReferenceLogo.jsx'
 import ReminderTable from '../components/ReminderTable.jsx'
 import { features, references } from '../data/siteData.js'
@@ -17,22 +18,23 @@ export default function LandingPage() {
           <div className="container hero-grid">
             <div className="hero-copy">
               <span className="eyebrow"><span></span>Hizmet sektörü için müşteri takip sistemi</span>
-              <h1>Kağıt defter devri bitti.<br/><strong>Müşteriniz kaçmasın,</strong><br/>işiniz büyüsün.</h1>
-              <p>Kağıda yazılan müşteri unutulur. Müşteri Takip; randevuları, gelen mesajları, satışları ve kaçan müşterileri tek ekranda toplar. Sistem zamanı geldiğinde sizi uyarır, hiçbir potansiyel müşteri arada kaybolmaz.</p>
+              <h1>Reklamdan Gelen Her Mesaj<br/><strong>Satışa Dönüşüyor mu?</strong></h1>
+              <p>Meta reklamlarından gelen talepleri, personel görüşmelerini, randevuları ve satışları tek panelden takip edin. Reklam bütçenizin nerede kaybolduğunu görün.</p>
               <div className="hero-actions">
-                <Link to="/deneme" className="btn btn-primary big">Ücretsiz 7 Gün Dene <ArrowRight size={18}/></Link>
-                <Link to="/iletisim" className="btn btn-ghost big"><Mail size={18}/> Sorularınız mı var?</Link>
+                <a href="https://wa.me/905336153445?text=Merhaba%2C%20M%C3%BC%C5%9Fteri%20Takip%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noreferrer" className="btn btn-primary big"><MessageCircle size={18}/> Ücretsiz Canlı Demo Planla</a>
+                <a href="#nasil-calisiyor" className="btn btn-ghost big">Nasıl Çalışıyor? <ChevronDown size={18}/></a>
               </div>
-              <div className="hero-checks"><span><CheckCircle2/>7 gün ücretsiz</span><span><CheckCircle2/>Kredi kartı gerekmez</span><span><CheckCircle2/>Kurulum gerektirmez</span></div>
+              <div className="hero-checks"><span><CheckCircle2/>7 gün ücretsiz deneme</span><span><CheckCircle2/>Kredi kartı gerekmez</span><span><CheckCircle2/>İşletmenize özel kurulum</span></div>
             </div>
-            <div className="hero-visual"><DashboardMock /><MobileReminderMock /></div>
+            <div className="hero-visual"><AdsFunnelGraphic /></div>
           </div>
         </section>
 
-        <section className="container references-strip">
+        <section id="nasil-calisiyor" className="container references-strip">
           <p>Bize güvenen işletmeler</p>
           <div className="reference-row">{references.map((item) => <ReferenceLogo key={item.name} item={item} />)}</div>
         </section>
+
 
         <section className="container feature-strip">
           {preview.map((item) => {
