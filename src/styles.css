@@ -41,6 +41,10 @@
 .pricing-amount-big b{font-size:60px}
 .pricing-desc{color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 16px}
 .pricing-desc small{color:var(--faint);font-size:12.5px}
+.pricing-desc b{color:var(--text)}
+.pricing-diff{color:var(--purple);font-size:14px;font-weight:700;line-height:1.5;margin:0 0 14px;padding-bottom:14px;border-bottom:1px solid rgba(124,92,255,.15)}
+.pricing-list-setup{margin-bottom:4px}
+.pricing-trust-line{text-align:center;color:var(--faint);font-size:11.5px;margin:8px 0 0}
 .pricing-list{list-style:none;padding:0;margin:0 0 20px;display:grid;gap:9px}
 .pricing-list li{display:flex;align-items:center;gap:10px;color:var(--text);font-size:13.5px;font-weight:600}
 .pricing-list li svg{color:var(--purple);flex-shrink:0}
