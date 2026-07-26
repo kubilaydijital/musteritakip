@@ -2170,7 +2170,7 @@ const NAV_ITEMS = [
   { key: 'admin', label: 'Yönetim', icon: <ShieldCheck size={18} />, show: (perms, isSuperAdmin) => isSuperAdmin },
 ]
 
-function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout, onQuickAction }) {
+function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout, onQuickAction, trialDaysLeft }) {
   return (
     <div style={{
       width: 248, flexShrink: 0, background: T.card, borderRight: `1px solid ${T.border}`,
@@ -2186,9 +2186,17 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
         </div>
       </div>
       <div style={{
-        background: T.primaryLight, borderRadius: 10, padding: '9px 11px', marginBottom: 16,
+        background: T.primaryLight, borderRadius: 10, padding: '9px 11px', marginBottom: trialDaysLeft != null ? 8 : 16,
         fontSize: 12, color: '#C7B9FF', fontWeight: 600
       }}>{currentUser.full_name || currentUser.email} · {branchLabel}</div>
+      {trialDaysLeft != null && (
+        <div style={{
+          borderRadius: 10, padding: '8px 11px', marginBottom: 16, fontSize: 11.5, fontWeight: 700,
+          background: trialDaysLeft <= 2 ? '#FCEAEA' : '#FCF3E1', color: trialDaysLeft <= 2 ? '#E5615F' : '#E5A536',
+        }}>
+          {trialDaysLeft > 0 ? `⏰ Deneme süresi: ${trialDaysLeft} gün kaldı` : '⏰ Deneme süresi bugün doluyor'}
+        </div>
+      )}
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {items.map(item => {
@@ -2271,13 +2279,14 @@ function BottomTabBar({ items, activeTab, onSelect, onMoreClick, isMoreActive })
   )
 }
 
-function MobileTopBar({ currentUser, branchLabel, onLogout }) {
+function MobileTopBar({ currentUser, branchLabel, onLogout, trialDaysLeft }) {
   return (
     <div style={{
-      position: 'sticky', top: 0, zIndex: 40, display: 'flex', alignItems: 'center',
-      justifyContent: 'space-between', padding: '12px 14px', background: T.card,
+      position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column',
+      padding: '10px 14px', background: T.card,
       borderBottom: `1px solid ${T.border}`, width: '100%', boxSizing: 'border-box'
     }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
         <span style={{
           width: 30, height: 30, borderRadius: 8, background: `linear-gradient(135deg, ${T.primary}, #A78BFA)`,
@@ -2292,6 +2301,15 @@ function MobileTopBar({ currentUser, branchLabel, onLogout }) {
         flexShrink: 0, padding: '7px 9px', borderRadius: 9, border: `1px solid ${T.border}`,
         background: 'transparent', color: T.textSoft, cursor: 'pointer', display: 'flex', alignItems: 'center'
       }}><LogOut size={15} /></button>
+    </div>
+    {trialDaysLeft != null && (
+      <div style={{
+        borderRadius: 8, padding: '5px 10px', marginTop: 8, fontSize: 11, fontWeight: 700, display: 'inline-block',
+        background: trialDaysLeft <= 2 ? '#FCEAEA' : '#FCF3E1', color: trialDaysLeft <= 2 ? '#E5615F' : '#E5A536',
+      }}>
+        {trialDaysLeft > 0 ? `⏰ Deneme: ${trialDaysLeft} gün kaldı` : '⏰ Deneme bugün doluyor'}
+      </div>
+    )}
     </div>
   )
 }
@@ -3089,6 +3107,9 @@ export function PanelApp() {
 
   const visibleNavItems = NAV_ITEMS.filter(item => item.show(perms, isSuperAdmin, canSeeOwnDataOnly))
   const branchLabel = isSuperAdmin ? 'süper admin · tüm şubeler' : `${branchName(currentUser.branch_id)}`
+  const trialDaysLeft = (!isSuperAdmin && currentUser.is_trial && currentUser.trial_ends_at)
+    ? Math.ceil((new Date(currentUser.trial_ends_at).getTime() - Date.now()) / 86400000)
+    : null
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: isMobile ? 'column' : 'row', background: T.bg, minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
@@ -3104,10 +3125,10 @@ export function PanelApp() {
       `}</style>
 
       {isMobile ? (
-        <MobileTopBar currentUser={currentUser} branchLabel={branchLabel} onLogout={logoutAndClear} />
+        <MobileTopBar currentUser={currentUser} branchLabel={branchLabel} onLogout={logoutAndClear} trialDaysLeft={trialDaysLeft} />
       ) : (
         <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
-          isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={setActiveTab} />
+          isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={setActiveTab} trialDaysLeft={trialDaysLeft} />
       )}
 
 <div style={getPageWrapStyle(isMobile)} className="page-wrap">
