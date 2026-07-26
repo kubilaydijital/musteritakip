@@ -1949,25 +1949,54 @@ function MessageMatchReport({ adsData, leads }) {
     }).length
   }
 
+  const rows = sorted.slice(0, 8).map(week => {
+    const recordCount = recordCountForWeek(week.date)
+    const adjusted = recordCount + (week.manual_adjustment || 0)
+    const total = week.messages || 0
+    const missing = Math.max(0, total - adjusted)
+    const pct = total > 0 ? Math.round((adjusted / total) * 100) : 100
+    return { week, recordCount, adjusted, total, missing, pct }
+  })
+
+  const sumTotal = rows.reduce((s, r) => s + r.total, 0)
+  const sumAdjusted = rows.reduce((s, r) => s + r.adjusted, 0)
+  const sumMissing = rows.reduce((s, r) => s + r.missing, 0)
+  const avgPct = sumTotal > 0 ? Math.round((sumAdjusted / sumTotal) * 100) : 100
+  const avgColor = avgPct >= 90 ? '#1FAA6D' : avgPct >= 70 ? '#E5A536' : '#E5615F'
+  const maxTotal = Math.max(...rows.map(r => r.total), 1)
+
   return (
     <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
       <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Mesaj / kayıt eşleşme raporu</p>
-      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 12px' }}>Meta'nın gösterdiği mesaj sayısı ile sisteme girilen kayıt sayısını karşılaştırır. Manuel düzeltme, kaçırılan mesajları telafi eder.</p>
-      {sorted.slice(0, 8).map(week => {
-        const recordCount = recordCountForWeek(week.date)
-        const adjusted = recordCount + (week.manual_adjustment || 0)
-        const total = week.messages || 0
-        const missing = Math.max(0, total - adjusted)
-        const pct = total > 0 ? Math.round((adjusted / total) * 100) : 100
+      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 16px' }}>Meta'nın gösterdiği mesaj sayısı ile sisteme girilen kayıt sayısını karşılaştırır. Manuel düzeltme, kaçırılan mesajları telafi eder.</p>
+
+      {/* Özet kart */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10,
+        background: '#FAFAF9', borderRadius: 10, padding: '14px 16px', marginBottom: 18,
+      }}>
+        <div><div style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Toplam mesaj</div><div style={{ fontSize: 22, fontWeight: 800, color: T.text }}>{sumTotal}</div></div>
+        <div><div style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Toplam kayıt</div><div style={{ fontSize: 22, fontWeight: 800, color: T.text }}>{sumAdjusted}</div></div>
+        <div><div style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Kaçan müşteri</div><div style={{ fontSize: 22, fontWeight: 800, color: sumMissing > 0 ? '#E5615F' : '#1FAA6D' }}>{sumMissing}</div></div>
+        <div><div style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Ortalama oran</div><div style={{ fontSize: 22, fontWeight: 800, color: avgColor }}>%{avgPct}</div></div>
+      </div>
+
+      {rows.map(({ week, recordCount, total, missing, pct }) => {
+        const barColor = pct >= 90 ? '#1FAA6D' : pct >= 70 ? '#E5A536' : '#E5615F'
         const dateLabel = new Date(week.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
         return (
-          <div key={week.id} style={{ padding: '8px 0', borderBottom: '1px solid #eee', fontSize: 13 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+          <div key={week.id} style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
               <span style={{ color: T.textSoft }}>{dateLabel}</span>
-              <span style={{ fontWeight: 600, color: pct >= 90 ? '#2e7d32' : pct >= 70 ? '#b8860b' : '#c0392b' }}>%{pct} kayıt oranı</span>
+              <span style={{ fontWeight: 700, color: barColor }}>%{pct} kayıt oranı</span>
             </div>
-            <span style={{ color: '#444' }}>
-              Mesaj: {total} · Kayıt: {recordCount}{week.manual_adjustment > 0 ? ` (+${week.manual_adjustment} manuel)` : ''} · {missing > 0 ? <strong style={{ color: '#c0392b' }}>{missing} eksik</strong> : 'eksik yok'}
+            {/* Mini bar: mesaj (arka plan) vs kayıt (dolu) */}
+            <div style={{ position: 'relative', height: 8, borderRadius: 4, background: '#EFEEEC', overflow: 'hidden', marginBottom: 6 }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(100, (total / maxTotal) * 100)}%`, background: '#D8D5CF' }} />
+              <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(100, (recordCount / maxTotal) * 100)}%`, background: barColor }} />
+            </div>
+            <span style={{ fontSize: 12.5, color: '#444' }}>
+              Mesaj: {total} · Kayıt: {recordCount}{week.manual_adjustment > 0 ? ` (+${week.manual_adjustment} manuel)` : ''} · {missing > 0 ? <strong style={{ color: '#E5615F' }}>{missing} eksik</strong> : 'eksik yok'}
             </span>
           </div>
         )
@@ -1979,13 +2008,17 @@ function MessageMatchReport({ adsData, leads }) {
 function MonthlySpendChart({ adsData }) {
   const ref = useRef(null)
   const chartRef = useRef(null)
-  const sorted = useMemo(() => [...adsData].sort((a, b) => new Date(a.date) - new Date(b.date)), [adsData])
+  // Son 30 günlük veriyi göster - daha eskisi grafiği okunmaz kılar.
+  const sorted = useMemo(() => [...adsData].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-30), [adsData])
   useEffect(() => {
     if (sorted.length === 0) return
     if (chartRef.current) chartRef.current.destroy()
     chartRef.current = new Chart(ref.current, {
       type: 'line',
-      data: { labels: sorted.map((w, i) => 'Hafta ' + (i + 1)), datasets: [{ label: 'Harcama (TL)', data: sorted.map(w => w.spend), borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.15)', fill: true, tension: 0.3 }] },
+      data: {
+        labels: sorted.map(w => new Date(w.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+        datasets: [{ label: 'Harcama (TL)', data: sorted.map(w => w.spend), borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.15)', fill: true, tension: 0.3 }]
+      },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     })
     return () => { if (chartRef.current) chartRef.current.destroy() }
@@ -3331,7 +3364,7 @@ export function PanelApp() {
               </div>
               {scopedAds.length > 0 && (
                 <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '1rem' }}>
-                  <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 8px', fontWeight: 600 }}>Haftalık reklam harcaması</p>
+                  <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 8px', fontWeight: 600 }}>Günlük reklam harcaması (son 30 gün)</p>
                   <MonthlySpendChart adsData={scopedAds} />
                 </div>
               )}
