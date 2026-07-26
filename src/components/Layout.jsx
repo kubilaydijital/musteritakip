@@ -59,6 +59,14 @@ export function Footer() {
   )
 }
 
+function FloatingWhatsApp() {
+  return (
+    <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="floating-whatsapp" aria-label="WhatsApp'tan yazın">
+      <MessageCircle size={26} />
+    </a>
+  )
+}
+
 export default function Layout({ children }) {
-  return <><Header />{children}<Footer /></>
+  return <><Header />{children}<Footer /><FloatingWhatsApp /></>
 }
