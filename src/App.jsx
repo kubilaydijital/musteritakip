@@ -3036,8 +3036,11 @@ export function PanelApp() {
     return <TrialExpired onLogout={logoutAndClear} trialEndsAt={currentUser.trial_ends_at} businessName={myBranch?.name} />
   }
 
-  // Geriye dönük uyumluluk: izin objesi yoksa (eski veri) role alanına göre varsayılan izinler uygula
-  const perms = currentUser.permissions || {
+  // Geriye dönük uyumluluk: izin objesi yoksa (eski veri) ya da eksikse (örn. Supabase
+  // sütun varsayılanı boş obje döndürüyorsa), role alanına göre varsayılan izinlerle
+  // BİRLEŞTİRİLİR — currentUser.permissions'taki her alan varsayılanı ezer, ama
+  // permissions objesinde hiç olmayan/undefined alanlar için role varsayılanı kullanılır.
+  const roleDefaultPerms = {
     can_see_phone: currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'manager',
     can_see_revenue: currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'manager',
     can_see_all_branches: currentUser.role === 'super_admin',
@@ -3051,6 +3054,11 @@ export function PanelApp() {
     can_export_data: currentUser.role === 'super_admin',
     can_see_calendar: true
   }
+  const storedPerms = currentUser.permissions || {}
+  const perms = { ...roleDefaultPerms }
+  Object.keys(roleDefaultPerms).forEach(key => {
+    if (storedPerms[key] !== undefined && storedPerms[key] !== null) perms[key] = storedPerms[key]
+  })
 
   const isSuperAdmin = perms.can_see_all_branches && perms.can_manage_users && perms.can_manage_branches
   // "isStaff" artık ayrı bir rol değil - her ekran kendi spesifik iznine bakıyor.
