@@ -3343,9 +3343,13 @@ export function PanelApp() {
         {activeTab === 'ads' && perms.can_enter_ads_data && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Reklam Kaynakları</h1>
-            <AdsBranchSelector branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} isMobile={isMobile} />
-            {adsSelectedBranch && (
-              <MetaConnectionPanel branchId={adsSelectedBranch} branchName={branchName(adsSelectedBranch)} />
+            {isSuperAdmin ? (
+              <AdsBranchSelector branches={activeBranches} selectedBranch={adsSelectedBranch} onSelectBranch={setAdsSelectedBranch} isMobile={isMobile} />
+            ) : (
+              <AdsBranchSelector branches={activeBranches.filter(b => b.id === currentUser.branch_id)} selectedBranch={currentUser.branch_id} onSelectBranch={() => {}} isMobile={isMobile} />
+            )}
+            {(isSuperAdmin ? adsSelectedBranch : currentUser.branch_id) && (
+              <MetaConnectionPanel branchId={isSuperAdmin ? adsSelectedBranch : currentUser.branch_id} branchName={branchName(isSuperAdmin ? adsSelectedBranch : currentUser.branch_id)} />
             )}
           </div>
         )}
