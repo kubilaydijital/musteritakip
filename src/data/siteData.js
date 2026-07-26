@@ -59,10 +59,10 @@ export const features = [
 ]
 
 export const reminderRows = [
-  ['Randevu aldı (randevu geçti)', '1g', '+14g (~15g)', '+30g (~45g)', 'Soğuk'],
-  ['Randevuya gelmedi', '3g', '+14g (~17g)', '+30g (~47g)', 'Soğuk'],
-  ['Cevap yazıldı, müşteriden dönüş gelmedi', '3g', '+14g (~17g)', '+30g (~47g)', 'Soğuk'],
-  ['Satın almadı', '15g', '+30g (~45g)', '+60g (~105g)', 'Soğuk'],
+  ['Randevuya gelmedi', '1g', '4g', '10g', '30g sonra'],
+  ['Cevap yazıldı, müşteriden dönüş gelmedi', '1g', '3g', '7g', '20g sonra'],
+  ['Satın almadı', '2g', '7g', '18g', '35g sonra'],
+  ['Randevu aldı (randevu geçti)', '1g', '—', '—', '—'],
   ['Müşteri oldu', 'takip yok', '—', '—', '—'],
 ]
 
