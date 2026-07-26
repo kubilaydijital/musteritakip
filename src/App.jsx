@@ -382,7 +382,7 @@ function Login({ onLogin }) {
 
 const TRIAL_CONTACT_EMAIL = 'info@musteritakip.net'
 const TRIAL_CONTACT_WHATSAPP = '905336153445'
-const TRIAL_PRICE_TEXT = '5.000 TL + KDV / ay'
+const TRIAL_PRICE_TEXT = '3.500 TL + KDV / ay'
 
 function TrialExpired({ onLogout, trialEndsAt, businessName }) {
   const endedDate = trialEndsAt ? new Date(trialEndsAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null
