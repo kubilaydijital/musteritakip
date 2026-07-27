@@ -2965,7 +2965,17 @@ export function PanelApp() {
     return result
   }
   async function deleteUser(userId) {
-    await supabase.from('app_users').delete().eq('id', userId)
+    // Hem app_users kaydını hem gerçek Supabase Auth girişini (service role
+    // gerektirdiği için Netlify Function üzerinden) tamamen siler.
+    const res = await fetch('/.netlify/functions/delete-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({}))
+      throw new Error(result.error || 'Kullanıcı silinemedi')
+    }
     setUsers(prev => prev.filter(u => u.id !== userId))
   }
   async function changeUserPassword(userId, newPassword) {
