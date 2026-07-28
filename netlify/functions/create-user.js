@@ -29,8 +29,11 @@ export async function handler(event) {
   }
 
   // Panelden açılan hesaplar da (self-servis kayıt gibi) varsayılan olarak deneme süresiyle başlar.
-  // trial_days gönderilmezse varsayılan 7 gün; admin panelden 14 veya 30 gün de seçebilir.
-  const days = Number.isFinite(Number(trial_days)) && Number(trial_days) > 0 ? Number(trial_days) : 7
+  // trial_days gönderilmezse varsayılan 7 gün. Kim çağırırsa çağırsın (tarayıcı arayüzü atlanıp
+  // doğrudan bu uca istek gönderilse bile) süre en fazla 30 gün olabilir - bu üst sınır,
+  // işletme sahiplerinin kendi kendine sınırsız/aşırı uzun deneme süresi vermesini engeller.
+  const requestedDays = Number.isFinite(Number(trial_days)) && Number(trial_days) > 0 ? Number(trial_days) : 7
+  const days = Math.min(requestedDays, 30)
   const trialEndsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
 
   try {
