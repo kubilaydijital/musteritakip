@@ -1690,7 +1690,7 @@ function SubscriptionManager({ users, branches, onExtend, onGrantUnlimited }) {
 }
 
 
-function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeName, onChangeEmail, branches, templates, isMobile, currentUserId }) {
+function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, onChangeName, onChangeEmail, branches, templates, isMobile, currentUserId, isSuperAdmin }) {
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newFullName, setNewFullName] = useState('')
@@ -1824,6 +1824,7 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
         )
       })}
 
+      {isSuperAdmin && (
       <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #eee' }}>
         <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>Yeni kullanıcı ekle</p>
         <form onSubmit={submitAdd}>
@@ -1841,18 +1842,26 @@ function UserManagement({ users, onToggle, onAdd, onDelete, onChangePassword, on
               {nonSuperAdminTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600, display: 'block', marginBottom: 4 }}>Deneme Süresi</label>
-            <select value={newTrialDays} onChange={e => setNewTrialDays(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 220 }}>
-              <option value={7}>7 gün (varsayılan)</option>
-              <option value={14}>14 gün</option>
-              <option value={30}>30 gün</option>
-            </select>
-          </div>
+          {isSuperAdmin && (
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600, display: 'block', marginBottom: 4 }}>Deneme Süresi</label>
+              <select value={newTrialDays} onChange={e => setNewTrialDays(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 220 }}>
+                <option value={7}>7 gün (varsayılan)</option>
+                <option value={14}>14 gün</option>
+                <option value={30}>30 gün</option>
+              </select>
+            </div>
+          )}
           {addErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{addErr}</p>}
           <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>Kullanıcı ekle</button>
         </form>
       </div>
+      )}
+      {!isSuperAdmin && (
+        <p style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #eee', fontSize: 12.5, color: T.textSoft }}>
+          Yeni personel eklemek için lütfen bizimle WhatsApp üzerinden iletişime geçin.
+        </p>
+      )}
     </div>
   )
 }
@@ -3410,7 +3419,7 @@ export function PanelApp() {
                 onDelete={deleteService}
               />
             )}
-            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeName={changeUserName} onChangeEmail={changeUserEmail} branches={activeBranches} templates={templates} isMobile={isMobile} currentUserId={currentUser.id} />}
+            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeName={changeUserName} onChangeEmail={changeUserEmail} branches={activeBranches} templates={templates} isMobile={isMobile} currentUserId={currentUser.id} isSuperAdmin={isSuperAdmin} />}
           </div>
         )}
 
