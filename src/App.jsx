@@ -1519,6 +1519,47 @@ function WorkingHoursEditor({ branch, onSave }) {
   )
 }
 
+// İşletme sahibinin kendi online randevu sayfası linkini görüp kopyalayabileceği/paylaşabileceği kart.
+function OnlineBookingLinkCard({ branchId, branchName }) {
+  const [copied, setCopied] = useState(false)
+  const link = `https://musteritakip.net/randevu/${branchId}`
+
+  function copyLink() {
+    navigator.clipboard?.writeText(link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const waShareUrl = `https://wa.me/?text=${encodeURIComponent(`${branchName} için online randevu sayfamız: ${link}`)}`
+
+  return (
+    <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: '1.25rem', marginBottom: 16 }}>
+      <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 4px' }}>🔗 Online Randevu Sayfanız</p>
+      <p style={{ fontSize: 12.5, color: T.textSoft, margin: '0 0 14px' }}>
+        Bu linki müşterilerinize (Instagram bio, WhatsApp durumu, kartvizit vb. üzerinden) paylaşın — sizi aramadan 7/24 randevu alabilirler.
+      </p>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{
+          flex: '1 1 260px', padding: '9px 12px', borderRadius: 9, border: `1px solid ${T.border}`,
+          background: T.bg, fontSize: 13, fontFamily: 'monospace', color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{link}</div>
+        <button onClick={copyLink} style={{
+          padding: '9px 14px', borderRadius: 9, border: 'none', background: T.primary, color: '#fff',
+          fontWeight: 600, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap',
+        }}>{copied ? 'Kopyalandı ✓' : 'Linki Kopyala'}</button>
+        <a href={waShareUrl} target="_blank" rel="noreferrer" style={{
+          padding: '9px 14px', borderRadius: 9, border: `1px solid #1FAA6D`, color: '#1FAA6D',
+          fontWeight: 600, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap',
+        }}>WhatsApp'ta Paylaş</a>
+        <a href={link} target="_blank" rel="noreferrer" style={{
+          padding: '9px 14px', borderRadius: 9, border: `1px solid ${T.border}`, color: T.textSoft,
+          fontWeight: 600, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap',
+        }}>Sayfayı Gör</a>
+      </div>
+    </div>
+  )
+}
+
 function BranchManagement({ branches, onAdd, onToggleActive, onDelete, onSaveWorkingHours }) {
   const [name, setName] = useState('')
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null)
@@ -3409,6 +3450,9 @@ export function PanelApp() {
         {activeTab === 'settings' && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Ayarlar</h1>
+            {!isSuperAdmin && !canSeeOwnDataOnly && (
+              <OnlineBookingLinkCard branchId={currentUser.branch_id} branchName={branchName(currentUser.branch_id)} />
+            )}
             {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} onDelete={deleteBranch} onSaveWorkingHours={saveWorkingHours} />}
             {!isSuperAdmin && !canSeeOwnDataOnly && (
               <BranchServiceManager
