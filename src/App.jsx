@@ -696,8 +696,20 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   async function submit(e) {
     e.preventDefault()
     let ok = true
-    if (!PHONE_RE.test(form.phone.trim())) { setPhoneErr('Geçerli bir cep telefonu girin: +90 ile başlayıp, 5 ile devam edip, toplam 10 hane olmalı. Örnek: +905551234567'); ok = false }
-    else setPhoneErr('')
+    // Instagram gibi kanallardan gelen ve henüz cevap alınamayan kişilerin telefon
+    // numarası çoğu zaman bilinmez - bu durumda telefon zorunlu tutulmaz, ama
+    // girilmişse formatı yine de doğrulanır.
+    const phoneOptional = form.result === 'Cevap yazıldı, müşteriden dönüş gelmedi'
+    const phoneTrimmed = form.phone.trim()
+    const phoneIsEffectivelyEmpty = !phoneTrimmed || phoneTrimmed === '+90'
+    if (phoneOptional && phoneIsEffectivelyEmpty) {
+      setPhoneErr('')
+    } else if (!PHONE_RE.test(phoneTrimmed)) {
+      setPhoneErr('Geçerli bir cep telefonu girin: +90 ile başlayıp, 5 ile devam edip, toplam 10 hane olmalı. Örnek: +905551234567')
+      ok = false
+    } else {
+      setPhoneErr('')
+    }
     if (!editing && !form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
     else setNoteErr('')
     if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
@@ -709,15 +721,17 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount.replace(/\./g, '')) : null
     const appointmentAt = (form.appointmentDate && form.appointmentTime) ? new Date(`${form.appointmentDate}T${form.appointmentTime}`).toISOString() : null
 
+    const cleanPhone = phoneIsEffectivelyEmpty ? '' : phoneTrimmed
+
     if (editing) {
       await onUpdate({
-        id: editing.id, name: form.name, phone: form.phone, channel: form.channel,
+        id: editing.id, name: form.name, phone: cleanPhone, channel: form.channel,
         service: form.service, note: form.newNote, result: form.result, sale_amount: saleAmount,
         appointment_at: appointmentAt, edited_at: new Date().toISOString()
       }, currentUser.full_name || currentUser.email)
     } else {
       await onAdd({
-        id: uid(), branch_id: targetBranchId, name: form.name, phone: form.phone,
+        id: uid(), branch_id: targetBranchId, name: form.name, phone: cleanPhone,
         channel: form.channel, service: form.service, note: form.note, result: form.result,
         sale_amount: saleAmount, appointment_at: appointmentAt, entered_by: currentUser.full_name || currentUser.email, date: new Date().toISOString()
       })
@@ -742,7 +756,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <input placeholder="İsim soyisim" value={form.name} onChange={e => set('name', e.target.value)} style={inputStyle} />
         <div>
-          <input placeholder="+905551234567" value={form.phone} onChange={e => {
+          <input placeholder={form.result === 'Cevap yazıldı, müşteriden dönüş gelmedi' ? '+905551234567 (isteğe bağlı)' : '+905551234567'} value={form.phone} onChange={e => {
             let v = e.target.value
             if (!v.startsWith('+90')) v = '+90' + v.replace(/^\+?90?/, '')
             set('phone', v)
@@ -1217,8 +1231,9 @@ const WHATSAPP_TEMPLATES = {
 function buildWhatsappUrl(lead) {
   const template = WHATSAPP_TEMPLATES[lead.result]
   if (!template) return null
-  const message = template(lead.name, lead.service)
   const digits = (lead.phone || '').replace(/[^\d]/g, '') // wa.me formatı: sadece rakamlar, + işareti olmadan
+  if (!digits || digits === '90') return null // telefon numarası girilmemiş (Instagram gibi kanallardan sıkça olur)
+  const message = template(lead.name, lead.service)
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
 }
 
