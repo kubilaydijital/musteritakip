@@ -3049,31 +3049,39 @@ export function PanelApp() {
   }
   function branchName(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
 
-  const customers = scopedLeads.filter(l => l.result === 'Müşteri oldu')
+  // Genel Bakış'taki kartlar ve Satış Hunisi 2023'ten beri biriken TÜM kayıtları
+  // değil, sadece içinde bulunulan ayın kayıtlarını göstermeli.
+  const now = new Date()
+  const monthlyLeads = scopedLeads.filter(l => {
+    const d = new Date(l.date)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  })
+
+  const customers = monthlyLeads.filter(l => l.result === 'Müşteri oldu')
   const withAmount = customers.filter(l => l.sale_amount != null)
   const revenue = customers.reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
   const avgTicket = withAmount.length ? Math.round(revenue / withAmount.length) : 0
-  const noShow = scopedLeads.filter(l => l.result === 'Randevuya gelmedi')
-  const notBought = scopedLeads.filter(l => l.result === 'Satın almadı')
-  const noResponse = scopedLeads.filter(l => l.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
-  const appointed = scopedLeads.filter(l => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(l.result))
-  const arrived = scopedLeads.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
+  const noShow = monthlyLeads.filter(l => l.result === 'Randevuya gelmedi')
+  const notBought = monthlyLeads.filter(l => l.result === 'Satın almadı')
+  const noResponse = monthlyLeads.filter(l => l.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
+  const appointed = monthlyLeads.filter(l => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(l.result))
+  const arrived = monthlyLeads.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
   const stats = {
-    total: scopedLeads.length,
+    total: monthlyLeads.length,
     customers: customers.length,
-    ig: scopedLeads.filter(l => l.channel === 'Instagram').length,
-    wa: scopedLeads.filter(l => l.channel === 'WhatsApp').length,
-    organik: scopedLeads.filter(l => l.channel === 'Organik').length,
-    rate: scopedLeads.length ? Math.round((customers.length / scopedLeads.length) * 100) : 0,
+    ig: monthlyLeads.filter(l => l.channel === 'Instagram').length,
+    wa: monthlyLeads.filter(l => l.channel === 'WhatsApp').length,
+    organik: monthlyLeads.filter(l => l.channel === 'Organik').length,
+    rate: monthlyLeads.length ? Math.round((customers.length / monthlyLeads.length) * 100) : 0,
     revenue, avgTicket, withAmountCount: withAmount.length,
     appointed: appointed.length, arrived: arrived.length,
     noShowCount: noShow.length, notBoughtCount: notBought.length, noResponseCount: noResponse.length,
-    pctAppointed: scopedLeads.length ? Math.round((appointed.length / scopedLeads.length) * 100) : 0,
+    pctAppointed: monthlyLeads.length ? Math.round((appointed.length / monthlyLeads.length) * 100) : 0,
     pctArrived: appointed.length ? Math.round((arrived.length / appointed.length) * 100) : 0,
     pctSold: arrived.length ? Math.round((customers.length / arrived.length) * 100) : 0,
     pctNoShow: appointed.length ? Math.round((noShow.length / appointed.length) * 100) : 0,
     pctNotBought: arrived.length ? Math.round((notBought.length / arrived.length) * 100) : 0,
-    pctNoResponse: scopedLeads.length ? Math.round((noResponse.length / scopedLeads.length) * 100) : 0,
+    pctNoResponse: monthlyLeads.length ? Math.round((noResponse.length / monthlyLeads.length) * 100) : 0,
   }
   const totalSpend = scopedAds.reduce((s, w) => s + Number(w.spend), 0)
 
@@ -3122,6 +3130,7 @@ export function PanelApp() {
             <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Genel Bakış</h1>
             <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>
               {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
+              {' · '}{now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
             </p>
             <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} ruleMap={reminderRuleMap} />
 
