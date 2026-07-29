@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Mail, MapPin } from 'lucide-react'
+import { Mail, MapPin, Phone } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
-import { EMAIL, LOCATION } from '../data/siteData.js'
+import { EMAIL, LOCATION, PHONE, PHONE_TEL } from '../data/siteData.js'
 import usePageMeta from '../usePageMeta.js'
 
 const FORMSPREE_URL = 'https://formspree.io/f/mlgvyrld'
@@ -46,6 +46,7 @@ export default function Contact() {
             <p>Demo talepleri ve tüm sorularınız için formu doldurabilir veya doğrudan e-posta gönderebilirsiniz.</p>
             <div className="contact-list">
               <a href={`mailto:${EMAIL}`}><Mail/> {EMAIL}</a>
+              <a href={`tel:${PHONE_TEL}`}><Phone/> {PHONE}</a>
               <span><MapPin/> {LOCATION}</span>
             </div>
           </div>
