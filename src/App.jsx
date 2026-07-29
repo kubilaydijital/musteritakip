@@ -475,11 +475,18 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [aiLoading, setAiLoading] = useState(false)
   const [aiErr, setAiErr] = useState('')
   const [duplicateNotice, setDuplicateNotice] = useState('')
+  const suppressNoticeReset = useRef(false)
 
   useEffect(() => {
     setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
     setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setConfirmingDelete(false)
-    setAiTip(''); setAiErr(''); setDuplicateNotice('')
+    setAiTip(''); setAiErr('')
+    if (suppressNoticeReset.current) {
+      // Bu geçiş bir çift-kayıt tespiti sonucu oldu (onFoundExisting) — uyarıyı silme.
+      suppressNoticeReset.current = false
+    } else {
+      setDuplicateNotice('')
+    }
   }, [editing])
 
   useEffect(() => {
@@ -555,6 +562,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         (l.name || '').trim().toLocaleLowerCase('tr') === normalizedName
       )
       if (duplicate) {
+        suppressNoticeReset.current = true
         setDuplicateNotice(`"${duplicate.name}" bu isim ve telefon numarasıyla zaten kayıtlı. Yeni kayıt açmak yerine mevcut danışan açıldı, yeni görüşmeyi oraya not olarak ekleyebilirsiniz.`)
         onFoundExisting && onFoundExisting(duplicate)
         return
