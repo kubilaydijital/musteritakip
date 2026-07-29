@@ -6,6 +6,8 @@ import {
 
 export const EMAIL = 'info@musteritakip.net'
 export const LOCATION = 'İzmir / Türkiye'
+export const PHONE = '0533 615 34 45'
+export const PHONE_TEL = '+905336153445'
 
 export const navItems = [
   { to: '/', label: 'Ana Sayfa' },
@@ -22,6 +24,7 @@ export const references = [
   { name: 'DENT CLINIC', sub: 'DİŞ KLİNİĞİ', icon: SmilePlus },
   { name: 'ÇINAR', sub: 'HUKUK BÜROSU', icon: Scale },
   { name: 'SINERGY', sub: 'BAYAN KUAFÖRÜ', icon: Scissors },
+  { name: 'ARİS EZGİ DOĞAN', sub: 'GÜZELLİK MERKEZİ - BALIKESİR', icon: Scissors },
 ]
 
 export const testimonials = [
