@@ -581,10 +581,15 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         appointment_at: appointmentAt, edited_at: new Date().toISOString()
       }, currentUser.full_name || currentUser.email)
     } else {
+      // Randevu tarihi geçmişte bir tarihse (örn. eski defterden aktarılan 2023 kaydı),
+      // bu kaydın "girildiği tarih" olarak da o gerçek tarihi kullanıyoruz - böylece
+      // aylık raporlar bugünün tarihine göre değil, olayın gerçekte olduğu tarihe göre hesaplanır.
+      // Randevu tarihi bugün/gelecekse (yeni, canlı bir kayıtsa) her zamanki gibi "şu an" kullanılır.
+      const entryDate = (appointmentAt && new Date(appointmentAt) < new Date()) ? appointmentAt : new Date().toISOString()
       await onAdd({
         id: uid(), branch_id: targetBranchId, name: form.name, phone: cleanPhone,
         channel: form.channel, service: form.service, note: form.note, result: form.result,
-        sale_amount: saleAmount, appointment_at: appointmentAt, entered_by: currentUser.full_name || currentUser.email, date: new Date().toISOString()
+        sale_amount: saleAmount, appointment_at: appointmentAt, entered_by: currentUser.full_name || currentUser.email, date: entryDate
       })
     }
     setSubmitting(false)
@@ -633,7 +638,9 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
           <input type="time" value={form.appointmentTime} onChange={e => { set('appointmentTime', e.target.value); if (form.appointmentDate && e.target.value) setAppointmentErr('') }} style={inputStyle} />
         </div>
         <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>
-          {form.result === 'Randevu aldı' ? 'Randevu tarihi ve saati zorunludur.' : 'Randevu tarihi/saati — varsa girin, takvimde görünür. Boş bırakılabilir.'}
+          {form.result === 'Randevu aldı'
+            ? 'Randevu tarihi ve saati zorunludur.'
+            : 'Randevu/görüşme tarihi — eski bir kaydı giriyorsanız gerçek tarihini buraya girin, sistem raporlarda bugünün tarihi yerine bu tarihi kullanır. Yeni/güncel bir kayıtsa boş bırakabilirsiniz.'}
         </p>
         {appointmentErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{appointmentErr}</p>}
       </div>
