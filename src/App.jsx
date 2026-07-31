@@ -737,6 +737,7 @@ const STAT_COLOR_MAP = {
   blue: { solid: T.blue, soft: T.blueBg },
   green: { solid: T.green, soft: T.greenBg },
   amber: { solid: T.orange, soft: T.orangeBg },
+  purple: { solid: '#9333EA', soft: 'rgba(147,51,234,0.1)' },
 }
 
 function StatCard({ icon, label, value, color = 'violet', trend, trendLabel, subtitle }) {
@@ -2320,10 +2321,18 @@ function MobileMoreSheet({ items, onSelect, onLogout }) {
   )
 }
 
-function FunnelSection({ stats, isMobile }) {
+function FunnelSection({ stats, isMobile, metaMessages }) {
+  const hasMeta = metaMessages != null && metaMessages > 0
   const stages = [
+    ...(hasMeta ? [{
+      label: 'Meta Mesaj (reklam)',
+      value: metaMessages,
+      icon: <Megaphone size={20} />,
+      color: '#9333EA',
+      bg: 'linear-gradient(135deg, rgba(147,51,234,0.34), rgba(147,51,234,0.08))'
+    }] : []),
     {
-      label: '1. Mesaj Geldi',
+      label: hasMeta ? 'Panele İşlendi' : '1. Mesaj Geldi',
       value: stats.total,
       icon: <MessageCircle size={20} />,
       color: T.primary,
@@ -2352,7 +2361,11 @@ function FunnelSection({ stats, isMobile }) {
     },
   ]
 
-  const rates = [stats.pctAppointed, stats.pctArrived, stats.pctSold]
+  const pctLoggedFromMeta = hasMeta ? (metaMessages ? Math.round((stats.total / metaMessages) * 100) : 0) : null
+  const rates = [
+    ...(hasMeta ? [pctLoggedFromMeta] : []),
+    stats.pctAppointed, stats.pctArrived, stats.pctSold
+  ]
 
   return (
     <div style={{ ...cardStyle, padding: isMobile ? 14 : 20 }}>
@@ -2381,7 +2394,7 @@ function FunnelSection({ stats, isMobile }) {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : `repeat(${stages.length}, minmax(0, 1fr))`,
         gap: 12,
         alignItems: 'stretch'
       }}>
@@ -3172,8 +3185,10 @@ export function PanelApp() {
   gap: 14,
   marginBottom: 18
 }}>
-  <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet"
-                subtitle={metaMessagesThisMonth > 0 ? `Meta'ya göre: ${metaMessagesThisMonth} mesaj` : undefined} />
+  {metaMessagesThisMonth > 0 && (
+    <StatCard icon={<Megaphone size={20} />} label="Meta Mesaj (reklam)" value={metaMessagesThisMonth} color="purple" />
+  )}
+  <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet" />
               <StatCard icon={<CalendarDays size={20} />} label="Randevu Verilen" value={stats.appointed} color="blue" />
               <StatCard icon={<UserRound size={20} />} label="Gelen Müşteri" value={stats.arrived} color="green" />
               <StatCard icon={<ShoppingCart size={20} />} label="Satış Olan" value={stats.customers} color="amber" />
@@ -3186,7 +3201,7 @@ export function PanelApp() {
             </div>
 
 <div style={{ ...sectionGridStyle, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-  <FunnelSection stats={stats} isMobile={isMobile} />
+  <FunnelSection stats={stats} isMobile={isMobile} metaMessages={metaMessagesThisMonth} />
 </div>
 
 <div style={{ ...sectionGridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
