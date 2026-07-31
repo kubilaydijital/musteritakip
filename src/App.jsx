@@ -477,6 +477,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
   const [appointmentErr, setAppointmentErr] = useState('')
+  const [entryDateErr, setEntryDateErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [aiTip, setAiTip] = useState('')
@@ -487,7 +488,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
 
   useEffect(() => {
     setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at), entryDate: toLocalDateValue(editing.date), entryTime: toLocalTimeValue(editing.date) } : freshEmptyForm())
-    setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setConfirmingDelete(false)
+    setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setEntryDateErr(''); setConfirmingDelete(false)
     setAiTip(''); setAiErr('')
     if (suppressNoticeReset.current) {
       // Bu geçiş bir çift-kayıt tespiti sonucu oldu (onFoundExisting) — uyarıyı silme.
@@ -553,6 +554,8 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     }
     if (!editing && !form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
     else setNoteErr('')
+    if (!(form.entryDate && form.entryTime)) { setEntryDateErr('Kayıt tarihi ve saati zorunludur.'); ok = false }
+    else setEntryDateErr('')
     if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
     else setAppointmentErr('')
     if (!form.name.trim()) ok = false
@@ -659,14 +662,15 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         {appointmentErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{appointmentErr}</p>}
       </div>
       <div style={{ marginBottom: 10, padding: 10, borderRadius: 8, background: T.cardSoft, border: `1px solid ${T.border}` }}>
-        <p style={{ fontSize: 12.5, fontWeight: 600, color: T.text, margin: '0 0 6px' }}>Kayıt Tarihi</p>
+        <p style={{ fontSize: 12.5, fontWeight: 600, color: T.text, margin: '0 0 6px' }}>Kayıt Tarihi *</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <input type="date" value={form.entryDate} onChange={e => set('entryDate', e.target.value)} style={inputStyle} />
-          <input type="time" value={form.entryTime} onChange={e => set('entryTime', e.target.value)} style={inputStyle} />
+          <input type="date" value={form.entryDate} onChange={e => { set('entryDate', e.target.value); if (e.target.value && form.entryTime) setEntryDateErr('') }} style={inputStyle} />
+          <input type="time" value={form.entryTime} onChange={e => { set('entryTime', e.target.value); if (form.entryDate && e.target.value) setEntryDateErr('') }} style={inputStyle} />
         </div>
         <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>
-          Otomatik olarak şu anın tarihiyle doldu. <b>Eski/geçmiş bir kaydı giriyorsanız buraya gerçek tarihini yazın</b> — raporlarda ve "bu ay" özetlerinde esas alınan tarih budur, randevu tarihinden bağımsızdır.
+          Otomatik olarak şu anın tarihiyle doldu. <b>Eski/geçmiş bir kaydı giriyorsanız buraya gerçek tarihini yazın</b> — raporlarda ve "bu ay" özetlerinde esas alınan tarih budur, randevu tarihinden bağımsızdır. Bu alan zorunludur, boş bırakılamaz.
         </p>
+        {entryDateErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{entryDateErr}</p>}
       </div>
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
