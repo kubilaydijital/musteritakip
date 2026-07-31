@@ -2713,7 +2713,13 @@ export function PanelApp() {
   const [loaded, setLoaded] = useState(false)
   const [editingLead, setEditingLead] = useState(null)
   const [adsSelectedBranch, setAdsSelectedBranch] = useState('')
-  const [filterBranch, setFilterBranch] = useState('all')
+  const [filterBranch, setFilterBranchState] = useState(() => {
+    try { return localStorage.getItem('mt_filterBranch') || 'all' } catch { return 'all' }
+  })
+  const setFilterBranch = (val) => {
+    setFilterBranchState(val)
+    try { localStorage.setItem('mt_filterBranch', val) } catch {}
+  }
   const [activeTab, setActiveTab] = useState('overview')
   const isMobile = useIsMobile()
   const [showMobileMore, setShowMobileMore] = useState(false)
