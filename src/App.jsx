@@ -587,24 +587,28 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount.replace(/\./g, '')) : null
     const appointmentAt = (form.appointmentDate && form.appointmentTime) ? new Date(`${form.appointmentDate}T${form.appointmentTime}`).toISOString() : null
 
+    // Kaydetme anında son bir kontrol: Randevu Tarihi geçmişte bir tarihse VE
+    // kullanıcı Kayıt Tarihi'ni elle değiştirmediyse (entryDateTouched=false),
+    // Kayıt Tarihi'ni otomatik olarak Randevu Tarihi ile eşitliyoruz. Bu, hem
+    // yeni kayıtta hem de var olan bir kaydı sadece açıp "Güncelle"ye basarken
+    // (alana hiç dokunulmasa bile) doğru tarihin garanti altına alınmasını sağlar.
+    const autoSyncDate = (!entryDateTouched.current && appointmentAt && new Date(appointmentAt) < new Date())
+      ? appointmentAt
+      : null
+
     if (editing) {
-      // "Kayıt Tarihi" alanı düzenlenebilir hale getirildi - personel bu ekrandan
-      // kaydın gerçek tarihini elle düzeltebilir.
-      const correctedDate = (form.entryDate && form.entryTime)
+      const correctedDate = autoSyncDate || ((form.entryDate && form.entryTime)
         ? new Date(`${form.entryDate}T${form.entryTime}`).toISOString()
-        : editing.date
+        : editing.date)
       await onUpdate({
         id: editing.id, name: form.name, phone: cleanPhone, channel: form.channel,
         service: form.service, note: form.newNote, result: form.result, sale_amount: saleAmount,
         appointment_at: appointmentAt, edited_at: new Date().toISOString(), date: correctedDate
       }, currentUser.full_name || currentUser.email)
     } else {
-      // "Kayıt Tarihi" alanı (entryDate/entryTime), her zaman "şu an" ile dolu gelir ve
-      // personel bilinçli olarak değiştirmediği sürece bugünün tarihini kullanır.
-      // Geçmiş bir kayıt giriliyorsa personel bu alanı değiştirir, sistem o tarihi esas alır.
-      const entryDate = (form.entryDate && form.entryTime)
+      const entryDate = autoSyncDate || ((form.entryDate && form.entryTime)
         ? new Date(`${form.entryDate}T${form.entryTime}`).toISOString()
-        : new Date().toISOString()
+        : new Date().toISOString())
       await onAdd({
         id: uid(), branch_id: targetBranchId, name: form.name, phone: cleanPhone,
         channel: form.channel, service: form.service, note: form.note, result: form.result,
