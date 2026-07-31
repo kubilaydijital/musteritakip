@@ -755,7 +755,7 @@ const STAT_COLOR_MAP = {
   amber: { solid: T.orange, soft: T.orangeBg },
 }
 
-function StatCard({ icon, label, value, color = 'violet', trend, trendLabel }) {
+function StatCard({ icon, label, value, color = 'violet', trend, trendLabel, subtitle }) {
   const c = STAT_COLOR_MAP[color] || STAT_COLOR_MAP.violet
   return (
     <div style={{ ...cardStyle, padding: '18px 18px' }}>
@@ -767,6 +767,9 @@ function StatCard({ icon, label, value, color = 'violet', trend, trendLabel }) {
         <div style={{ minWidth: 0 }}>
           <p style={{ fontSize: 12.5, color: T.textSoft, margin: '0 0 2px', fontWeight: 500 }}>{label}</p>
           <p style={{ fontSize: 22, fontWeight: 700, margin: 0, color: T.text, lineHeight: 1.15 }}>{value}</p>
+          {subtitle && (
+            <p style={{ fontSize: 11, margin: '3px 0 0', color: T.textFaint }}>{subtitle}</p>
+          )}
           {trend != null && (
             <p style={{ fontSize: 11.5, margin: '3px 0 0', color: T.green, fontWeight: 600 }}>
               ↗ {trend}{trendLabel ? <span style={{ color: T.textFaint, fontWeight: 500 }}> · {trendLabel}</span> : null}
@@ -3084,23 +3087,28 @@ export function PanelApp() {
   }
   function branchName(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
 
-  // Genel Bakış'taki kartlar ve Satış Hunisi 2023'ten beri biriken TÜM kayıtları
-  // değil, sadece içinde bulunulan ayın kayıtlarını göstermeli.
+  // Genel Bakış'taki her kart, KENDİ olayının gerçekleştiği aya göre sayılır:
+  // - "Toplam Mesaj": görüşmenin/kaydın açıldığı ay (date alanı)
+  // - "Randevu Verilen / Gelen Müşteri / Satış Olan / Ciro": randevunun/satışın
+  //   GERÇEKLEŞTİĞİ ay (appointment_at alanı). Randevu tarihi girilmemişse
+  //   (örn. aynı gün doğrudan satış), kaydın kendi tarihine düşer.
+  // Böylece Temmuz'da alınıp Ağustos'a verilen bir randevunun satışı,
+  // doğru şekilde Ağustos'un performansına yazılır, Temmuz'a değil.
   const now = new Date()
-  const monthlyLeads = scopedLeads.filter(l => {
-    const d = new Date(l.date)
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-  })
+  const isThisMonth = d => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
 
-  const customers = monthlyLeads.filter(l => l.result === 'Müşteri oldu')
+  const monthlyLeads = scopedLeads.filter(l => isThisMonth(new Date(l.date)))
+  const monthlyByEvent = scopedLeads.filter(l => isThisMonth(new Date(l.appointment_at || l.date)))
+
+  const customers = monthlyByEvent.filter(l => l.result === 'Müşteri oldu')
   const withAmount = customers.filter(l => l.sale_amount != null)
   const revenue = customers.reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
   const avgTicket = withAmount.length ? Math.round(revenue / withAmount.length) : 0
-  const noShow = monthlyLeads.filter(l => l.result === 'Randevuya gelmedi')
-  const notBought = monthlyLeads.filter(l => l.result === 'Satın almadı')
+  const noShow = monthlyByEvent.filter(l => l.result === 'Randevuya gelmedi')
+  const notBought = monthlyByEvent.filter(l => l.result === 'Satın almadı')
   const noResponse = monthlyLeads.filter(l => l.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
-  const appointed = monthlyLeads.filter(l => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(l.result))
-  const arrived = monthlyLeads.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
+  const appointed = monthlyByEvent.filter(l => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(l.result))
+  const arrived = monthlyByEvent.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
   const stats = {
     total: monthlyLeads.length,
     customers: customers.length,
