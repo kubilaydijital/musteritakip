@@ -3111,6 +3111,9 @@ export function PanelApp() {
     pctNoResponse: monthlyLeads.length ? Math.round((noResponse.length / monthlyLeads.length) * 100) : 0,
   }
   const totalSpend = scopedAds.reduce((s, w) => s + Number(w.spend), 0)
+  const metaMessagesThisMonth = scopedAds
+    .filter(w => isThisMonth(new Date(w.date)))
+    .reduce((s, w) => s + (Number(w.messages) || 0), 0)
 
   const visibleNavItems = NAV_ITEMS.filter(item => item.show(perms, isSuperAdmin, canSeeOwnDataOnly))
   const branchLabel = isSuperAdmin ? 'süper admin · tüm şubeler' : `${branchName(currentUser.branch_id)}`
@@ -3169,7 +3172,8 @@ export function PanelApp() {
   gap: 14,
   marginBottom: 18
 }}>
-  <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet" />
+  <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet"
+                subtitle={metaMessagesThisMonth > 0 ? `Meta'ya göre: ${metaMessagesThisMonth} mesaj` : undefined} />
               <StatCard icon={<CalendarDays size={20} />} label="Randevu Verilen" value={stats.appointed} color="blue" />
               <StatCard icon={<UserRound size={20} />} label="Gelen Müşteri" value={stats.arrived} color="green" />
               <StatCard icon={<ShoppingCart size={20} />} label="Satış Olan" value={stats.customers} color="amber" />
