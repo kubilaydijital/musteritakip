@@ -425,7 +425,7 @@ function TrialExpired({ onLogout, trialEndsAt, businessName }) {
   )
 }
 
-const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', newNote: '', result: 'Randevu aldı', saleAmount: '', appointmentDate: '', appointmentTime: '', entryDate: '', entryTime: '' }
+const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', newNote: '', result: 'Randevu aldı', saleAmount: '', appointmentDate: '', appointmentTime: '' }
 
 function toLocalDateValue(iso) {
   if (!iso) return ''
@@ -438,14 +438,6 @@ function toLocalTimeValue(iso) {
   const d = new Date(iso)
   const pad = n => String(n).padStart(2, '0')
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-// Yeni kayıt formunun "Kayıt Tarihi" alanı her zaman "şu an" ile dolu gelir.
-// Randevu tarihinden BAĞIMSIZDIR (o alan hâlâ sadece takvim/randevu amaçlıdır,
-// boş bırakılabilir). Kayıt Tarihi ise raporlarda esas alınan gerçek tarihtir -
-// personel geçmiş bir kaydı girerken bunu bilinçli olarak değiştirmek zorunda kalır.
-function freshEmptyForm() {
-  const nowIso = new Date().toISOString()
-  return { ...emptyForm, entryDate: toLocalDateValue(nowIso), entryTime: toLocalTimeValue(nowIso) }
 }
 
 function NoteHistory({ notes }) {
@@ -472,13 +464,11 @@ function NoteHistory({ notes }) {
 }
 
 function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile, notesForLead, existingLeads = [], onFoundExisting }) {
-  const [form, setForm] = useState(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at), entryDate: toLocalDateValue(editing.date), entryTime: toLocalTimeValue(editing.date) } : freshEmptyForm())
+  const [form, setForm] = useState(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
   const [appointmentErr, setAppointmentErr] = useState('')
-  const [entryDateErr, setEntryDateErr] = useState('')
-  const entryDateTouched = useRef(false)
   const [submitting, setSubmitting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [aiTip, setAiTip] = useState('')
@@ -488,9 +478,8 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const suppressNoticeReset = useRef(false)
 
   useEffect(() => {
-    setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at), entryDate: toLocalDateValue(editing.date), entryTime: toLocalTimeValue(editing.date) } : freshEmptyForm())
-    setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setEntryDateErr(''); setConfirmingDelete(false)
-    entryDateTouched.current = false
+    setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
+    setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setConfirmingDelete(false)
     setAiTip(''); setAiErr('')
     if (suppressNoticeReset.current) {
       // Bu geçiş bir çift-kayıt tespiti sonucu oldu (onFoundExisting) — uyarıyı silme.
@@ -556,8 +545,6 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     }
     if (!editing && !form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
     else setNoteErr('')
-    if (!(form.entryDate && form.entryTime)) { setEntryDateErr('Kayıt tarihi ve saati zorunludur.'); ok = false }
-    else setEntryDateErr('')
     if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
     else setAppointmentErr('')
     if (!form.name.trim()) ok = false
@@ -587,28 +574,22 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount.replace(/\./g, '')) : null
     const appointmentAt = (form.appointmentDate && form.appointmentTime) ? new Date(`${form.appointmentDate}T${form.appointmentTime}`).toISOString() : null
 
-    // Kaydetme anında son bir kontrol: Randevu Tarihi geçmişte bir tarihse VE
-    // kullanıcı Kayıt Tarihi'ni elle değiştirmediyse (entryDateTouched=false),
-    // Kayıt Tarihi'ni otomatik olarak Randevu Tarihi ile eşitliyoruz. Bu, hem
-    // yeni kayıtta hem de var olan bir kaydı sadece açıp "Güncelle"ye basarken
-    // (alana hiç dokunulmasa bile) doğru tarihin garanti altına alınmasını sağlar.
-    const autoSyncDate = (!entryDateTouched.current && appointmentAt && new Date(appointmentAt) < new Date())
-      ? appointmentAt
-      : null
+    // Kaydın gerçek tarihi otomatik belirlenir: Randevu/Görüşme Tarihi geçmişte
+    // bir tarihse (örn. eski defterden aktarılan 2023 kaydı), kayıt o gerçek
+    // tarihle damgalanır - böylece "bu ay" raporları bugünün tarihine göre değil,
+    // olayın gerçekte olduğu tarihe göre hesaplanır. Randevu tarihi bugün/gelecekteyse
+    // (yeni, canlı bir kayıtsa) normal şekilde "şu an" kullanılır.
+    const isHistorical = appointmentAt && new Date(appointmentAt) < new Date()
 
     if (editing) {
-      const correctedDate = autoSyncDate || ((form.entryDate && form.entryTime)
-        ? new Date(`${form.entryDate}T${form.entryTime}`).toISOString()
-        : editing.date)
+      const correctedDate = isHistorical ? appointmentAt : editing.date
       await onUpdate({
         id: editing.id, name: form.name, phone: cleanPhone, channel: form.channel,
         service: form.service, note: form.newNote, result: form.result, sale_amount: saleAmount,
         appointment_at: appointmentAt, edited_at: new Date().toISOString(), date: correctedDate
       }, currentUser.full_name || currentUser.email)
     } else {
-      const entryDate = autoSyncDate || ((form.entryDate && form.entryTime)
-        ? new Date(`${form.entryDate}T${form.entryTime}`).toISOString()
-        : new Date().toISOString())
+      const entryDate = isHistorical ? appointmentAt : new Date().toISOString()
       await onAdd({
         id: uid(), branch_id: targetBranchId, name: form.name, phone: cleanPhone,
         channel: form.channel, service: form.service, note: form.note, result: form.result,
@@ -616,7 +597,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       })
     }
     setSubmitting(false)
-    setForm(freshEmptyForm())
+    setForm(emptyForm)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -661,46 +642,19 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
             const val = e.target.value
             set('appointmentDate', val)
             if (val && form.appointmentTime) setAppointmentErr('')
-            // Randevu tarihi geçmişte bir tarihe ayarlandıysa ve kullanıcı Kayıt Tarihi'ni
-            // elle değiştirmediyse, Kayıt Tarihi'ni de otomatik olarak aynı tarihe çekiyoruz.
-            if (val && form.appointmentTime && !entryDateTouched.current) {
-              const dt = new Date(`${val}T${form.appointmentTime}`)
-              if (dt < new Date()) {
-                setForm(f => ({ ...f, appointmentDate: val, entryDate: val, entryTime: form.appointmentTime }))
-                setEntryDateErr('')
-              }
-            }
           }} style={inputStyle} />
           <input type="time" value={form.appointmentTime} onChange={e => {
             const val = e.target.value
             set('appointmentTime', val)
             if (form.appointmentDate && val) setAppointmentErr('')
-            if (form.appointmentDate && val && !entryDateTouched.current) {
-              const dt = new Date(`${form.appointmentDate}T${val}`)
-              if (dt < new Date()) {
-                setForm(f => ({ ...f, appointmentTime: val, entryDate: form.appointmentDate, entryTime: val }))
-                setEntryDateErr('')
-              }
-            }
           }} style={inputStyle} />
         </div>
         <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>
           {form.result === 'Randevu aldı'
             ? 'Randevu tarihi ve saati zorunludur.'
-            : 'Randevu/görüşme tarihi — varsa girin, takvimde görünür. Boş bırakılabilir.'}
+            : 'Randevu/görüşme tarihi — varsa girin, takvimde görünür. Boş bırakılabilir. Geçmiş bir tarih girerseniz (örn. eski defterden aktarım), kayıt otomatik olarak o tarihe damgalanır, raporları bugünün tarihiyle etkilemez.'}
         </p>
         {appointmentErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{appointmentErr}</p>}
-      </div>
-      <div style={{ marginBottom: 10, padding: 10, borderRadius: 8, background: T.cardSoft, border: `1px solid ${T.border}` }}>
-        <p style={{ fontSize: 12.5, fontWeight: 600, color: T.text, margin: '0 0 6px' }}>Kayıt Tarihi *</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <input type="date" value={form.entryDate} onChange={e => { entryDateTouched.current = true; set('entryDate', e.target.value); if (e.target.value && form.entryTime) setEntryDateErr('') }} style={inputStyle} />
-          <input type="time" value={form.entryTime} onChange={e => { entryDateTouched.current = true; set('entryTime', e.target.value); if (form.entryDate && e.target.value) setEntryDateErr('') }} style={inputStyle} />
-        </div>
-        <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>
-          Randevu/görüşme tarihine geçmiş bir tarih girdiğinizde bu alan otomatik olarak eşleşir. Farklı bir tarih istiyorsanız buradan elle değiştirebilirsiniz. Bu alan zorunludur, boş bırakılamaz.
-        </p>
-        {entryDateErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{entryDateErr}</p>}
       </div>
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
