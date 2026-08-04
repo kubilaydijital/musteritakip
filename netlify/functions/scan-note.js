@@ -1,3 +1,5 @@
+import { requireAuthorizedUser } from './_auth.js'
+
 // Netlify Function: Kağıda elle yazılmış görüşme notlarının fotoğrafını okuyup
 // (ad soyad, telefon, geldi/gelmedi, satış oldu/olmadı gibi bilgileri) yapılandırılmış
 // JSON olarak çıkarır. Groq API key'i Netlify environment variable olarak saklanır
@@ -57,6 +59,9 @@ export async function handler(event) {
   if (!imageBase64) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Fotoğraf verisi (imageBase64) gerekli' }) }
   }
+
+  const authorization = await requireAuthorizedUser(event)
+  if (authorization.error) return authorization.error
 
   const cleanBase64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
   const resolvedMimeType = mimeType || 'image/jpeg'

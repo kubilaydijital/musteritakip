@@ -3,8 +3,9 @@
 // Auth kullanıcısını silmek admin API (service role key) gerektirdiği için
 // bu işlem güvenli sunucu tarafında yapılıyor, tarayıcıda değil.
 
-const SUPABASE_URL = 'https://rngahpybhgdqabbkldrr.supabase.co'
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+import { requireAuthorizedUser } from './_auth.js'
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rngahpybhgdqabbkldrr.supabase.co'
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -23,11 +24,18 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'userId gerekli' }) }
   }
 
+  const authorization = await requireAuthorizedUser(event, { superAdminOnly: true })
+  if (authorization.error) return authorization.error
+  if (authorization.authUser.id === userId) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Kendi hesabınızı silemezsiniz' }) }
+  }
+  const { serviceRoleKey } = authorization
+
   try {
     // 1) app_users tablosundan sil
     const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/app_users?id=eq.${encodeURIComponent(userId)}`, {
       method: 'DELETE',
-      headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
     })
     if (!dbRes.ok) {
       const errText = await dbRes.text()
@@ -37,7 +45,7 @@ export async function handler(event) {
     // 2) Supabase Auth kaydını sil (gerçek giriş yetkisini kaldırır)
     const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
       method: 'DELETE',
-      headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
     })
     // Auth kaydı zaten yoksa (örn. daha önce silinmişse) 404 dönebilir, bunu hataya saymayalım.
     if (!authRes.ok && authRes.status !== 404) {

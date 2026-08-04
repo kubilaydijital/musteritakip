@@ -1,3 +1,5 @@
+import { requireAuthorizedUser } from './_auth.js'
+
 // Netlify Function: 7 günlük deneme hesabı oluştuğunda, kullanıcıya giriş bilgilerini
 // e-posta ile gönderir. Resend API key'i Netlify environment variable olarak saklanır
 // (RESEND_API_KEY), frontend'e asla açık edilmez.
@@ -18,6 +20,12 @@ export async function handler(event) {
 
   if (!email) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Eksik alanlar' }) }
+  }
+
+  const authorization = await requireAuthorizedUser(event)
+  if (authorization.error) return authorization.error
+  if (authorization.authUser.email?.toLowerCase() !== email.trim().toLowerCase()) {
+    return { statusCode: 403, body: JSON.stringify({ error: 'Başka bir adrese e-posta gönderemezsiniz' }) }
   }
 
   const apiKey = process.env.RESEND_API_KEY

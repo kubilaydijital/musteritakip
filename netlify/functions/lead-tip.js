@@ -1,3 +1,5 @@
+import { requireAuthorizedUser } from './_auth.js'
+
 // Netlify Function: Bir görüşme notunu okuyup, personele kısa bir iletişim/satış
 // ipucu önerir. Groq API key'i Netlify environment variable olarak saklanır
 // (GROQ_API_KEY), frontend'e asla açık edilmez.
@@ -38,6 +40,9 @@ export async function handler(event) {
   if (!note || !note.trim()) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Not metni gerekli' }) }
   }
+
+  const authorization = await requireAuthorizedUser(event)
+  if (authorization.error) return authorization.error
 
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) {

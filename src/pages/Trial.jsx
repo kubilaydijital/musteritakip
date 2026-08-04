@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient.js'
+import { authenticatedNetlifyFetch } from '../lib/netlify.js'
 import Layout from '../components/Layout.jsx'
 import usePageMeta from '../usePageMeta.js'
 
@@ -72,7 +73,7 @@ export default function Trial() {
       // 5) Hoş geldin maili (Netlify Function üzerinden, Resend ile) - artık şifre içermiyor,
       // kullanıcı zaten kendi şifresini belirledi.
       try {
-        await fetch('/.netlify/functions/send-trial-email', {
+        await authenticatedNetlifyFetch('/.netlify/functions/send-trial-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -2,17 +2,13 @@
 // Supabase'in admin.createUser API'si SADECE service role key ile çalışır,
 // bu yüzden bu işlem tarayıcıda değil, güvenli sunucu tarafında yapılmalı.
 
-const SUPABASE_URL = 'https://rngahpybhgdqabbkldrr.supabase.co'
-// Service role key, Netlify environment variable olarak saklanıyor (asla kod içine yazılmaz).
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+import { requireAuthorizedUser } from './_auth.js'
 
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rngahpybhgdqabbkldrr.supabase.co'
+// Service role key, Netlify environment variable olarak saklanıyor (asla kod içine yazılmaz).
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
-  }
-
-  if (!SERVICE_ROLE_KEY) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Sunucu yapılandırma hatası: SUPABASE_SERVICE_ROLE_KEY tanımlı değil' }) }
   }
 
   let payload
@@ -28,6 +24,11 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'E-posta ve şifre gerekli' }) }
   }
 
+  // Kullanıcı açmak, tüm sisteme erişim verebildiği için yalnızca süper admin'e açıktır.
+  const authorization = await requireAuthorizedUser(event, { superAdminOnly: true })
+  if (authorization.error) return authorization.error
+  const { serviceRoleKey } = authorization
+
   // Panelden açılan hesaplar da (self-servis kayıt gibi) varsayılan olarak deneme süresiyle başlar.
   // trial_days gönderilmezse varsayılan 7 gün. Kim çağırırsa çağırsın (tarayıcı arayüzü atlanıp
   // doğrudan bu uca istek gönderilse bile) süre en fazla 30 gün olabilir - bu üst sınır,
@@ -41,8 +42,8 @@ export async function handler(event) {
     const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
       method: 'POST',
       headers: {
-        apikey: SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -67,8 +68,8 @@ export async function handler(event) {
     const updateRes = await fetch(`${SUPABASE_URL}/rest/v1/app_users?id=eq.${userId}`, {
       method: 'PATCH',
       headers: {
-        apikey: SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
       },

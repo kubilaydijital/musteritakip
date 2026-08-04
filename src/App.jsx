@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from './supabaseClient'
-import ExcelJS from 'exceljs'
+import { authenticatedNetlifyFetch } from './lib/netlify'
+import { T } from './panel/theme'
+import { ExportButtons } from './panel/ExportButtons'
+import { leadsToExportRows } from './panel/exportRows'
 import {
   Chart, BarController, BarElement, DoughnutController, ArcElement,
   LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip
@@ -8,91 +11,10 @@ import {
 import {
   MessageCircle, CalendarDays, UserRound, ShoppingCart, TrendingUp, Wallet,
   Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
-  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Download, Flame
+  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Flame
 } from 'lucide-react'
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
-
-// Dosya indirme yardımcı fonksiyonu - tarayıcıda blob oluşturup otomatik indirme tetikler.
-function downloadBlob(content, filename, mimeType) {
-  const blob = new Blob([content], { type: mimeType })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
-// rows: [{ "Sütun Adı": değer, ... }, ...] formatında satır dizisi bekler.
-function exportToCsv(rows, filename) {
-  if (!rows || rows.length === 0) return
-  const headers = Object.keys(rows[0])
-  // CSV hücrelerinde virgül/tırnak/satır sonu varsa tırnak içine alıp kaçış karakteri ekliyoruz.
-  const escapeCell = (val) => {
-    const str = val == null ? '' : String(val)
-    if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`
-    return str
-  }
-  const lines = [
-    headers.map(escapeCell).join(','),
-    ...rows.map(row => headers.map(h => escapeCell(row[h])).join(',')),
-  ]
-  // Excel'de Türkçe karakterlerin doğru görünmesi için BOM (byte order mark) ekliyoruz.
-  const csvContent = '\uFEFF' + lines.join('\r\n')
-  downloadBlob(csvContent, filename, 'text/csv;charset=utf-8;')
-}
-
-async function exportToExcel(rows, filename, sheetName = 'Veri') {
-  if (!rows || rows.length === 0) return
-  const workbook = new ExcelJS.Workbook()
-  const worksheet = workbook.addWorksheet(sheetName)
-  const headers = Object.keys(rows[0])
-  worksheet.columns = headers.map(h => ({ header: h, key: h, width: Math.max(14, h.length + 2) }))
-  worksheet.getRow(1).font = { bold: true }
-  rows.forEach(row => worksheet.addRow(row))
-  const buffer = await workbook.xlsx.writeBuffer()
-  downloadBlob(buffer, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-}
-
-// Danışan kayıtlarını dışa aktarma formatına çevirir (Meta/Google Ads yüklemesine uygun
-// E.164 telefon formatı korunur, panel kolonları Türkçe başlıklarla etiketlenir).
-function leadsToExportRows(leads, branchNameFn, showBranch) {
-  return leads.map(l => ({
-    'Ad Soyad': l.name,
-    'Telefon': l.phone,
-    ...(showBranch ? { 'Şube': branchNameFn(l.branch_id) } : {}),
-    'Kanal': l.channel,
-    'Hizmet': l.service || '',
-    'Sonuç': l.result,
-    'Tutar (TL)': l.sale_amount != null ? l.sale_amount : '',
-    'Randevu Tarihi': l.appointment_at ? new Date(l.appointment_at).toLocaleString('tr-TR') : '',
-    'Not': l.note || '',
-    'Kayıt Tarihi': l.date ? new Date(l.date).toLocaleDateString('tr-TR') : '',
-  }))
-}
-
-function ExportButtons({ rows, baseFilename, sheetName }) {
-  if (!rows || rows.length === 0) return null
-  return (
-    <div style={{ display: 'flex', gap: 8 }}>
-      <button onClick={() => exportToCsv(rows, `${baseFilename}.csv`)} style={{
-        fontSize: 12.5, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`,
-        background: 'transparent', color: T.textSoft, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
-      }}>
-        <Download size={13} /> CSV
-      </button>
-      <button onClick={() => exportToExcel(rows, `${baseFilename}.xlsx`, sheetName)} style={{
-        fontSize: 12.5, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`,
-        background: 'transparent', color: T.textSoft, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
-      }}>
-        <Download size={13} /> Excel
-      </button>
-    </div>
-  )
-}
 
 const CHANNELS = ['Instagram', 'WhatsApp', 'Telefon', 'Google Ads', 'Facebook Ads', 'TikTok', 'Online Randevu', 'Organik', 'Kağıt Not']
 const RESULTS = ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
@@ -156,27 +78,6 @@ function staleness(lead, noteCount = 0, rule = null) {
 }
 function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
-// Tasarım sistemi token'ları — koyu tema
-const T = {
-  primary: '#7C5CFC',
-  primaryDark: '#6C3FFC',
-  primaryLight: 'rgba(124,92,252,0.1)',
-  bg: '#FFFFFF',
-  card: '#FFFFFF',
-  cardSoft: 'rgba(124,92,252,0.04)',
-  border: 'rgba(0,0,0,0.08)',
-  text: '#1A1A2E',
-  textSoft: '#6B7280',
-  textFaint: '#9CA3AF',
-  green: '#16A34A',
-  greenBg: 'rgba(22,163,74,0.1)',
-  orange: '#D97706',
-  orangeBg: 'rgba(217,119,6,0.1)',
-  red: '#DC2626',
-  redBg: 'rgba(220,38,38,0.1)',
-  blue: '#2563EB',
-  blueBg: 'rgba(37,99,235,0.1)',
-}
 const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: '#faf9fc', color: T.text, colorScheme: 'light' }
 const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 4px 20px rgba(124,92,252,0.06)' }
 const quickBtnStyle = {
@@ -508,7 +409,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     setAiErr('')
     setAiTip('')
     try {
-      const res = await fetch('/.netlify/functions/lead-tip', {
+      const res = await authenticatedNetlifyFetch('/.netlify/functions/lead-tip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ note: noteText, result: form.result, service: form.service }),
@@ -2900,28 +2801,39 @@ export function PanelApp() {
   }
   async function toggleActive(userId, currentActive) {
     const newActive = currentActive === false ? true : false
-    const { data } = await supabase.from('app_users').update({ active: newActive }).eq('id', userId).select()
-    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
+    const res = await authenticatedNetlifyFetch('/.netlify/functions/manage-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_active', userId, active: newActive }),
+    })
+    const result = await res.json()
+    if (!res.ok) throw new Error(result.error || 'Kullanıcı güncellenemedi')
+    if (result.user) setUsers(prev => prev.map(u => u.id === userId ? result.user : u))
   }
   // Ödeme bildirimi onaylandığında (WhatsApp/e-posta üzerinden manuel kontrol sonrası),
   // süper admin bu fonksiyonla kullanıcının erişimini 30 gün daha uzatır.
   // Mevcut bitiş tarihi hâlâ ileride bir tarihse (erken ödeme yapıldıysa) o tarihten,
   // geçmişte kaldıysa bugünden itibaren 30 gün eklenir.
-  async function extendTrial(userId, currentTrialEndsAt) {
-    const base = currentTrialEndsAt && new Date(currentTrialEndsAt) > new Date() ? new Date(currentTrialEndsAt) : new Date()
-    const newEnd = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    const { data } = await supabase.from('app_users').update({ is_trial: true, trial_ends_at: newEnd }).eq('id', userId).select()
-    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
+  async function extendTrial(userId) {
+    const res = await authenticatedNetlifyFetch('/.netlify/functions/manage-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'extend_trial', userId }),
+    })
+    const result = await res.json()
+    if (!res.ok) throw new Error(result.error || 'Deneme süresi uzatılamadı')
+    if (result.user) setUsers(prev => prev.map(u => u.id === userId ? result.user : u))
   }
   // Kalıcı olarak sınırsız erişim tanımak istersen (örn. özel anlaşma), is_trial'ı kapatır.
   async function grantUnlimitedAccess(userId) {
-    const { data } = await supabase.from('app_users').update({ is_trial: false, trial_ends_at: null }).eq('id', userId).select()
-    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
+    const res = await authenticatedNetlifyFetch('/.netlify/functions/manage-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'grant_unlimited', userId }),
+    })
+    const result = await res.json()
+    if (!res.ok) throw new Error(result.error || 'Sınırsız erişim verilemedi')
+    if (result.user) setUsers(prev => prev.map(u => u.id === userId ? result.user : u))
   }
   async function addUser(user) {
     // Kullanıcı oluşturma admin API gerektirdiği için (service role key), bu işlem
     // güvenli sunucu tarafında (Netlify Function) yapılıyor, tarayıcıda değil.
-    const res = await fetch('/.netlify/functions/create-user', {
+    const res = await authenticatedNetlifyFetch('/.netlify/functions/create-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2944,7 +2856,7 @@ export function PanelApp() {
   async function deleteUser(userId) {
     // Hem app_users kaydını hem gerçek Supabase Auth girişini (service role
     // gerektirdiği için Netlify Function üzerinden) tamamen siler.
-    const res = await fetch('/.netlify/functions/delete-user', {
+    const res = await authenticatedNetlifyFetch('/.netlify/functions/delete-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId }),
@@ -2966,12 +2878,22 @@ export function PanelApp() {
     }
   }
   async function changeUserEmail(userId, newEmail) {
-    const { data } = await supabase.from('app_users').update({ email: newEmail || null }).eq('id', userId).select()
-    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
+    const res = await authenticatedNetlifyFetch('/.netlify/functions/manage-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'change_email', userId, email: newEmail }),
+    })
+    const result = await res.json()
+    if (!res.ok) throw new Error(result.error || 'E-posta güncellenemedi')
+    if (result.user) setUsers(prev => prev.map(u => u.id === userId ? result.user : u))
   }
   async function changeUserName(userId, newName) {
-    const { data } = await supabase.from('app_users').update({ full_name: newName }).eq('id', userId).select()
-    if (data) setUsers(prev => prev.map(u => u.id === userId ? data[0] : u))
+    const res = await authenticatedNetlifyFetch('/.netlify/functions/manage-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'change_name', userId, fullName: newName }),
+    })
+    const result = await res.json()
+    if (!res.ok) throw new Error(result.error || 'Ad soyad güncellenemedi')
+    if (result.user) setUsers(prev => prev.map(u => u.id === userId ? result.user : u))
   }
   async function addBranch(branch) {
     const { data } = await supabase.from('branches').insert(branch).select()
@@ -3407,7 +3329,7 @@ export function PanelApp() {
                 onDelete={deleteService}
               />
             )}
-            {perms.can_manage_users && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeName={changeUserName} onChangeEmail={changeUserEmail} branches={activeBranches} templates={templates} isMobile={isMobile} currentUserId={currentUser.id} isSuperAdmin={isSuperAdmin} />}
+            {isSuperAdmin && <UserManagement users={users} onToggle={toggleActive} onAdd={addUser} onDelete={deleteUser} onChangePassword={changeUserPassword} onChangeName={changeUserName} onChangeEmail={changeUserEmail} branches={activeBranches} templates={templates} isMobile={isMobile} currentUserId={currentUser.id} isSuperAdmin={isSuperAdmin} />}
           </div>
         )}
 
