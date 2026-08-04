@@ -1,127 +1,114 @@
 import { Link } from 'react-router-dom'
-import { CheckCircle2, ArrowRight, Mail, Monitor, Smartphone, ShieldCheck, MessageCircle, ChevronDown } from 'lucide-react'
+import {
+  ArrowRight, CalendarClock, ChartNoAxesCombined, Check, CircleCheck,
+  MessageCircle, ShieldCheck, Sparkles, UsersRound, WalletCards,
+} from 'lucide-react'
 import Layout from '../components/Layout.jsx'
-import DashboardMock, { MobileReminderMock } from '../components/DashboardMock.jsx'
-import AdsFunnelGraphic from '../components/AdsFunnelGraphic.jsx'
 import dashboardPreview from '../assets/dashboard-preview.png'
 import ReferenceLogo from '../components/ReferenceLogo.jsx'
-import ReminderTable from '../components/ReminderTable.jsx'
 import { features, references } from '../data/siteData.js'
 import usePageMeta from '../usePageMeta.js'
 
+const WHATSAPP_URL = 'https://wa.me/905336153445?text=Merhaba%2C%20M%C3%BC%C5%9Fteri%20Takip%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum.'
+
+const outcomes = [
+  { icon: UsersRound, label: 'Tüm talepler tek yerde' },
+  { icon: CalendarClock, label: 'Randevular gözden kaçmaz' },
+  { icon: ChartNoAxesCombined, label: 'Reklamdan satışa netlik' },
+]
+
+const steps = [
+  ['01', 'Talepleri toplayın', 'Instagram, WhatsApp, telefon ve online randevu kayıtları tek ekranda buluşur.'],
+  ['02', 'Ekibi yönlendirin', 'Doğru müşteriye, doğru zamanda dönüş yapmak için akıllı hatırlatmalar kullanın.'],
+  ['03', 'Sonucu görün', 'Randevu, satış ve reklam performansını sade raporlarla takip edin.'],
+]
+
 export default function LandingPage() {
-  usePageMeta(null, 'Güzellik salonları, klinikler ve randevu bazlı hizmet işletmeleri için lead ve randevu takip sistemi. Instagram, WhatsApp ve telefon görüşmelerini tek panelde topla, kaybı durdur.')
-  const preview = features.slice(0, 6)
+  usePageMeta(null, 'Müşteri Takip; randevu bazlı işletmeler için lead, müşteri, randevu ve reklam performansını tek panelde birleştirir.')
+  const capabilities = features.slice(0, 6)
+
   return (
     <Layout>
-      <main>
-        <section className="hero section-glow">
-          <div className="container hero-grid">
-            <div className="hero-copy">
-              <span className="eyebrow"><span></span>Hizmet sektörü için müşteri takip sistemi</span>
-              <h1>Reklamdan Gelen Her Mesaj<br/><strong>Satışa Dönüşüyor mu?</strong></h1>
-              <p>Meta reklamlarından gelen talepleri, personel görüşmelerini, randevuları ve satışları tek panelden takip edin. Reklam bütçenizin nerede kaybolduğunu görün.</p>
-              <div className="hero-actions">
-                <a href="https://wa.me/905336153445?text=Merhaba%2C%20M%C3%BC%C5%9Fteri%20Takip%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noreferrer" className="btn btn-primary big"><MessageCircle size={18}/> Ücretsiz Canlı Demo Planla</a>
-                <a href="#nasil-calisiyor" className="btn btn-ghost big">Nasıl Çalışıyor? <ChevronDown size={18}/></a>
+      <main className="premium-site">
+        <section className="landing-hero">
+          <div className="container landing-hero-grid">
+            <div className="landing-hero-copy">
+              <span className="premium-kicker"><Sparkles size={14} /> Hizmet işletmeleri için müşteri yönetimi</span>
+              <h1>Müşteri sürecinizi<br /><em>görünür</em> kılın.</h1>
+              <p>Reklamdan gelen ilk mesajdan satışa kadar bütün süreci tek, sakin ve anlaşılır panelden yönetin.</p>
+              <div className="landing-actions">
+                <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="premium-button primary"><MessageCircle size={18} /> Canlı demo planla <ArrowRight size={17} /></a>
+                <Link to="/giris" className="premium-button secondary">Panele giriş yap</Link>
               </div>
-              <div className="hero-checks"><span><CheckCircle2/>7 gün ücretsiz deneme</span><span><CheckCircle2/>Kredi kartı gerekmez</span><span><CheckCircle2/>İşletmenize özel kurulum</span></div>
+              <div className="landing-assurances">
+                <span><Check size={15} /> 7 gün ücretsiz deneme</span>
+                <span><Check size={15} /> Kredi kartı gerekmez</span>
+                <span><Check size={15} /> Kurulum desteği dahil</span>
+              </div>
             </div>
-            <div className="hero-visual"><AdsFunnelGraphic /></div>
-          </div>
-        </section>
 
-        <section id="nasil-calisiyor" className="container product-preview">
-          <span className="eyebrow"><span></span>Gerçek panel görüntüsü</span>
-          <h2>İlk kez reklamdan satışa kadar<br/><strong>tüm süreci tek panelden görün.</strong></h2>
-          <div className="browser-frame">
-            <div className="browser-bar"><span></span><span></span><span></span></div>
-            <img src={dashboardPreview} alt="Müşteri Takip panel — Genel Bakış ekranı" />
-          </div>
-        </section>
-
-        <section className="container references-strip">
-          <p>Bize güvenen işletmeler</p>
-          <div className="reference-row">{references.map((item) => <ReferenceLogo key={item.name} item={item} />)}</div>
-        </section>
-
-
-        <section className="container feature-strip">
-          {preview.map((item) => {
-            const Icon = item.icon
-            return <article key={item.title} className="feature-mini"><Icon size={28}/><h3>{item.title}</h3><p>{item.desc}</p></article>
-          })}
-        </section>
-
-        <section className="container compare-section">
-          <div className="problem-card">
-            <h2>Hâlâ kağıt defter mi kullanıyorsunuz?</h2>
-            <ul>
-              <li>Müşteriler kayboluyor, notlar karışıyor.</li>
-              <li>Randevu çakışmaları ve iptaller yaşanıyor.</li>
-              <li>Hangi kaynaktan müşteri geldiğini bilmiyorsunuz.</li>
-              <li>Günlük, haftalık rapor almak imkansızlaşıyor.</li>
-              <li>İşiniz büyüdükçe kontrolü kaybediyorsunuz.</li>
-            </ul>
-          </div>
-          <div className="compare-arrow"><ArrowRight size={34}/></div>
-          <div className="solution-card">
-            <h2>Müşteri Takip ile her şey kontrol altında</h2>
-            <ul>
-              <li>Tüm müşteri bilgileri tek yerde, güvenle saklanır.</li>
-              <li>Randevular, hatırlatmalar ve iptaller düzenli yönetilir.</li>
-              <li>Reklam ve kaynak performansınızı net görün.</li>
-              <li>Gerçek zamanlı raporlarla işinizi büyütün.</li>
-              <li>Kaçan müşterinin peşinden gidin, kazancınızı artırın.</li>
-            </ul>
-          </div>
-        </section>
-
-        <section className="container reminder-flow-card">
-          <div className="reminder-text"><h2>Unutsanız da sistem unutmaz.</h2><p>Hatırlatma sistemi müşterinizin sonucuna göre çalışır. Sistem doğru zamanda uyarır, ekip doğru kişiye ulaşır.</p></div>
-          <div className="flow"><span>1. Hatırlatma<small>1g / 3g / 15g</small></span><ArrowRight/><span>2. Hatırlatma<small>+14g / +30g</small></span><ArrowRight/><span>3. Hatırlatma<small>+30g / +60g</small></span><ArrowRight/><b>Geri kazanılan müşteri</b></div>
-        </section>
-
-        <section className="reminder-section">
-          <div className="container split-grid">
-            <div>
-              <span className="eyebrow"><span></span>Nasıl çalışır?</span>
-              <h2>Sonuca göre kademeli hatırlatma sistemi</h2>
-              <p>Randevu geçti, randevuya gelmedi, cevap yazıldı ama dönüş olmadı veya satın almadı. Her sonuç kategorisi için hatırlatma süresi farklıdır. 3 hatırlatma sonrası müşteri soğuk kabul edilir.</p>
-              <ReminderTable />
-            </div>
-            <div className="notice-card"><h3>Sistem sizi uyarır.</h3><p>Personel her gün kimi arayacağını ezberlemek zorunda kalmaz. Uyarılar sayesinde doğru müşteriye, doğru zamanda ulaşılır.</p><Link to="/ozellikler" className="btn btn-primary">Özellikleri İncele</Link></div>
-          </div>
-        </section>
-
-        <section className="container booking-feature">
-          <div className="booking-feature-copy">
-            <span className="booking-badge"><span></span>Yeni özellik</span>
-            <h2>Müşterileriniz artık sizi aramadan<br/><strong>randevu alabilir.</strong></h2>
-            <p>Kendi randevu sayfanızla, müşterileriniz 7/24 size uygun saati görüp anında randevu oluşturabilir. Siz hiçbir şey yapmadan, panel otomatik dolar.</p>
-            <a href="https://wa.me/905336153445?text=Merhaba%2C%20M%C3%BC%C5%9Fteri%20Takip%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noreferrer" className="btn btn-primary big">Ücretsiz Canlı Demo Planla <ArrowRight size={18}/></a>
-          </div>
-          <div className="booking-mock">
-            <p className="booking-mock-title">İşletmeniz</p>
-            <p className="booking-mock-sub">Aşağıdan size uygun bir gün ve saat seçin.</p>
-            <p className="booking-mock-label">Müsait saatler</p>
-            <div className="booking-mock-slots">
-              <span>10:00</span><span className="active">11:30</span><span>13:00</span><span>14:30</span>
-            </div>
-            <div className="booking-mock-fields">
-              <span>Ad Soyad</span>
-              <span>Telefon</span>
-              <div className="booking-mock-cta">11:30 için randevu al</div>
+            <div className="landing-hero-visual" aria-label="Müşteri Takip panel ön izlemesi">
+              <div className="hero-orbit orbit-one" />
+              <div className="hero-orbit orbit-two" />
+              <div className="hero-panel-card hero-floating-top"><span>Bu ayki dönüşüm</span><strong>+18,4%</strong><i>↑ geçen aya göre</i></div>
+              <div className="hero-dashboard-frame">
+                <div className="hero-dashboard-top"><span className="hero-logo-dot">M</span><span>Genel Bakış</span><small>Bu ay</small></div>
+                <img src={dashboardPreview} alt="Müşteri Takip paneli genel bakış ekranı" />
+              </div>
+              <div className="hero-panel-card hero-floating-bottom"><span className="status-dot" /> <b>18 müşteri için takip zamanı geldi</b></div>
             </div>
           </div>
         </section>
 
-        <section className="container device-section">
-          <div><h2>Her yerden, her cihazdan erişin.</h2><p>Bilgileriniz güvende, siz işinize odaklanın. Web ekranı, mobil uyum ve güvenli altyapı ile süreçlerinizi daha net yönetin.</p><div className="device-badges"><span><Monitor/>Web</span><span><Smartphone/>Mobil uyumlu</span><span><ShieldCheck/>Güvenli altyapı</span></div></div>
-          <DashboardMock compact />
+        <section className="landing-outcomes-wrap">
+          <div className="container landing-outcomes">
+            {outcomes.map(({ icon: Icon, label }) => <div key={label}><span><Icon size={19} /></span><p>{label}</p></div>)}
+          </div>
         </section>
 
-        <section className="container final-cta"><h2>Hemen başlayın, işinizi kolaylaştırın.</h2><p>İşletmenizin ihtiyacını konuşmak için ücretsiz bir canlı demo planlayın.</p><div><a href="https://wa.me/905336153445?text=Merhaba%2C%20M%C3%BC%C5%9Fteri%20Takip%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noreferrer" className="btn btn-primary big">Ücretsiz Canlı Demo Planla</a></div></section>
+        <section className="container landing-trust">
+          <p>Farklı hizmet sektörlerindeki işletmelerin tercihi</p>
+          <div className="landing-trust-logos">{references.map((item) => <ReferenceLogo key={item.name} item={item} />)}</div>
+        </section>
+
+        <section className="container product-story">
+          <div className="section-heading compact">
+            <span className="premium-kicker">Tek merkez, net kararlar</span>
+            <h2>Ekibiniz için daha az karmaşa.<br />İşletmeniz için daha çok kontrol.</h2>
+            <p>Rutin iş akışlarını tek bir yerde toplar; müşteri sürecini kişilere değil sisteme bağlar.</p>
+          </div>
+          <div className="product-window">
+            <div className="product-window-bar"><span /><span /><span /><p>app.musteritakip.net / genel-bakis</p><i>Canlı veri</i></div>
+            <img src={dashboardPreview} alt="Müşteri Takip raporlama ve müşteri takip ekranı" />
+          </div>
+        </section>
+
+        <section className="container capability-section">
+          <div className="section-heading split-heading">
+            <div><span className="premium-kicker">Günlük operasyon için tasarlandı</span><h2>İşletmenin her gün baktığı tek ekran.</h2></div>
+            <p>Takip, randevu, satış ve reklam performansını; ekibin hızını kesmeden bir araya getirir.</p>
+          </div>
+          <div className="capability-grid">
+            {capabilities.map((item, index) => {
+              const Icon = item.icon
+              return <article key={item.title} className={`capability-card capability-${index}`}><span className="capability-icon"><Icon size={21} /></span><h3>{item.title}</h3><p>{item.desc}</p><span className="capability-index">0{index + 1}</span></article>
+            })}
+          </div>
+        </section>
+
+        <section className="process-section">
+          <div className="container process-inner">
+            <div className="section-heading process-intro"><span className="premium-kicker"><ShieldCheck size={14} /> Düzenli ve güvenli süreç</span><h2>Her müşterinin sonraki adımı belli olsun.</h2><p>Sistem, kritik bilgileri ve takip zamanını öne çıkarır; ekip müşteriyi unutmaz, yöneticiler tablo peşinde koşmaz.</p></div>
+            <div className="process-steps">
+              {steps.map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}
+            </div>
+          </div>
+        </section>
+
+        <section className="container premium-cta">
+          <div><span className="premium-kicker"><WalletCards size={14} /> İlk 7 gün ücretsiz</span><h2>İşletmenizi daha net<br />yönetmeye başlayın.</h2><p>Size uygun kurulumu birlikte planlayalım. Verileriniz, süreçleriniz ve ekibiniz için doğru başlangıcı yapalım.</p></div>
+          <div className="premium-cta-side"><CircleCheck size={27} /><p>Kurulum ve ilk kullanım desteği dahil.</p><a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="premium-button light">Ücretsiz demo planla <ArrowRight size={17} /></a></div>
+        </section>
       </main>
     </Layout>
   )

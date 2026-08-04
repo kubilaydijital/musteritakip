@@ -78,19 +78,20 @@ function staleness(lead, noteCount = 0, rule = null) {
 }
 function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
-const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: '#faf9fc', color: T.text, colorScheme: 'light' }
-const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: '0 4px 20px rgba(124,92,252,0.06)' }
+const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: '#fff', color: T.text, colorScheme: 'light' }
+const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 15, boxShadow: '0 12px 28px rgba(20,32,57,0.045)' }
 const quickBtnStyle = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9,
-  border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, fontSize: 12.5, cursor: 'pointer', textAlign: 'left'
+  border: '1px solid rgba(237,242,250,0.12)', background: 'rgba(255,255,255,0.045)', color: T.sidebarMuted, fontSize: 12.5, cursor: 'pointer', textAlign: 'left'
 }
 function getPageWrapStyle(isMobile) {
   return {
     flex: 1,
-    padding: isMobile ? '16px 14px 84px' : '28px 32px',
+    padding: isMobile ? '16px 14px 84px' : '32px 38px',
     width: '100%',
     maxWidth: 'none',
-    overflowX: 'hidden'
+    overflowX: 'hidden',
+    background: T.bg,
   }
 }
 
@@ -2063,21 +2064,21 @@ const NAV_ITEMS = [
 function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout, onQuickAction, trialDaysLeft }) {
   return (
     <div style={{
-      width: 248, flexShrink: 0, background: T.card, borderRight: `1px solid ${T.border}`,
-      minHeight: '100vh', padding: '22px 16px', display: 'flex', flexDirection: 'column'
+      width: 258, flexShrink: 0, background: T.sidebar, borderRight: 'none',
+      minHeight: '100vh', padding: '24px 16px 18px', display: 'flex', flexDirection: 'column'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 6px 18px', marginBottom: 14 }}>
         <span style={{
-          width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${T.primary}, #A78BFA)`,
-          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 17
+          width: 37, height: 37, borderRadius: 11, background: '#fff',
+          color: T.sidebar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 17
         }}>M</span>
         <div>
-          <p style={{ fontWeight: 800, fontSize: 14.5, margin: 0, color: T.text, lineHeight: 1.25, letterSpacing: '0.01em' }}>MÜŞTERİ<br />TAKİP</p>
+          <p style={{ fontWeight: 800, fontSize: 13, margin: 0, color: T.sidebarText, lineHeight: 1.2, letterSpacing: '0.1em' }}>MÜŞTERİ<br />TAKİP</p>
         </div>
       </div>
       <div style={{
-        background: T.primaryLight, borderRadius: 10, padding: '9px 11px', marginBottom: trialDaysLeft != null ? 8 : 16,
-        fontSize: 12, color: '#C7B9FF', fontWeight: 600
+        background: 'rgba(255,255,255,0.075)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '9px 11px', marginBottom: trialDaysLeft != null ? 8 : 16,
+        fontSize: 12, color: T.sidebarMuted, fontWeight: 600
       }}>{currentUser.full_name || currentUser.email} · {branchLabel}</div>
       {trialDaysLeft != null && (
         <div style={{
@@ -2094,8 +2095,8 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
           return (
             <button key={item.key} onClick={() => onSelect(item.key)} style={{
               display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10,
-              border: 'none', background: active ? T.primary : 'transparent',
-              color: active ? '#fff' : T.textSoft,
+              border: active ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent', background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+              color: active ? '#fff' : T.sidebarMuted,
               fontWeight: active ? 600 : 500, fontSize: 14, cursor: 'pointer',
               textAlign: 'left', width: '100%', transition: 'background 0.15s ease'
             }}>
@@ -2108,7 +2109,7 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
 
       {onQuickAction && (
         <div style={{ marginTop: 22 }}>
-          <p style={{ fontSize: 11, color: T.textFaint, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px', fontWeight: 700 }}>Hızlı İşlemler</p>
+          <p style={{ fontSize: 10.5, color: '#8190A8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 10px', fontWeight: 700 }}>Hızlı İşlemler</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <button onClick={() => onQuickAction('clients')} style={quickBtnStyle}><Plus size={14} /> Yeni Görüşme</button>
             <button onClick={() => onQuickAction('appointments')} style={quickBtnStyle}><Plus size={14} /> Randevu Oluştur</button>
@@ -2119,11 +2120,11 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
 
       <div style={{ marginTop: 'auto', paddingTop: 18 }}>
         <button onClick={onLogout} style={{
-          width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`,
-          background: 'transparent', color: T.textSoft, fontWeight: 500, fontSize: 13, cursor: 'pointer',
+          width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(237,242,250,0.12)',
+          background: 'transparent', color: T.sidebarMuted, fontWeight: 500, fontSize: 13, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
         }}><LogOut size={14} /> Çıkış yap</button>
-        <p style={{ fontSize: 11, color: T.textFaint, margin: '14px 0 0', textAlign: 'center' }}>Müşteri Takip v2.0.0</p>
+        <p style={{ fontSize: 10.5, color: '#8190A8', margin: '14px 0 0', textAlign: 'center' }}>Müşteri Takip v2.0.0</p>
       </div>
     </div>
   )
@@ -3086,7 +3087,7 @@ export function PanelApp() {
     : null
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: isMobile ? 'column' : 'row', background: T.bg, minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
+    <div style={{ fontFamily: "'DM Sans', Inter, system-ui, sans-serif", display: 'flex', flexDirection: isMobile ? 'column' : 'row', background: T.bg, minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
