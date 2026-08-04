@@ -135,7 +135,11 @@ function staleness(lead, noteCount = 0, rule = null) {
     if (!lead.appointment_at) return null
     anchorDate = lead.appointment_at
   } else {
-    anchorDate = noteCount === 0 ? lead.date : lastTouch(lead)
+    // last_note_at, kayıt oluşturulduğunda zaten kayıt tarihiyle başlatılıyor ve her
+    // yeni notta güncelleniyor - bu yüzden doğrudan kullanmak yeterli ve doğrudur.
+    // (Önceki "noteCount === 0 ? lead.date : lastTouch(lead)" kontrolü gereksizdi ve
+    // sonuç kategorisi değiştiğinde yanlışlıkla eski kayıt tarihine dönmesine sebep oluyordu.)
+    anchorDate = lastTouch(lead)
   }
 
   const d = daysSince(anchorDate)
