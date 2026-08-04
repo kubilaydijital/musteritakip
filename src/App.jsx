@@ -680,9 +680,46 @@ function dateKey(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+// Randevu kaydındaki mevcut sonuç alanından, takvimde okunması kolay bir durum üretir.
+// Yeni bir veritabanı alanı gerektirmez; gelecek randevular ve sonuç bekleyen geçmiş
+// randevular otomatik ayrışır.
+const APPOINTMENT_STATUS = {
+  upcoming: { label: 'Yaklaşan', shortLabel: 'Yaklaşan', color: '#6F61D9', bg: '#EEECFF' },
+  needs_result: { label: 'Sonuç girilmeli', shortLabel: 'Sonuç bekliyor', color: '#A87412', bg: '#FCF3DE' },
+  customer: { label: 'Müşteri oldu', shortLabel: 'Müşteri oldu', color: '#147561', bg: '#E8F4EF' },
+  no_show: { label: 'Randevuya gelmedi', shortLabel: 'Gelmedi', color: '#BF4B4B', bg: '#FBEAEA' },
+  not_bought: { label: 'Satın almadı', shortLabel: 'Satın almadı', color: '#A87412', bg: '#FCF3DE' },
+  awaiting_reply: { label: 'Dönüş bekliyor', shortLabel: 'Dönüş bekliyor', color: '#64748B', bg: '#EEF1F5' },
+}
+
+function getAppointmentStatus(lead) {
+  if (lead.result === 'Müşteri oldu') return 'customer'
+  if (lead.result === 'Randevuya gelmedi') return 'no_show'
+  if (lead.result === 'Satın almadı') return 'not_bought'
+  if (lead.result === 'Cevap yazıldı, müşteriden dönüş gelmedi') return 'awaiting_reply'
+
+  const appointmentTime = new Date(lead.appointment_at).getTime()
+  if (Number.isFinite(appointmentTime) && appointmentTime > Date.now()) return 'upcoming'
+  return 'needs_result'
+}
+
+function AppointmentStatusBadge({ status, compact = false }) {
+  const item = APPOINTMENT_STATUS[status]
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', borderRadius: 99,
+      padding: compact ? '3px 7px' : '4px 9px', background: item.bg, color: item.color,
+      fontSize: compact ? 10.5 : 11.5, fontWeight: 700,
+    }}>
+      {compact ? item.shortLabel : item.label}
+    </span>
+  )
+}
+
 function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, showBranch, branchNameFn, isMobile }) {
   const [viewDate, setViewDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const scopedLeads = useMemo(() =>
     leads.filter(l => l.appointment_at),
@@ -728,6 +765,21 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
 
   const selectedKey = selectedDay ? dateKey(new Date(year, month, selectedDay)) : null
   const selectedLeads = selectedKey ? (leadsByDay[selectedKey] || []) : []
+  const selectedStatusCounts = selectedLeads.reduce((counts, lead) => {
+    const status = getAppointmentStatus(lead)
+    counts[status] = (counts[status] || 0) + 1
+    return counts
+  }, {})
+  const filteredSelectedLeads = statusFilter === 'all'
+    ? selectedLeads
+    : selectedLeads.filter(lead => getAppointmentStatus(lead) === statusFilter)
+  const statusFilters = [
+    ['all', 'Tümü'],
+    ['needs_result', 'Sonuç bekliyor'],
+    ['upcoming', 'Yaklaşan'],
+    ['customer', 'Müşteri oldu'],
+    ['no_show', 'Gelmedi'],
+  ]
 
   return (
     <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem 0.75rem' : '1.25rem', marginBottom: '1.5rem' }}>
@@ -743,6 +795,23 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
         </div>
         <button type="button" onClick={() => changeMonth(1)} style={{ padding: '4px 10px', borderRadius: 8 }}>›</button>
       </div>
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
+        {statusFilters.map(([value, label]) => {
+          const active = statusFilter === value
+          const config = value === 'all' ? null : APPOINTMENT_STATUS[value]
+          return (
+            <button key={value} type="button" onClick={() => setStatusFilter(value)} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 99, padding: isMobile ? '5px 8px' : '6px 10px',
+              border: active ? `1px solid ${config?.color || T.primary}` : `1px solid ${T.border}`,
+              background: active ? (config?.bg || T.primaryLight) : '#fff', color: active ? (config?.color || T.primary) : T.textSoft,
+              fontSize: isMobile ? 10.5 : 11.5, fontWeight: 700, cursor: 'pointer',
+            }}>
+              {config && <span style={{ width: 6, height: 6, borderRadius: '50%', background: config.color }} />}
+              {label}
+            </button>
+          )
+        })}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? 3 : 4, marginBottom: 6 }}>
         {WEEKDAY_NAMES.map(w => <div key={w} style={{ textAlign: 'center', fontSize: isMobile ? 10 : 11, color: '#888', fontWeight: 600 }}>{w}</div>)}
       </div>
@@ -751,25 +820,40 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
           if (d === null) return <div key={'e' + i} />
           const key = dateKey(new Date(year, month, d))
           const dayLeads = leadsByDay[key] || []
+          const dayStatusCounts = dayLeads.reduce((counts, lead) => {
+            const status = getAppointmentStatus(lead)
+            counts[status] = (counts[status] || 0) + 1
+            return counts
+          }, {})
           const isToday = key === todayKey
           const isSelected = key === selectedKey
           return (
             <button key={d} type="button" onClick={() => setSelectedDay(d)}
               style={{
                 position: 'relative', padding: isMobile ? '5px 2px' : '8px 4px', minHeight: isMobile ? 36 : 44, borderRadius: 8, textAlign: 'left',
-                background: isSelected ? '#6C5CE7' : (isToday ? '#eef2f8' : '#fafafa'),
+                background: isSelected ? T.primary : (isToday ? T.primaryLight : '#fff'),
                 color: isSelected ? '#fff' : '#222',
-                border: isToday && !isSelected ? '1px solid #6C5CE7' : '1px solid #eee',
+                border: isToday && !isSelected ? `1px solid ${T.primary}` : `1px solid ${T.border}`,
                 cursor: 'pointer', fontSize: isMobile ? 12 : 13
               }}>
               <span>{d}</span>
               {dayLeads.length > 0 && (
-                <span style={{
-                  display: 'block', marginTop: 4, fontSize: isMobile ? 9 : 10, fontWeight: 700,
-                  color: isSelected ? '#fff' : '#6C5CE7'
-                }}>
-                  {isMobile ? dayLeads.length : `${dayLeads.length} randevu`}
-                </span>
+                <>
+                  <span style={{
+                    display: 'block', marginTop: 4, fontSize: isMobile ? 9 : 10, fontWeight: 700,
+                    color: isSelected ? '#fff' : T.primary
+                  }}>
+                    {isMobile ? dayLeads.length : `${dayLeads.length} randevu`}
+                  </span>
+                  <span style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+                    {Object.entries(dayStatusCounts).slice(0, 4).map(([status, count]) => (
+                      <i key={status} title={`${APPOINTMENT_STATUS[status].label}: ${count}`} style={{
+                        display: 'block', width: isMobile ? 4 : 5, height: isMobile ? 4 : 5, borderRadius: '50%',
+                        background: isSelected ? 'rgba(255,255,255,0.9)' : APPOINTMENT_STATUS[status].color,
+                      }} />
+                    ))}
+                  </span>
+                </>
               )}
             </button>
           )
@@ -778,12 +862,24 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
 
       {selectedDay && (
         <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 14 }}>
-          <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>
+          <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 10px', color: T.text }}>
             {selectedDay} {MONTH_NAMES[month]} {year} — {selectedLeads.length} randevu
           </p>
+          {selectedLeads.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              {Object.entries(selectedStatusCounts).map(([status, count]) => (
+                <span key={status} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', borderRadius: 99, background: APPOINTMENT_STATUS[status].bg, color: APPOINTMENT_STATUS[status].color, fontSize: 11, fontWeight: 700 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: APPOINTMENT_STATUS[status].color }} />
+                  {count} {APPOINTMENT_STATUS[status].shortLabel.toLocaleLowerCase('tr-TR')}
+                </span>
+              ))}
+            </div>
+          )}
           {selectedLeads.length === 0 ? (
             <p style={{ fontSize: 13, color: '#888' }}>Bu günde randevu yok.</p>
-          ) : selectedLeads.map(lead => (
+          ) : filteredSelectedLeads.length === 0 ? (
+            <p style={{ fontSize: 13, color: T.textSoft }}>Bu filtreye uygun randevu yok.</p>
+          ) : filteredSelectedLeads.map(lead => (
             isMobile ? (
               <div key={lead.id} style={{ padding: '9px 0', fontSize: 13, borderBottom: '1px solid #f0f0f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -795,6 +891,7 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
                 <p style={{ margin: '3px 0 0', fontSize: 12, color: T.textSoft }}>
                   {canSeePhone ? lead.phone : '••• gizli'}{showBranch && ` · ${branchNameFn(lead.branch_id)}`} · {lead.service}
                 </p>
+                <div style={{ marginTop: 6 }}><AppointmentStatusBadge status={getAppointmentStatus(lead)} compact /></div>
                 {lead.note && <p style={{ margin: '2px 0 0', fontSize: 12, color: T.textFaint }}>{lead.note.slice(0, 40)}</p>}
               </div>
             ) : (
@@ -806,8 +903,11 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
                   <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {lead.service}</span>
                   {lead.note && <span style={{ color: T.textFaint, marginLeft: 8, fontSize: 12 }}>· {lead.note.slice(0, 40)}</span>}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#6C5CE7' }}>
-                  {new Date(lead.appointment_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 12 }}>
+                  <AppointmentStatusBadge status={getAppointmentStatus(lead)} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: T.primary }}>
+                    {new Date(lead.appointment_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </span>
               </div>
             )
