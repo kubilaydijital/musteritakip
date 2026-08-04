@@ -21,7 +21,8 @@ body { background: var(--premium-ivory); color: var(--premium-ink); font-family:
 .site-header { background: rgba(247, 246, 242, .88); border-bottom: 1px solid rgba(20, 32, 57, .08); backdrop-filter: blur(18px); }
 .header-inner { height: 78px; }
 .logo { gap: 10px; }
-.logo-mark { width: 39px; height: 39px; border-radius: 12px; background: var(--premium-ink); box-shadow: none; font-size: 17px; }
+.logo-mark { width: 39px; height: 39px; border-radius: 12px; background: var(--premium-ink); color: #fff; box-shadow: none; font-size: 17px; }
+.site-header .logo-mark { background: linear-gradient(135deg, var(--premium-violet), #978BEF); color: #fff; box-shadow: 0 8px 18px rgba(111, 97, 217, .2); }
 .logo-mark.small { width: 32px; height: 32px; border-radius: 10px; font-size: 14px; }
 .logo-text { font-size: 11.5px; line-height: 1.1; letter-spacing: .1em; color: var(--premium-ink); }
 .desktop-nav { gap: 23px; }
