@@ -49,13 +49,17 @@ export async function handler(event) {
       if (typeof payload.active !== 'boolean') return badRequest('active alanı gerekli')
       user = await updateAppUser(userId, { active: payload.active }, serviceRoleKey)
     } else if (action === 'extend_trial') {
+      // Abonelik ekranında yalnızca bu iki süre seçilebilir. İstek elle değiştirilse
+      // bile başka bir gün sayısı kabul edilmez.
+      const days = Number(payload.days)
+      if (![7, 30].includes(days)) return badRequest('Süre 7 veya 30 gün olmalı')
       const targetRes = await fetch(`${SUPABASE_URL}/rest/v1/app_users?id=eq.${encodeURIComponent(userId)}&select=trial_ends_at`, {
         headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
       })
       const targets = await targetRes.json()
       const currentEnd = Array.isArray(targets) ? targets[0]?.trial_ends_at : null
       const base = currentEnd && new Date(currentEnd) > new Date() ? new Date(currentEnd) : new Date()
-      const trialEndsAt = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      const trialEndsAt = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString()
       user = await updateAppUser(userId, { is_trial: true, trial_ends_at: trialEndsAt }, serviceRoleKey)
     } else if (action === 'grant_unlimited') {
       user = await updateAppUser(userId, { is_trial: false, trial_ends_at: null }, serviceRoleKey)
