@@ -1467,7 +1467,7 @@ function BranchServiceManager({ services, branchId, branchName, onAdd, onDelete 
   )
 }
 // Süper admin için: hangi işletmenin denemesinin ne zaman dolacağını/dolduğunu gösterir,
-// ödeme onaylandığında tek tıkla 30 gün uzatma imkanı sunar.
+// ödeme onaylandığında tek tıkla 7 veya 30 gün uzatma imkanı sunar.
 function SubscriptionManager({ users, branches, onExtend, onGrantUnlimited }) {
   const [busyId, setBusyId] = useState(null)
   function branchNameFor(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
@@ -1509,7 +1509,14 @@ function SubscriptionManager({ users, branches, onExtend, onGrantUnlimited }) {
             </div>
             {!isUnlimited && (
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={async () => { setBusyId(u.id); await onExtend(u.id, u.trial_ends_at); setBusyId(null) }}
+                <button onClick={async () => { setBusyId(u.id); await onExtend(u.id, 7); setBusyId(null) }}
+                  disabled={busyId === u.id} style={{
+                    fontSize: 12.5, fontWeight: 700, color: '#7C5CFC', background: '#fff', border: `1px solid ${T.primary}`,
+                    borderRadius: 8, padding: '7px 14px', cursor: 'pointer',
+                  }}>
+                  {busyId === u.id ? '...' : '+7 Gün Uzat'}
+                </button>
+                <button onClick={async () => { setBusyId(u.id); await onExtend(u.id, 30); setBusyId(null) }}
                   disabled={busyId === u.id} style={{
                     fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#7C5CFC', border: 'none',
                     borderRadius: 8, padding: '7px 14px', cursor: 'pointer',
@@ -2811,12 +2818,12 @@ export function PanelApp() {
     if (result.user) setUsers(prev => prev.map(u => u.id === userId ? result.user : u))
   }
   // Ödeme bildirimi onaylandığında (WhatsApp/e-posta üzerinden manuel kontrol sonrası),
-  // süper admin bu fonksiyonla kullanıcının erişimini 30 gün daha uzatır.
+  // süper admin bu fonksiyonla kullanıcının erişimini seçilen süre kadar uzatır.
   // Mevcut bitiş tarihi hâlâ ileride bir tarihse (erken ödeme yapıldıysa) o tarihten,
   // geçmişte kaldıysa bugünden itibaren 30 gün eklenir.
-  async function extendTrial(userId) {
+  async function extendTrial(userId, days) {
     const res = await authenticatedNetlifyFetch('/.netlify/functions/manage-user', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'extend_trial', userId }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'extend_trial', userId, days }),
     })
     const result = await res.json()
     if (!res.ok) throw new Error(result.error || 'Deneme süresi uzatılamadı')
