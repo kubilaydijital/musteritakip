@@ -2737,17 +2737,28 @@ export function PanelApp() {
     const map = {}
     const leadById = {}
     leads.forEach(l => { leadById[l.id] = l })
+
+    // Kaydın hayatı boyunca eklenen GERÇEK ilk notu (kronolojik olarak en eski) bulunuyor -
+    // sonuç kategorisi sonradan değişse bile, hariç tutulacak olan hep bu tek nottur.
+    // Önceki mantık "şu anki kategoride ilk not"u hariç tutuyordu; bu, kategori
+    // değiştikten sonra eklenen GERÇEK bir takip notunu da yanlışlıkla "kayıt açma
+    // notu" sayıp sıfırlıyordu.
+    const earliestNoteIdByLead = {}
+    leadNotes.forEach(n => {
+      const current = earliestNoteIdByLead[n.lead_id]
+      if (!current || new Date(n.created_at) < new Date(current.created_at)) {
+        earliestNoteIdByLead[n.lead_id] = n
+      }
+    })
+
     leadNotes.forEach(n => {
       const lead = leadById[n.lead_id]
       if (!lead) return
+      if (earliestNoteIdByLead[n.lead_id] && earliestNoteIdByLead[n.lead_id].id === n.id) return // gerçek ilk not, sayma
       // result_at_time eski kayıtlarda olmayabilir (migration öncesi); o durumda güvenli tarafta kalıp say.
       if (n.result_at_time && n.result_at_time !== lead.result) return
       map[n.lead_id] = (map[n.lead_id] || 0) + 1
     })
-    // Kayıt oluşturulurken zorunlu olarak eklenen ilk not, "1. temas" sayılmaz —
-    // sadece kaydı açmak için gereken bir not, gerçek bir takip/hatırlatma değil.
-    // Bu yüzden her lead için ham sayıdan 1 çıkarıyoruz (Seçenek A tasarım kararı).
-    Object.keys(map).forEach(id => { map[id] = Math.max(0, map[id] - 1) })
     return map
   }, [leadNotes, leads])
 
