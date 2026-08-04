@@ -1472,9 +1472,10 @@ function SubscriptionManager({ users, branches, onExtend, onGrantUnlimited }) {
   const [busyId, setBusyId] = useState(null)
   function branchNameFor(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
 
-  // Sadece admin/manager rolündeki (işletme sahibi/yöneticisi sayılan) kullanıcıları göster —
-  // her şubenin personeli değil, faturalandırılan asıl hesap sahiplerini listelemek yeterli.
-  const billable = users.filter(u => u.role === 'admin' || u.role === 'manager')
+  // Hesap oluşturulurken seçilen izin şablonuna göre rol "staff" da olabildiği için
+  // burada rol filtresi kullanmıyoruz. Böylece deneme süresi biten hiçbir müşteri
+  // abonelik ekranından kaybolmaz; sistem sahibinin hesabı ise listelenmez.
+  const billable = users.filter(u => u.role !== 'super_admin')
     .sort((a, b) => {
       const aEnd = a.trial_ends_at ? new Date(a.trial_ends_at).getTime() : Infinity
       const bEnd = b.trial_ends_at ? new Date(b.trial_ends_at).getTime() : Infinity
