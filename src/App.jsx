@@ -11,7 +11,7 @@ import {
 import {
   MessageCircle, CalendarDays, UserRound, ShoppingCart, TrendingUp, Wallet,
   Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
-  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Flame
+  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Flame, Search, X
 } from 'lucide-react'
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
@@ -369,7 +369,7 @@ function NoteHistory({ notes }) {
   )
 }
 
-function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile, notesForLead, existingLeads = [], onFoundExisting }) {
+function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, onSaved, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile, notesForLead, existingLeads = [], onFoundExisting }) {
   const [form, setForm] = useState(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
@@ -505,6 +505,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     setSubmitting(false)
     setForm(emptyForm)
     setSaved(true)
+    onSaved?.()
     setTimeout(() => setSaved(false), 2000)
   }
 
@@ -1123,65 +1124,78 @@ function buildWhatsappUrl(lead) {
 }
 
 function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile, noteCount = 0, rule = null }) {
-  const s = staleness(lead, noteCount, rule)
+  const followUp = staleness(lead, noteCount, rule)
+  const status = getAppointmentStatus(lead)
+  const appointment = lead.appointment_at ? new Date(lead.appointment_at) : null
+  const hasAppointment = appointment && !Number.isNaN(appointment.getTime())
+  const whatsappUrl = canSeePhone ? buildWhatsappUrl(lead) : null
+
+  let nextStep = 'Kayıt bekliyor'
+  let nextStepColor = T.textSoft
+  if (status === 'needs_result') {
+    nextStep = hasAppointment ? `Sonucu güncelle · ${appointment.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}` : 'Sonucu güncelle'
+    nextStepColor = T.orange
+  } else if (status === 'upcoming') {
+    nextStep = `Randevu · ${appointment.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })} ${appointment.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
+    nextStepColor = T.primary
+  } else if (followUp?.level === 'cold') {
+    nextStep = 'Takip soğuk'
+  } else if (followUp) {
+    nextStep = `${followUp.days} gün önce takip zamanı geldi`
+    nextStepColor = followUp.level === 'critical' ? T.red : T.orange
+  } else if (hasAppointment) {
+    nextStep = appointment.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  const detailButton = canEdit ? (
+    <button onClick={() => onEdit(lead)} style={{
+      border: `1px solid ${T.border}`, background: '#fff', color: T.text, borderRadius: 8,
+      padding: isMobile ? '6px 9px' : '7px 10px', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
+    }}>Detay</button>
+  ) : null
 
   if (isMobile) {
     return (
-      <div style={{ padding: '12px 0', borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ padding: '13px 0', borderBottom: `1px solid ${T.border}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ minWidth: 0 }}>
-            <p style={{ fontWeight: 700, fontSize: 14, margin: 0, color: T.text }}>{lead.name}</p>
-            <p style={{ fontSize: 12.5, color: T.textSoft, margin: '2px 0 0' }}>
-              {canSeePhone ? lead.phone : '••• gizli'} · {lead.channel}
-              {showBranch && ` · ${branchName}`}
-            </p>
+            <p style={{ fontWeight: 700, fontSize: 14.5, margin: 0, color: T.text }}>{lead.name}</p>
+            <p style={{ fontSize: 12, color: T.textSoft, margin: '3px 0 0' }}>{lead.service || 'Hizmet belirtilmedi'} · {lead.channel}{showBranch && ` · ${branchName}`}</p>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            {canSeePhone && lead.phone && buildWhatsappUrl(lead) && (
-              <a href={buildWhatsappUrl(lead)} target="_blank" rel="noopener noreferrer" style={{
-                fontSize: 12, padding: '5px 9px', borderRadius: 8, border: `1px solid #1D9E75`, background: 'transparent', color: '#1D9E75', textDecoration: 'none'
-              }}>📱</a>
-            )}
-            {canEdit && (
-              <button onClick={() => onEdit(lead)} style={{ fontSize: 12, padding: '5px 9px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'transparent', color: T.textSoft, flexShrink: 0 }}>✎</button>
-            )}
-          </div>
+          {detailButton}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: RESULT_COLOR[lead.result], background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>{lead.result}</span>
-          {lead.service && <span style={{ fontSize: 11.5, color: T.textSoft, background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>{lead.service}</span>}
-          {lead.sale_amount != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: T.green, background: T.greenBg, padding: '3px 8px', borderRadius: 6 }}>{fmtTL(lead.sale_amount)}</span>}
-          {s && s.level === 'cold' && <span style={{ fontSize: 11.5, fontWeight: 700, color: T.textFaint, background: T.cardSoft, padding: '3px 8px', borderRadius: 6 }}>Soğuk</span>}
-          {s && s.level !== 'cold' && <span style={{ fontSize: 11.5, fontWeight: 700, color: s.level === 'critical' ? T.red : T.orange, background: s.level === 'critical' ? T.redBg : T.orangeBg, padding: '3px 8px', borderRadius: 6 }}>{s.days} gün önce</span>}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
+          <AppointmentStatusBadge status={status} compact />
+          {lead.sale_amount != null && <span style={{ fontSize: 11, fontWeight: 700, color: T.green, background: T.greenBg, padding: '3px 8px', borderRadius: 99 }}>{fmtTL(lead.sale_amount)}</span>}
+          {whatsappUrl && <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" style={{ color: T.green, fontSize: 12, textDecoration: 'none', fontWeight: 700 }}>WhatsApp</a>}
         </div>
-        {lead.note && <p style={{ fontSize: 12.5, color: T.textFaint, margin: '8px 0 0' }}>{lead.note}</p>}
+        <p style={{ margin: '8px 0 0', color: nextStepColor, fontSize: 12.5, fontWeight: 600 }}>{nextStep}</p>
       </div>
     )
   }
 
+  const columns = showBranch ? '0.82fr 1.35fr 1.05fr 1.05fr 1.15fr .7fr .46fr' : '1.4fr 1.1fr 1.1fr 1.15fr .72fr .48fr'
   return (
     <div style={{
-      display: 'grid',
-      gridTemplateColumns: showBranch ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
-      gap: 8, padding: '10px 0', borderBottom: '1px solid #eee', fontSize: 13, alignItems: 'center'
+      display: 'grid', gridTemplateColumns: columns, gap: 12, padding: '13px 0', borderBottom: `1px solid ${T.border}`,
+      fontSize: 13, alignItems: 'center', minWidth: 790,
     }}>
       {showBranch && <span style={{ fontSize: 12, color: T.textSoft }}>{branchName}</span>}
-      <span style={{ fontWeight: 600 }}>{lead.name}</span>
-      <span style={{ color: T.textSoft, display: 'flex', alignItems: 'center', gap: 6 }}>
-        {canSeePhone ? lead.phone : '••• gizli'}
-        {canSeePhone && lead.phone && buildWhatsappUrl(lead) && (
-          <a href={buildWhatsappUrl(lead)} target="_blank" rel="noopener noreferrer" title="WhatsApp'tan yaz" style={{
-            fontSize: 13, color: '#1D9E75', textDecoration: 'none', flexShrink: 0
-          }}>📱</a>
-        )}
-      </span>
-      <span>{lead.channel}</span>
-      <span style={{ color: T.textSoft, fontSize: 12 }}>{lead.service || '—'}</span>
-      <span style={{ fontSize: 12, color: T.textSoft }}>{lead.note ? lead.note.slice(0, 30) : '—'}</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: RESULT_COLOR[lead.result] }}>{lead.result}</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: '#2e7d32' }}>{lead.sale_amount != null ? fmtTL(lead.sale_amount) : '—'}</span>
-      {s && s.level === 'cold' ? <span style={{ fontSize: 11, fontWeight: 600, color: T.textFaint }}>Soğuk</span> : s ? <span style={{ fontSize: 11, fontWeight: 600, color: s.level === 'critical' ? '#c0392b' : '#b8860b' }}>{s.days}g</span> : <span />}
-      {canEdit ? <button onClick={() => onEdit(lead)} style={{ fontSize: 12, padding: '4px 8px' }}>✎</button> : <span />}
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontWeight: 700, margin: 0, color: T.text, fontSize: 13.5 }}>{lead.name}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, minWidth: 0 }}>
+          <span style={{ color: T.textSoft, fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canSeePhone ? (lead.phone || 'Telefon yok') : '••• gizli'}</span>
+          {whatsappUrl && <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" title="WhatsApp'tan yaz" style={{ color: T.green, textDecoration: 'none', fontSize: 12 }}>◉</a>}
+        </div>
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ color: T.text, margin: 0, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lead.service || 'Hizmet belirtilmedi'}</p>
+        <p style={{ color: T.textSoft, margin: '3px 0 0', fontSize: 11.5 }}>{lead.channel}</p>
+      </div>
+      <span><AppointmentStatusBadge status={status} compact /></span>
+      <span style={{ color: nextStepColor, fontSize: 12, fontWeight: 600, lineHeight: 1.35 }}>{nextStep}</span>
+      <span style={{ color: lead.sale_amount != null ? T.green : T.textFaint, fontSize: 12.5, fontWeight: lead.sale_amount != null ? 700 : 500 }}>{lead.sale_amount != null ? fmtTL(lead.sale_amount) : '—'}</span>
+      <span>{detailButton}</span>
     </div>
   )
 }
@@ -2726,6 +2740,10 @@ export function PanelApp() {
   const [branchServices, setBranchServices] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [editingLead, setEditingLead] = useState(null)
+  const [isLeadFormOpen, setIsLeadFormOpen] = useState(false)
+  const [clientSearch, setClientSearch] = useState('')
+  const [clientStatusFilter, setClientStatusFilter] = useState('all')
+  const [clientSort, setClientSort] = useState('priority')
   const [adsSelectedBranch, setAdsSelectedBranch] = useState('')
   const [filterBranch, setFilterBranchState] = useState(() => {
     try { return localStorage.getItem('mt_filterBranch') || 'all' } catch { return 'all' }
@@ -3126,6 +3144,29 @@ export function PanelApp() {
   const visibleLeads = scopedLeads
   const scopedAds = isSuperAdmin ? (filterBranch === 'all' ? adsData : adsData.filter(a => a.branch_id === filterBranch)) : adsData.filter(a => a.branch_id === currentUser.branch_id)
 
+  // Danışan ekranı için arama, durum filtresi ve öncelikli sıralama. Bu yalnızca
+  // ekrandaki görünümü değiştirir; kayıtların kendisine veya raporlara dokunmaz.
+  const normalizedClientSearch = clientSearch.trim().toLocaleLowerCase('tr')
+  const clientStatusCounts = visibleLeads.reduce((counts, lead) => {
+    const status = getAppointmentStatus(lead)
+    counts[status] = (counts[status] || 0) + 1
+    return counts
+  }, {})
+  const clientRows = [...visibleLeads]
+    .filter(lead => {
+      if (clientStatusFilter !== 'all' && getAppointmentStatus(lead) !== clientStatusFilter) return false
+      if (!normalizedClientSearch) return true
+      return [lead.name, lead.phone, lead.service, lead.channel, lead.note]
+        .some(value => String(value || '').toLocaleLowerCase('tr').includes(normalizedClientSearch))
+    })
+    .sort((a, b) => {
+      if (clientSort === 'newest') return new Date(b.date) - new Date(a.date)
+      const priority = { needs_result: 0, upcoming: 1, no_show: 2, not_bought: 3, awaiting_reply: 4, customer: 5 }
+      const rank = priority[getAppointmentStatus(a)] - priority[getAppointmentStatus(b)]
+      if (rank !== 0) return rank
+      return new Date(b.appointment_at || b.date) - new Date(a.appointment_at || a.date)
+    })
+
   function canEditLead(lead) {
     if (perms.can_edit_any_lead) return true
     const myName = currentUser.full_name || currentUser.email
@@ -3203,7 +3244,10 @@ export function PanelApp() {
         <MobileTopBar currentUser={currentUser} branchLabel={branchLabel} onLogout={logoutAndClear} trialDaysLeft={trialDaysLeft} />
       ) : (
         <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
-          isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={setActiveTab} trialDaysLeft={trialDaysLeft} />
+          isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={(key) => {
+            setActiveTab(key)
+            if (key === 'clients') { setEditingLead(null); setIsLeadFormOpen(true) }
+          }} trialDaysLeft={trialDaysLeft} />
       )}
 
 <div style={getPageWrapStyle(isMobile)} className="page-wrap">
@@ -3319,53 +3363,117 @@ export function PanelApp() {
             branchName={branchName}
             onSaveRule={saveReminderRule}
             canSeePhone={perms.can_see_phone}
-            onOpenLead={(lead) => { setEditingLead(lead); setActiveTab('clients') }}
+            onOpenLead={(lead) => { setEditingLead(lead); setIsLeadFormOpen(true); setActiveTab('clients') }}
           />
         )}
 
         {activeTab === 'clients' && (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Danışanlar</h1>
-            {perms.can_add_lead && (
-              <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} onCancelEdit={() => setEditingLead(null)} services={currentBranchServices} isMobile={isMobile}
-                targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
-                targetBranchName={isSuperAdmin ? (filterBranch !== 'all' ? branchName(filterBranch) : branchName(activeBranches[0]?.id)) : branchName(currentUser.branch_id)}
-                isSuperAdmin={isSuperAdmin}
-                notesForLead={editingLead ? leadNotes.filter(n => n.lead_id === editingLead.id) : []}
-                existingLeads={visibleLeads}
-                onFoundExisting={(lead) => setEditingLead(lead)}
-              />
-            )}
-            <div style={{ marginTop: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>
-                  {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler — kayıtlar' : 'Şube kayıtları'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 18 }}>
+              <div>
+                <h1 style={{ fontSize: 24, fontWeight: 800, color: T.text, margin: 0, letterSpacing: '-0.025em' }}>Danışanlar</h1>
+                <p style={{ margin: '4px 0 0', color: T.textSoft, fontSize: 13 }}>
+                  {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubelerdeki müşteri süreçleri' : 'Müşteri süreçlerini ve günlük aksiyonları yönetin'}
                 </p>
-                {(isSuperAdmin || perms.can_export_data) && (
-                  <ExportButtons
-                    rows={leadsToExportRows(visibleLeads, branchName, isSuperAdmin && filterBranch === 'all')}
-                    baseFilename={`danisanlar-${new Date().toISOString().slice(0, 10)}`}
-                    sheetName="Danışanlar"
-                  />
-                )}
               </div>
-              {visibleLeads.length === 0 ? (
-                <p style={{ fontSize: 13, color: T.textSoft }}>Henüz kayıt yok.</p>
+              {perms.can_add_lead && (
+                <button type="button" onClick={() => {
+                  if (isLeadFormOpen || editingLead) { setEditingLead(null); setIsLeadFormOpen(false) }
+                  else setIsLeadFormOpen(true)
+                }} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 14px', border: 'none', borderRadius: 10,
+                  background: T.primary, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 9px 18px rgba(111,97,217,.22)',
+                }}>
+                  {isLeadFormOpen || editingLead ? <X size={16} /> : <Plus size={16} />}
+                  {editingLead ? 'Düzenlemeyi kapat' : (isLeadFormOpen ? 'Formu kapat' : 'Yeni görüşme')}
+                </button>
+              )}
+            </div>
+
+            {perms.can_add_lead && (isLeadFormOpen || editingLead) && (
+              <div style={{ marginBottom: 18 }}>
+                <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead}
+                  onCancelEdit={() => { setEditingLead(null); setIsLeadFormOpen(false) }}
+                  onSaved={() => { setEditingLead(null); setIsLeadFormOpen(false) }}
+                  services={currentBranchServices} isMobile={isMobile}
+                  targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
+                  targetBranchName={isSuperAdmin ? (filterBranch !== 'all' ? branchName(filterBranch) : branchName(activeBranches[0]?.id)) : branchName(currentUser.branch_id)}
+                  isSuperAdmin={isSuperAdmin}
+                  notesForLead={editingLead ? leadNotes.filter(n => n.lead_id === editingLead.id) : []}
+                  existingLeads={visibleLeads}
+                  onFoundExisting={(lead) => { setEditingLead(lead); setIsLeadFormOpen(true) }}
+                />
+              </div>
+            )}
+
+            <div style={{ ...cardStyle, padding: isMobile ? '14px' : '18px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 14 }}>
+                <div style={{ position: 'relative', width: isMobile ? '100%' : 330 }}>
+                  <Search size={17} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: T.textFaint }} />
+                  <input value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="İsim, telefon, hizmet veya not ara"
+                    style={{ ...inputStyle, width: '100%', paddingLeft: 37, fontSize: 13 }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12.5, color: T.textSoft, whiteSpace: 'nowrap' }}><strong style={{ color: T.text }}>{clientRows.length}</strong> kayıt gösteriliyor</span>
+                  <select value={clientSort} onChange={e => setClientSort(e.target.value)} style={{ ...inputStyle, padding: '8px 10px', width: 'auto', fontSize: 12.5, fontWeight: 600 }}>
+                    <option value="priority">Önceliğe göre</option>
+                    <option value="newest">En yeni kayıtlar</option>
+                  </select>
+                  {(isSuperAdmin || perms.can_export_data) && (
+                    <ExportButtons
+                      rows={leadsToExportRows(clientRows, branchName, isSuperAdmin && filterBranch === 'all')}
+                      baseFilename={`danisanlar-${new Date().toISOString().slice(0, 10)}`}
+                      sheetName="Danışanlar"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
+                {[
+                  ['all', 'Tümü'],
+                  ['needs_result', 'Sonuç bekliyor'],
+                  ['upcoming', 'Yaklaşan'],
+                  ['customer', 'Müşteri oldu'],
+                  ['no_show', 'Gelmedi'],
+                ].map(([value, label]) => {
+                  const active = clientStatusFilter === value
+                  const config = value === 'all' ? null : APPOINTMENT_STATUS[value]
+                  const count = value === 'all' ? visibleLeads.length : (clientStatusCounts[value] || 0)
+                  return (
+                    <button key={value} type="button" onClick={() => setClientStatusFilter(value)} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 99, padding: '6px 10px',
+                      border: active ? `1px solid ${config?.color || T.primary}` : `1px solid ${T.border}`,
+                      background: active ? (config?.bg || T.primaryLight) : '#fff', color: active ? (config?.color || T.primary) : T.textSoft,
+                      fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                    }}>
+                      {config && <span style={{ width: 6, height: 6, borderRadius: '50%', background: config.color }} />}
+                      {label} <span style={{ opacity: .72 }}>{count}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {clientRows.length === 0 ? (
+                <div style={{ padding: '34px 8px', textAlign: 'center', color: T.textSoft, fontSize: 13 }}>
+                  Bu arama veya filtreye uygun danışan bulunamadı.
+                </div>
               ) : (
-                <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: isMobile ? '0 1rem' : '0 1.25rem', overflowX: isMobile ? 'visible' : 'auto' }}>
+                <div style={{ overflowX: isMobile ? 'visible' : 'auto' }}>
                   {!isMobile && (
                     <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.8fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.6fr 0.5fr 0.4fr' : '1fr 1fr 0.7fr 1fr 1fr 0.7fr 0.6fr 0.6fr 0.4fr',
-                      gap: 8, padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: 12, color: T.textSoft, minWidth: 760
+                      display: 'grid', gridTemplateColumns: (isSuperAdmin && filterBranch === 'all') ? '0.82fr 1.35fr 1.05fr 1.05fr 1.15fr .7fr .46fr' : '1.4fr 1.1fr 1.1fr 1.15fr .72fr .48fr',
+                      gap: 12, minWidth: 790, padding: '0 0 10px', borderBottom: `1px solid ${T.border}`, color: T.textFaint, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.055em',
                     }}>
-                      {(isSuperAdmin && filterBranch === 'all') && <span>şube</span>}
-                      <span>isim</span><span>telefon</span><span>kanal</span><span>hizmet</span><span>not</span><span>sonuç</span><span>tutar</span><span>takip</span><span></span>
+                      {(isSuperAdmin && filterBranch === 'all') && <span>Şube</span>}
+                      <span>Danışan</span><span>Hizmet / kanal</span><span>Durum</span><span>Sonraki adım</span><span>Tutar</span><span />
                     </div>
                   )}
-                  {visibleLeads.map(l => (
-                    <LeadRow key={l.id} lead={l} canSeePhone={perms.can_see_phone} canEdit={canEditLead(l)} onEdit={setEditingLead}
-                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(l.branch_id)} isMobile={isMobile} noteCount={noteCountByLeadId[l.id] || 0} rule={reminderRuleMap[`${l.branch_id}__${l.result}`] || null} />
+                  {clientRows.map(lead => (
+                    <LeadRow key={lead.id} lead={lead} canSeePhone={perms.can_see_phone} canEdit={canEditLead(lead)}
+                      onEdit={(selected) => { setEditingLead(selected); setIsLeadFormOpen(true) }}
+                      showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(lead.branch_id)} isMobile={isMobile}
+                      noteCount={noteCountByLeadId[lead.id] || 0} rule={reminderRuleMap[`${lead.branch_id}__${lead.result}`] || null} />
                   ))}
                 </div>
               )}
