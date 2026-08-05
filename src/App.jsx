@@ -74,7 +74,13 @@ function staleness(lead, noteCount = 0, rule = null) {
   if (d < threshold) return null
 
   const level = noteCount === schedule.length - 1 ? 'critical' : 'warning'
-  return { level, days: d, reminderNumber: noteCount + 1, totalReminders: schedule.length }
+  return {
+    level,
+    days: d,
+    dueDays: Math.max(0, d - threshold),
+    reminderNumber: noteCount + 1,
+    totalReminders: schedule.length,
+  }
 }
 function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
@@ -934,7 +940,7 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMa
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
         <div>
           <p style={{ fontWeight: 800, fontSize: 15, margin: 0, color: '#B83B34' }}>Takip bekleyen {stale.length} danışan</p>
-          <p style={{ color: T.textSoft, fontSize: 12, margin: '3px 0 0' }}>Öncelikli üç takip aşağıda. Diğerlerini Fırsatlar ekranından yönetebilirsin.</p>
+          <p style={{ color: T.textSoft, fontSize: 12, margin: '3px 0 0' }}>Öncelikli üç takip aşağıda. Diğerlerini Takip Merkezi ekranından yönetebilirsin.</p>
         </div>
         <button type="button" onClick={onViewAll} style={{ border: '1px solid #E8AAA4', background: '#fff', color: '#B83B34', borderRadius: 9, padding: '8px 11px', fontSize: 12, fontWeight: 750, cursor: 'pointer' }}>
           Tüm takipleri aç →
@@ -963,22 +969,50 @@ const REMINDER_RULE_LABELS = {
 }
 const REMINDER_RULE_ORDER = ['Randevuya gelmedi', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Satın almadı', 'Randevu aldı']
 
-function OpportunitiesTab({ leads, noteCountMap, rules, ruleMap, canEditRules, isSuperAdmin, filterBranch, activeBranches, branchName, onSaveRule, canSeePhone, onOpenLead }) {
+function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap, canEditRules, isSuperAdmin, filterBranch, activeBranches, branchName, onSaveRule, canSeePhone, onOpenLead }) {
   const [ruleBranchId, setRuleBranchId] = useState(
     isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || '')) : null
   )
   const [editValues, setEditValues] = useState({})
   const [savingKey, setSavingKey] = useState(null)
+  const [followUpFilter, setFollowUpFilter] = useState('all')
 
   const opportunities = useMemo(() =>
     leads
       .map(l => ({ lead: l, s: staleness(l, noteCountMap[l.id] || 0, ruleMap[`${l.branch_id}__${l.result}`] || null) }))
       .filter(x => x.s && x.s.level !== 'cold')
       .sort((a, b) => {
+        const aUrgent = a.s.level === 'critical' || a.s.dueDays >= 3
+        const bUrgent = b.s.level === 'critical' || b.s.dueDays >= 3
+        if (aUrgent !== bUrgent) return aUrgent ? -1 : 1
         if (a.s.level !== b.s.level) return a.s.level === 'critical' ? -1 : 1
         return b.s.days - a.s.days
       }),
     [leads, noteCountMap, ruleMap])
+
+  const latestNoteByLeadId = useMemo(() => {
+    const map = {}
+    leadNotes.forEach(note => {
+      if (!map[note.lead_id]) map[note.lead_id] = note.note
+    })
+    return map
+  }, [leadNotes])
+
+  function isUrgent(item) { return item.s.level === 'critical' || item.s.dueDays >= 3 }
+  function matchesFilter(item, filter) {
+    if (filter === 'urgent') return isUrgent(item)
+    if (filter === 'today') return item.s.dueDays === 0
+    if (filter === 'week') return item.s.dueDays >= 0 && item.s.dueDays <= 7
+    return true
+  }
+
+  const followUpFilters = [
+    { key: 'all', label: 'Tümü' },
+    { key: 'urgent', label: 'Acil' },
+    { key: 'today', label: 'Bugün takip' },
+    { key: 'week', label: 'Bu hafta' },
+  ]
+  const filteredOpportunities = opportunities.filter(item => matchesFilter(item, followUpFilter))
 
   const targetBranchId = isSuperAdmin ? ruleBranchId : (leads[0]?.branch_id || null)
   const branchRules = rules.filter(r => r.branch_id === targetBranchId)
@@ -1005,37 +1039,65 @@ function OpportunitiesTab({ leads, noteCountMap, rules, ruleMap, canEditRules, i
 
   return (
     <div>
-      <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Fırsatlar</h1>
-      <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>Takip bekleyen danışanlar ve hatırlatma kuralları</p>
+      <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Takip Merkezi</h1>
+      <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>Takip bekleyen danışanlar, son notlar ve hatırlatma kuralları</p>
 
       {/* AKSİYON LİSTESİ */}
       <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '1.25rem', marginBottom: 24 }}>
-        <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 14px' }}>
-          🔥 {opportunities.length} danışan sizi bekliyor
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+          <div>
+            <p style={{ fontWeight: 750, fontSize: 16, margin: 0, color: T.text }}>Takip sırası</p>
+            <p style={{ fontSize: 12.5, color: T.textSoft, margin: '4px 0 0' }}>
+              {opportunities.length} danışan için aksiyon bekleniyor
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+            {followUpFilters.map(filter => {
+              const active = followUpFilter === filter.key
+              const count = opportunities.filter(item => matchesFilter(item, filter.key)).length
+              return (
+                <button key={filter.key} type="button" onClick={() => setFollowUpFilter(filter.key)} style={{
+                  border: `1px solid ${active ? T.primary : T.border}`,
+                  background: active ? '#F0ECFF' : '#fff', color: active ? T.primary : T.textSoft,
+                  padding: '6px 9px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}>
+                  {filter.label} · {count}
+                </button>
+              )
+            })}
+          </div>
+        </div>
         {opportunities.length === 0 && (
           <p style={{ fontSize: 13.5, color: T.textSoft }}>Şu anda takip bekleyen bir danışan yok, harika iş!</p>
         )}
-        {opportunities.map(({ lead, s }) => {
+        {opportunities.length > 0 && filteredOpportunities.length === 0 && (
+          <p style={{ fontSize: 13.5, color: T.textSoft, margin: '18px 0 4px' }}>Bu filtrede takip bekleyen danışan yok.</p>
+        )}
+        {filteredOpportunities.map(({ lead, s }) => {
           const waUrl = buildWhatsappUrl(lead)
+          const isUrgentLead = isUrgent({ lead, s })
+          const latestNote = (latestNoteByLeadId[lead.id] || lead.note || '').replace(/\s+/g, ' ').trim()
+          const notePreview = latestNote.length > 105 ? `${latestNote.slice(0, 105)}…` : latestNote
+          const followUpLabel = s.dueDays === 0 ? 'Bugün takip' : `${s.dueDays} gün gecikmiş`
           return (
             <div key={lead.id} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10,
-              padding: '12px 0', borderTop: `1px solid ${T.border}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14,
+              padding: '14px 0', borderTop: `1px solid ${T.border}`,
             }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{lead.name}</div>
+              <div style={{ minWidth: 200, flex: '1 1 380px' }}>
+                <div style={{ fontWeight: 750, fontSize: 14.5, color: T.text }}>{lead.name}</div>
                 <div style={{ fontSize: 12.5, color: T.textSoft, marginTop: 2 }}>
                   {canSeePhone ? lead.phone : '••• gizli'} · {lead.result}
                 </div>
+                {notePreview && <p style={{ fontSize: 12.5, lineHeight: 1.45, color: T.textSoft, margin: '6px 0 0', maxWidth: 560 }}><strong style={{ color: T.text, fontWeight: 650 }}>Son not:</strong> {notePreview}</p>}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{
                   fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                  background: s.level === 'critical' ? '#FCEAEA' : '#FCF3E1',
-                  color: s.level === 'critical' ? '#E5615F' : '#E5A536',
+                  background: isUrgentLead ? '#FCEAEA' : '#FCF3E1',
+                  color: isUrgentLead ? '#C84B46' : '#A87412',
                 }}>
-                  {s.days} gün önce · {s.reminderNumber}. temas
+                  {followUpLabel} · {s.reminderNumber}. temas
                 </span>
                 {waUrl && (
                   <a href={waUrl} target="_blank" rel="noreferrer" style={{
@@ -2390,7 +2452,7 @@ function PermissionTemplateManager({ isMobile }) {
 
 const NAV_ITEMS = [
   { key: 'overview', label: 'Genel Bakış', icon: <Home size={18} />, show: () => true },
-  { key: 'opportunities', label: 'Fırsatlar', icon: <Flame size={18} />, show: () => true },
+  { key: 'opportunities', label: 'Takip Merkezi', icon: <Flame size={18} />, show: () => true },
   { key: 'clients', label: 'Danışanlar', icon: <Users size={18} />, show: () => true },
   { key: 'appointments', label: 'Randevular', icon: <CalendarDays size={18} />, show: perms => perms.can_see_calendar },
   { key: 'reports', label: 'Raporlar', icon: <BarChart3 size={18} />, show: perms => perms.can_see_revenue },
@@ -3548,6 +3610,7 @@ export function PanelApp() {
         {activeTab === 'opportunities' && (
           <OpportunitiesTab
             leads={visibleLeads}
+            leadNotes={leadNotes}
             noteCountMap={noteCountByLeadId}
             rules={reminderRules}
             ruleMap={reminderRuleMap}
