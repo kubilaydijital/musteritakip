@@ -9,7 +9,7 @@ import {
   LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip
 } from 'chart.js'
 import {
-  MessageCircle, CalendarDays, UserRound, ShoppingCart, TrendingUp, Wallet,
+  MessageCircle, CalendarDays, ShoppingCart, TrendingUp, Wallet,
   Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
   ShieldCheck, Settings, Plus, ChevronDown, LogOut, Flame, Search, X
 } from 'lucide-react'
@@ -2638,8 +2638,8 @@ function MobileMoreSheet({ items, onSelect, onLogout }) {
 function FunnelSection({ stats, isMobile }) {
   const stages = [
     {
-      label: '1. Yeni danışan',
-      value: stats.total,
+      label: '1. Meta mesajı',
+      value: stats.metaMessages,
       icon: <MessageCircle size={20} />,
       color: T.primary,
       bg: 'linear-gradient(135deg, rgba(124,92,252,0.38), rgba(124,92,252,0.08))'
@@ -2652,14 +2652,7 @@ function FunnelSection({ stats, isMobile }) {
       bg: 'linear-gradient(135deg, rgba(59,130,246,0.36), rgba(59,130,246,0.08))'
     },
     {
-      label: '3. Geldi',
-      value: stats.arrived,
-      icon: <UserRound size={20} />,
-      color: T.green,
-      bg: 'linear-gradient(135deg, rgba(34,197,94,0.32), rgba(34,197,94,0.08))'
-    },
-    {
-      label: '4. Satış Oldu',
+      label: '3. Satış Oldu',
       value: stats.customers,
       icon: <ShoppingCart size={20} />,
       color: T.orange,
@@ -2667,7 +2660,7 @@ function FunnelSection({ stats, isMobile }) {
     },
   ]
 
-  const stageRates = [null, stats.pctAppointed, stats.pctArrived, stats.pctSold]
+  const stageRates = [null, stats.pctAppointmentFromMeta, stats.pctSold]
 
   return (
     <div style={{ ...cardStyle, padding: isMobile ? 14 : 20 }}>
@@ -2677,7 +2670,7 @@ function FunnelSection({ stats, isMobile }) {
             Bu ayın satış hunisi
           </h2>
           <p style={{ fontSize: 12.5, color: T.textSoft, margin: '4px 0 0' }}>
-            Bu ay sisteme giren danışanların güncel satış süreci.
+            Meta mesajından randevuya ve satışa uzanan bu ayki sonuçlar.
           </p>
         </div>
 
@@ -2690,13 +2683,13 @@ function FunnelSection({ stats, isMobile }) {
           fontSize: 12,
           fontWeight: 700
         }}>
-          Toplam dönüşüm %{stats.rate}
+          Meta'dan satışa dönüşüm %{stats.rate}
         </span>
       </div>
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))',
         gap: isMobile ? 10 : 12,
         alignItems: 'stretch'
       }}>
@@ -3447,15 +3440,17 @@ export function PanelApp() {
   }
   function branchName(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
 
-  // Genel Bakış bir "dönem hunisi" olarak çalışır: ay içinde sisteme girilen
-  // danışanlar aynı kohortta randevu, geliş ve satış aşamalarına ayrılır.
-  // Böylece bir ayın randevusu diğer ayın yeni kaydıyla karışmaz ve huni
-  // oranları %100'ün üzerine çıkmaz. Gerçekleşen olay bazlı detay raporlar
-  // Raporlar sekmesinde ayrıca görüntülenebilir.
+  // Genel Bakışın ilk adımı Meta'nın bu ay bildirdiği gerçek reklam mesajlarıdır.
+  // Sonraki adımlar aynı ay sisteme işlenen randevu ve satış sonuçlarıdır;
+  // böylece reklamdan gelen tüm mesajlar, henüz kayda dönüşmemiş olanlar dahil,
+  // satış hunisinde görünür.
   const now = new Date()
   const isThisMonth = d => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
 
   const monthlyLeads = scopedLeads.filter(l => isThisMonth(new Date(l.date)))
+  const metaMessages = scopedAds
+    .filter(ad => isThisMonth(new Date(ad.date)) && ad.channel === 'Meta (Otomatik)')
+    .reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
   const customers = monthlyLeads.filter(l => l.result === 'Müşteri oldu')
   const withAmount = customers.filter(l => l.sale_amount != null)
   const revenue = customers.reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
@@ -3467,17 +3462,19 @@ export function PanelApp() {
   const arrived = monthlyLeads.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
   const stats = {
     total: monthlyLeads.length,
+    metaMessages,
     customers: customers.length,
     ig: monthlyLeads.filter(l => l.channel === 'Instagram').length,
     wa: monthlyLeads.filter(l => l.channel === 'WhatsApp').length,
     organik: monthlyLeads.filter(l => l.channel === 'Organik').length,
-    rate: monthlyLeads.length ? Math.round((customers.length / monthlyLeads.length) * 100) : 0,
+    rate: metaMessages ? Math.round((customers.length / metaMessages) * 100) : 0,
     revenue, avgTicket, withAmountCount: withAmount.length,
     appointed: appointed.length, arrived: arrived.length,
     noShowCount: noShow.length, notBoughtCount: notBought.length, noResponseCount: noResponse.length,
+    pctAppointmentFromMeta: metaMessages ? Math.round((appointed.length / metaMessages) * 100) : 0,
     pctAppointed: monthlyLeads.length ? Math.round((appointed.length / monthlyLeads.length) * 100) : 0,
     pctArrived: appointed.length ? Math.round((arrived.length / appointed.length) * 100) : 0,
-    pctSold: arrived.length ? Math.round((customers.length / arrived.length) * 100) : 0,
+    pctSold: appointed.length ? Math.round((customers.length / appointed.length) * 100) : 0,
     pctNoShow: appointed.length ? Math.round((noShow.length / appointed.length) * 100) : 0,
     pctNotBought: arrived.length ? Math.round((notBought.length / arrived.length) * 100) : 0,
     pctNoResponse: monthlyLeads.length ? Math.round((noResponse.length / monthlyLeads.length) * 100) : 0,
@@ -3541,9 +3538,9 @@ export function PanelApp() {
               gap: 14,
               marginBottom: 18
             }}>
-              <StatCard icon={<MessageCircle size={20} />} label="Yeni danışan" value={stats.total} subtitle="Bu ay sisteme giren" color="violet" />
-              <StatCard icon={<CalendarDays size={20} />} label="Randevu verilen" value={stats.appointed} subtitle="Bu ayki danışanlardan" color="blue" />
-              <StatCard icon={<ShoppingCart size={20} />} label="Satışa dönüşen" value={stats.customers} subtitle={`Dönüşüm %${stats.rate}`} color="amber" />
+              <StatCard icon={<MessageCircle size={20} />} label="Meta mesajı" value={stats.metaMessages} subtitle="Bu ay reklamlardan gelen" color="violet" />
+              <StatCard icon={<CalendarDays size={20} />} label="Randevu verilen" value={stats.appointed} subtitle={`Meta mesajlarının %${stats.pctAppointmentFromMeta}'ı`} color="blue" />
+              <StatCard icon={<ShoppingCart size={20} />} label="Satışa dönüşen" value={stats.customers} subtitle={`Randevudan dönüşüm %${stats.pctSold}`} color="amber" />
               {perms.can_see_revenue && <StatCard icon={<Wallet size={20} />} label="Bu ayki ciro" value={fmtTL(stats.revenue)} subtitle="Satışa dönüşen kayıtlar" color="green" />}
             </div>
 
