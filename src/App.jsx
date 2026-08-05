@@ -21,7 +21,7 @@ const RESULTS = ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap 
 const OPEN_RESULTS = []
 const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D', 'Satın almadı': '#854F0B', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#6B6B6B', 'Müşteri oldu': '#3B6D11' }
 const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A', 'Satın almadı': '#EF9F27', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#9CA3AF', 'Müşteri oldu': '#639922' }
-const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Telefon': '#3B82F6', 'Google Ads': '#EF9F27', 'Facebook Ads': '#4267B2', 'TikTok': '#25F4EE', 'Online Randevu': '#9B59B6', 'Organik': '#7F77DD' }
+const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Telefon': '#3B82F6', 'Google Ads': '#EF9F27', 'Facebook Ads': '#4267B2', 'TikTok': '#25F4EE', 'Online Randevu': '#9B59B6', 'Organik': '#7F77DD', 'Kağıt Not': '#64748B' }
 const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#E24B4A', '#639922', '#854F0B']
 // E.164 formatına uygun Türkiye cep telefonu: +90 ardından 5 ile başlayan 9 hane (toplam +90 + 10 hane).
 // Bu format, Meta/Google Ads gibi platformlara müşteri listesi yüklerken eşleşme oranını maksimize eder
@@ -919,7 +919,7 @@ function AppointmentCalendar({ leads, canSeePhone, currentUserName, isStaff, sho
   )
 }
 
-function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMap, ruleMap }) {
+function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMap, ruleMap, onViewAll }) {
   const stale = useMemo(() =>
     leads
       .map(l => ({ lead: l, s: staleness(l, noteCountMap[l.id] || 0, ruleMap ? ruleMap[`${l.branch_id}__${l.result}`] : null) }))
@@ -930,21 +930,27 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMa
   if (stale.length === 0) return null
 
   return (
-    <div style={{ background: '#fdecea', border: '1px solid #f3c4c0', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <p style={{ fontWeight: 600, fontSize: 15, margin: 0, color: '#c0392b' }}>🔔 {stale.length} lead takip bekliyor</p>
-      </div>
-      {stale.slice(0, 8).map(({ lead, s }) => (
-        <div key={lead.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 13, borderTop: '1px solid #f3c4c0' }}>
-          <span>
-            <span style={{ fontWeight: 600 }}>{lead.name}</span>
-            <span style={{ color: T.textSoft, marginLeft: 8 }}>{canSeePhone ? lead.phone : '••• gizli'}</span>
-            <span style={{ color: T.textSoft, marginLeft: 8, fontSize: 12 }}>· {lead.result}</span>
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: s.level === 'critical' ? '#c0392b' : '#b8860b' }}>{s.days} gün önce — {s.reminderNumber}. hatırlatma</span>
+    <div style={{ ...cardStyle, padding: '14px 16px', marginBottom: 18, borderColor: '#F3C4C0', background: 'linear-gradient(105deg, #FFF5F3, #FFFDFC)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
+        <div>
+          <p style={{ fontWeight: 800, fontSize: 15, margin: 0, color: '#B83B34' }}>Takip bekleyen {stale.length} danışan</p>
+          <p style={{ color: T.textSoft, fontSize: 12, margin: '3px 0 0' }}>Öncelikli üç takip aşağıda. Diğerlerini Fırsatlar ekranından yönetebilirsin.</p>
         </div>
-      ))}
-      {stale.length > 8 && <p style={{ fontSize: 12, color: T.textSoft, margin: '8px 0 0' }}>+ {stale.length - 8} kayıt daha</p>}
+        <button type="button" onClick={onViewAll} style={{ border: '1px solid #E8AAA4', background: '#fff', color: '#B83B34', borderRadius: 9, padding: '8px 11px', fontSize: 12, fontWeight: 750, cursor: 'pointer' }}>
+          Tüm takipleri aç →
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8 }}>
+        {stale.slice(0, 3).map(({ lead, s }) => (
+          <div key={lead.id} style={{ padding: '9px 10px', background: '#fff', border: '1px solid rgba(232,170,164,.6)', borderRadius: 9, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              <span style={{ color: T.text, fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name}</span>
+              <span style={{ color: s.level === 'critical' ? '#C2413B' : '#A87412', fontSize: 11.5, fontWeight: 750, whiteSpace: 'nowrap' }}>{s.days} gün</span>
+            </div>
+            <p style={{ fontSize: 11.5, color: T.textSoft, margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.result}{canSeePhone ? ` · ${lead.phone}` : ''}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -2567,18 +2573,10 @@ function MobileMoreSheet({ items, onSelect, onLogout }) {
   )
 }
 
-function FunnelSection({ stats, isMobile, metaMessages }) {
-  const hasMeta = metaMessages != null && metaMessages > 0
+function FunnelSection({ stats, isMobile }) {
   const stages = [
-    ...(hasMeta ? [{
-      label: 'Meta Mesaj (reklam)',
-      value: metaMessages,
-      icon: <Megaphone size={20} />,
-      color: '#9333EA',
-      bg: 'linear-gradient(135deg, rgba(147,51,234,0.34), rgba(147,51,234,0.08))'
-    }] : []),
     {
-      label: hasMeta ? 'Panele İşlendi' : '1. Mesaj Geldi',
+      label: '1. Yeni danışan',
       value: stats.total,
       icon: <MessageCircle size={20} />,
       color: T.primary,
@@ -2607,21 +2605,17 @@ function FunnelSection({ stats, isMobile, metaMessages }) {
     },
   ]
 
-  const pctLoggedFromMeta = hasMeta ? (metaMessages ? Math.round((stats.total / metaMessages) * 100) : 0) : null
-  const rates = [
-    ...(hasMeta ? [pctLoggedFromMeta] : []),
-    stats.pctAppointed, stats.pctArrived, stats.pctSold
-  ]
+  const stageRates = [null, stats.pctAppointed, stats.pctArrived, stats.pctSold]
 
   return (
     <div style={{ ...cardStyle, padding: isMobile ? 14 : 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0, marginBottom: 18 }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: T.text }}>
-            Satış Hunisi
+            Bu ayın satış hunisi
           </h2>
           <p style={{ fontSize: 12.5, color: T.textSoft, margin: '4px 0 0' }}>
-            Mesajdan satışa kadar müşteri kaybını takip edin.
+            Bu ay sisteme giren danışanların güncel satış süreci.
           </p>
         </div>
 
@@ -2640,16 +2634,16 @@ function FunnelSection({ stats, isMobile, metaMessages }) {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : `repeat(${stages.length}, minmax(0, 1fr))`,
-        gap: 12,
+        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+        gap: isMobile ? 10 : 12,
         alignItems: 'stretch'
       }}>
         {stages.map((s, i) => (
-          <div key={s.label} style={{ position: 'relative' }}>
+          <div key={s.label}>
             <div style={{
-              minHeight: isMobile ? 120 : 150,
-              borderRadius: 18,
-              padding: isMobile ? 14 : 18,
+              minHeight: isMobile ? 112 : 138,
+              borderRadius: 15,
+              padding: isMobile ? 13 : 16,
               background: s.bg,
               border: `1px solid ${T.border}`,
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
@@ -2678,6 +2672,11 @@ function FunnelSection({ stats, isMobile, metaMessages }) {
                 }}>
                   {s.value}
                 </p>
+                {stageRates[i] != null && (
+                  <span style={{ display: 'inline-flex', marginTop: 8, padding: '3px 7px', borderRadius: 999, fontSize: 10.5, fontWeight: 750, color: s.color, background: 'rgba(255,255,255,.7)' }}>
+                    Önceki adımdan %{stageRates[i]}
+                  </span>
+                )}
               </div>
 
               <div style={{
@@ -2693,29 +2692,6 @@ function FunnelSection({ stats, isMobile, metaMessages }) {
                 {s.icon}
               </div>
             </div>
-
-            {!isMobile && i < stages.length - 1 && (
-              <div style={{
-                position: 'absolute',
-                right: -22,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                zIndex: 5,
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                background: '#08111F',
-                border: `1px solid ${T.border}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: T.textSoft,
-                fontSize: 12,
-                fontWeight: 800
-              }}>
-                %{rates[i]}
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -2754,10 +2730,13 @@ function ChannelDonut({ leads }) {
     CHANNELS.forEach(c => counts[c] = 0)
     leads.forEach(l => { if (counts[l.channel] !== undefined) counts[l.channel]++ })
     const total = leads.length || 1
-    return CHANNELS.map(c => ({ label: c, count: counts[c], pct: Math.round((counts[c] / total) * 100) }))
+    return CHANNELS
+      .map(c => ({ label: c, count: counts[c], pct: Math.round((counts[c] / total) * 100) }))
+      .filter(item => item.count > 0)
   }, [leads])
   useEffect(() => {
     if (chartRef.current) chartRef.current.destroy()
+    if (data.length === 0) return
     chartRef.current = new Chart(ref.current, {
       type: 'doughnut',
       data: { labels: data.map(d => d.label), datasets: [{ data: data.map(d => d.count), backgroundColor: data.map(d => CHANNEL_HEX[d.label]), borderWidth: 0 }] },
@@ -2765,6 +2744,7 @@ function ChannelDonut({ leads }) {
     })
     return () => { if (chartRef.current) chartRef.current.destroy() }
   }, [data])
+  if (data.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Bu ay için kaynak verisi yok.</p>
   return (
     <div>
       <div style={{ position: 'relative', width: 140, height: 140, margin: '0 auto' }}><canvas ref={ref} /></div>
@@ -2784,16 +2764,16 @@ function MonthlyTrendChart({ leads }) {
   const ref = useRef(null)
   const chartRef = useRef(null)
   const data = useMemo(() => {
-    const byDay = {}
+    const byDay = new Map()
     leads.forEach(l => {
-      const day = new Date(l.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })
-      byDay[day] = (byDay[day] || 0) + 1
+      const day = calendarDayKey(l.date)
+      if (day) byDay.set(day, (byDay.get(day) || 0) + 1)
     })
-    const sortedDays = Object.keys(byDay).sort((a, b) => {
-      const [da, ma] = a.split('.'); const [db, mb] = b.split('.')
-      return new Date(2026, ma - 1, da) - new Date(2026, mb - 1, db)
-    })
-    return { labels: sortedDays, values: sortedDays.map(d => byDay[d]) }
+    const sortedDays = [...byDay.keys()].sort()
+    return {
+      labels: sortedDays.map(day => new Date(`${day}T12:00:00`).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+      values: sortedDays.map(day => byDay.get(day))
+    }
   }, [leads])
   useEffect(() => {
     if (chartRef.current) chartRef.current.destroy()
@@ -2836,48 +2816,43 @@ function AdsPerformanceTable({ adsData, leads, isMobile }) {
       byChannel[ch].messages += Number(w.messages) || 0
     })
     return Object.keys(byChannel).map(ch => {
-      const sales = thisMonthLeads.filter(l => l.channel === ch && l.result === 'Müşteri oldu').length
+      // Meta otomatik verisindeki kanal adı ile formda seçilen kaynak adı farklıdır.
+      // İşletmenin kullanımına göre Meta'dan gelen mesajlar Instagram DM ve WhatsApp
+      // olarak kaydedildiği için, ücretli Meta performansına sadece bu iki kaynak girer.
+      // Organik, telefon vb. kaynaklar bilerek hariç tutulur; ROAS şişmez.
+      const attributedChannels = ch === 'Meta (Otomatik)' ? ['Instagram', 'WhatsApp'] : [ch]
+      const attributedSales = thisMonthLeads.filter(lead => attributedChannels.includes(lead.channel) && lead.result === 'Müşteri oldu')
+      const sales = attributedSales.length
       const spend = byChannel[ch].spend
-      const revenue = thisMonthLeads.filter(l => l.channel === ch && l.result === 'Müşteri oldu').reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
+      const revenue = attributedSales.reduce((sum, lead) => sum + (Number(lead.sale_amount) || 0), 0)
       const roas = spend > 0 ? (revenue / spend).toFixed(1) : '—'
-      return { channel: ch, spend, messages: byChannel[ch].messages, sales, roas }
+      return {
+        channel: ch,
+        label: ch === 'Meta (Otomatik)' ? 'Meta reklamları' : ch,
+        detail: ch === 'Meta (Otomatik)' ? 'Instagram DM ve WhatsApp kaynaklı satışlar' : 'Bu kaynağa ait sonuçlar',
+        spend, messages: byChannel[ch].messages, sales, revenue, roas
+      }
     }).sort((a, b) => b.spend - a.spend)
   }, [adsData, leads])
 
   if (rows.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Bu ay için henüz reklam verisi yok.</p>
 
-  if (isMobile) {
-    return (
-      <div>
-        {rows.map(r => (
-          <div key={r.channel} style={{ padding: '11px 0', borderBottom: `1px solid ${T.border}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: T.text, fontWeight: 700, fontSize: 14 }}>{r.channel}</span>
-              <span style={{ color: r.roas !== '—' && Number(r.roas) >= 2 ? T.green : T.orange, fontWeight: 700, fontSize: 14 }}>{r.roas}{r.roas !== '—' ? 'x ROAS' : ''}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 14, marginTop: 4, fontSize: 12, color: T.textSoft }}>
-              <span>Harcanan: {fmtTL(r.spend)}</span>
-              <span>Mesaj: {r.messages}</span>
-              <span>Satış: {r.sales}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 0.7fr 0.7fr 0.7fr', gap: 6, fontSize: 11.5, color: T.textFaint, paddingBottom: 8, borderBottom: `1px solid ${T.border}` }}>
-        <span>KANAL</span><span>HARCANAN</span><span>MESAJ</span><span>SATIŞ</span><span>ROAS</span>
-      </div>
+    <div style={{ display: 'grid', gap: 10 }}>
       {rows.map(r => (
-        <div key={r.channel} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 0.7fr 0.7fr 0.7fr', gap: 6, padding: '11px 0', borderBottom: `1px solid ${T.border}`, fontSize: 13, alignItems: 'center' }}>
-          <span style={{ color: T.text, fontWeight: 600 }}>{r.channel}</span>
-          <span style={{ color: T.textSoft }}>{fmtTL(r.spend)}</span>
-          <span style={{ color: T.textSoft }}>{r.messages}</span>
-          <span style={{ color: T.textSoft }}>{r.sales}</span>
-          <span style={{ color: r.roas !== '—' && Number(r.roas) >= 2 ? T.green : T.orange, fontWeight: 700 }}>{r.roas}{r.roas !== '—' ? 'x' : ''}</span>
+        <div key={r.channel} style={{ border: `1px solid ${T.border}`, background: '#FCFCFD', borderRadius: 12, padding: isMobile ? 12 : 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+            <div>
+              <p style={{ color: T.text, fontWeight: 800, fontSize: 14, margin: 0 }}>{r.label}</p>
+              <p style={{ color: T.textSoft, fontSize: 11.5, margin: '3px 0 0' }}>{r.detail}</p>
+            </div>
+            <span style={{ color: r.roas !== '—' && Number(r.roas) >= 2 ? T.green : T.orange, fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap' }}>{r.roas}{r.roas !== '—' ? 'x ROAS' : ''}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+            <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>HARCAMA</div><div style={{ color: T.text, fontWeight: 800, fontSize: isMobile ? 14 : 15, marginTop: 3 }}>{fmtTL(Math.round(r.spend))}</div></div>
+            <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>MESAJ</div><div style={{ color: T.text, fontWeight: 800, fontSize: isMobile ? 16 : 18, marginTop: 3 }}>{r.messages}</div></div>
+            <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>META SATIŞ</div><div style={{ color: r.sales > 0 ? T.green : T.text, fontWeight: 800, fontSize: isMobile ? 16 : 18, marginTop: 3 }}>{r.sales}</div></div>
+          </div>
         </div>
       ))}
     </div>
@@ -3406,28 +3381,24 @@ export function PanelApp() {
   }
   function branchName(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
 
-  // Genel Bakış'taki her kart, KENDİ olayının gerçekleştiği aya göre sayılır:
-  // - "Toplam Mesaj": görüşmenin/kaydın açıldığı ay (date alanı)
-  // - "Randevu Verilen / Gelen Müşteri / Satış Olan / Ciro": randevunun/satışın
-  //   GERÇEKLEŞTİĞİ ay (appointment_at alanı). Randevu tarihi girilmemişse
-  //   (örn. aynı gün doğrudan satış), kaydın kendi tarihine düşer.
-  // Böylece Temmuz'da alınıp Ağustos'a verilen bir randevunun satışı,
-  // doğru şekilde Ağustos'un performansına yazılır, Temmuz'a değil.
+  // Genel Bakış bir "dönem hunisi" olarak çalışır: ay içinde sisteme girilen
+  // danışanlar aynı kohortta randevu, geliş ve satış aşamalarına ayrılır.
+  // Böylece bir ayın randevusu diğer ayın yeni kaydıyla karışmaz ve huni
+  // oranları %100'ün üzerine çıkmaz. Gerçekleşen olay bazlı detay raporlar
+  // Raporlar sekmesinde ayrıca görüntülenebilir.
   const now = new Date()
   const isThisMonth = d => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
 
   const monthlyLeads = scopedLeads.filter(l => isThisMonth(new Date(l.date)))
-  const monthlyByEvent = scopedLeads.filter(l => isThisMonth(new Date(l.appointment_at || l.date)))
-
-  const customers = monthlyByEvent.filter(l => l.result === 'Müşteri oldu')
+  const customers = monthlyLeads.filter(l => l.result === 'Müşteri oldu')
   const withAmount = customers.filter(l => l.sale_amount != null)
   const revenue = customers.reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
   const avgTicket = withAmount.length ? Math.round(revenue / withAmount.length) : 0
-  const noShow = monthlyByEvent.filter(l => l.result === 'Randevuya gelmedi')
-  const notBought = monthlyByEvent.filter(l => l.result === 'Satın almadı')
+  const noShow = monthlyLeads.filter(l => l.result === 'Randevuya gelmedi')
+  const notBought = monthlyLeads.filter(l => l.result === 'Satın almadı')
   const noResponse = monthlyLeads.filter(l => l.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
-  const appointed = monthlyByEvent.filter(l => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(l.result))
-  const arrived = monthlyByEvent.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
+  const appointed = monthlyLeads.filter(l => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(l.result))
+  const arrived = monthlyLeads.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
   const stats = {
     total: monthlyLeads.length,
     customers: customers.length,
@@ -3445,10 +3416,6 @@ export function PanelApp() {
     pctNotBought: arrived.length ? Math.round((notBought.length / arrived.length) * 100) : 0,
     pctNoResponse: monthlyLeads.length ? Math.round((noResponse.length / monthlyLeads.length) * 100) : 0,
   }
-  const totalSpend = scopedAds.reduce((s, w) => s + Number(w.spend), 0)
-  const metaMessagesThisMonth = scopedAds
-    .filter(w => isThisMonth(new Date(w.date)))
-    .reduce((s, w) => s + (Number(w.messages) || 0), 0)
 
   const visibleNavItems = NAV_ITEMS.filter(item => item.show(perms, isSuperAdmin, canSeeOwnDataOnly))
   const branchLabel = isSuperAdmin ? 'süper admin · tüm şubeler' : `${branchName(currentUser.branch_id)}`
@@ -3498,70 +3465,65 @@ export function PanelApp() {
             <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Genel Bakış</h1>
             <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>
               {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
-              {' · '}{now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+              {' · '}{now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })} · Bu ay açılan kayıtların özeti
             </p>
-            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} ruleMap={reminderRuleMap} />
+            <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} ruleMap={reminderRuleMap} onViewAll={() => setActiveTab('opportunities')} />
 
-<div style={{
-  display: 'grid',
-  gridTemplateColumns: perms.can_see_revenue
-    ? 'repeat(auto-fit, minmax(180px, 1fr))'
-    : 'repeat(auto-fit, minmax(190px, 1fr))',
-  gap: 14,
-  marginBottom: 18
-}}>
-  {metaMessagesThisMonth > 0 && (
-    <StatCard icon={<Megaphone size={20} />} label="Meta Mesaj (reklam)" value={metaMessagesThisMonth} color="purple" />
-  )}
-  <StatCard icon={<MessageCircle size={20} />} label="Toplam Mesaj" value={stats.total} color="violet" />
-              <StatCard icon={<CalendarDays size={20} />} label="Randevu Verilen" value={stats.appointed} color="blue" />
-              <StatCard icon={<UserRound size={20} />} label="Gelen Müşteri" value={stats.arrived} color="green" />
-              <StatCard icon={<ShoppingCart size={20} />} label="Satış Olan" value={stats.customers} color="amber" />
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: perms.can_see_revenue ? 'repeat(auto-fit, minmax(190px, 1fr))' : 'repeat(auto-fit, minmax(210px, 1fr))',
+              gap: 14,
+              marginBottom: 18
+            }}>
+              <StatCard icon={<MessageCircle size={20} />} label="Yeni danışan" value={stats.total} subtitle="Bu ay sisteme giren" color="violet" />
+              <StatCard icon={<CalendarDays size={20} />} label="Randevuya ilerleyen" value={stats.appointed} subtitle="Bu ayki danışanlardan" color="blue" />
+              <StatCard icon={<ShoppingCart size={20} />} label="Satışa dönüşen" value={stats.customers} subtitle={`Dönüşüm %${stats.rate}`} color="amber" />
+              {perms.can_see_revenue && <StatCard icon={<Wallet size={20} />} label="Bu ayki ciro" value={fmtTL(stats.revenue)} subtitle="Satışa dönüşen kayıtlar" color="green" />}
+            </div>
+
+            <div style={{ ...sectionGridStyle, gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.35fr) minmax(280px, .65fr)' }}>
+              <FunnelSection stats={stats} isMobile={isMobile} />
+              <LossAnalysis stats={stats} />
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: (perms.can_see_revenue && perms.can_enter_ads_data && !isMobile) ? '1fr 1fr' : '1fr',
+              gap: 16,
+              marginBottom: 16
+            }}>
               {perms.can_see_revenue && (
-                <>
-                  <StatCard icon={<TrendingUp size={20} />} label="Dönüşüm Oranı" value={`%${stats.rate}`} color="violet" />
-                  <StatCard icon={<Wallet size={20} />} label="Toplam Ciro" value={fmtTL(stats.revenue)} color="blue" />
-                </>
+                <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                  <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 4px', fontWeight: 800 }}>Hizmete göre ciro</p>
+                  <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>Bu ay açılan kayıtlardan gerçekleşen satışlar.</p>
+                  <RevenueByServiceChart leads={monthlyLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(service => [service.name, service])).values()) : currentBranchServices} />
+                </div>
+              )}
+              {perms.can_enter_ads_data && (
+                <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                  <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 4px', fontWeight: 800 }}>Meta reklam özeti</p>
+                  <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>Bu ayın harcama, mesaj, Meta kaynaklı satış ve ROAS sonucu.</p>
+                  <AdsPerformanceTable adsData={scopedAds} leads={monthlyLeads} isMobile={isMobile} />
+                </div>
               )}
             </div>
 
-<div style={{ ...sectionGridStyle, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-  <FunnelSection stats={stats} isMobile={isMobile} metaMessages={metaMessagesThisMonth} />
-</div>
-
-<div style={{ ...sectionGridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-  <LossAnalysis stats={stats} />
-</div>
-
-<div style={{
-  display: 'grid',
-  gridTemplateColumns: perms.can_see_revenue
-    ? 'repeat(auto-fit, minmax(260px, 1fr))'
-    : 'repeat(auto-fit, minmax(320px, 1fr))',
-  gap: 16,
-  marginBottom: 16
-}}>              <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Lead Kaynak Dağılımı</p>
-                <ChannelDonut leads={scopedLeads} />
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'minmax(280px, .8fr) minmax(360px, 1.2fr)',
+              gap: 16,
+              marginBottom: 16
+            }}>
+              <div style={{ ...cardStyle, padding: '1.1rem' }}>
+                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 4px', fontWeight: 800 }}>Kaynak dağılımı</p>
+                <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>Bu ay açılan kayıtların kaynağı.</p>
+                <ChannelDonut leads={monthlyLeads} />
               </div>
               <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Aylık Trend</p>
-                <MonthlyTrendChart leads={scopedLeads} />
+                <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 4px', fontWeight: 800 }}>Günlük kayıt trendi</p>
+                <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>Bu ay her gün sisteme girilen yeni danışan sayısı.</p>
+                <MonthlyTrendChart leads={monthlyLeads} />
               </div>
-              {perms.can_see_revenue && (
-                <>
-                  <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                    <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Hizmete Göre Ciro</p>
-                    <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
-                  </div>
-                  {perms.can_enter_ads_data && (
-                    <div style={{ ...cardStyle, padding: '1.1rem' }}>
-                      <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 14px', fontWeight: 700 }}>Reklam Performansı (Bu Ay)</p>
-                      <AdsPerformanceTable adsData={scopedAds} leads={scopedLeads} isMobile={isMobile} />
-                    </div>
-                  )}
-                </>
-              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: (isSuperAdmin && filterBranch === 'all' && !isMobile) ? '2fr 1fr' : '1fr', gap: 16 }}>
