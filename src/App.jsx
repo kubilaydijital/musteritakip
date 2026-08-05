@@ -1887,13 +1887,16 @@ function ChannelPieChart({ leads }) {
 function RevenueByServiceChart({ leads, services }) {
   const ref = useRef(null)
   const chartRef = useRef(null)
-  const serviceNames = (services || []).map(s => s.name)
+  const serviceNames = useMemo(() => {
+    const configured = (services || []).map(service => service.name)
+    const usedInPeriod = leads.map(lead => lead.service).filter(Boolean)
+    return [...new Set([...configured, ...usedInPeriod])]
+  }, [services, leads])
   const sums = useMemo(() => {
     const s = {}; serviceNames.forEach(sv => s[sv] = 0)
     leads.forEach(l => { if (l.result === 'Müşteri oldu' && l.sale_amount != null && s[l.service] !== undefined) s[l.service] += Number(l.sale_amount) })
     return s
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, serviceNames.join(',')])
+  }, [leads, serviceNames])
   useEffect(() => {
     if (serviceNames.length === 0) return
     if (chartRef.current) chartRef.current.destroy()
@@ -1903,76 +1906,283 @@ function RevenueByServiceChart({ leads, services }) {
       options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
     })
     return () => { if (chartRef.current) chartRef.current.destroy() }
-  }, [sums])
+  }, [sums, serviceNames])
+  if (serviceNames.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Bu dönem için hizmet bazında ciro verisi yok.</p>
   return <div style={{ position: 'relative', width: '100%', height: 200 }}><canvas ref={ref} /></div>
 }
 
-function MessageMatchReport({ adsData, leads }) {
-  const sorted = useMemo(() => [...adsData].sort((a, b) => new Date(b.date) - new Date(a.date)), [adsData])
-  if (sorted.length === 0) return null
+function calendarDayKey(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const pad = n => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
 
-  function recordCountForWeek(weekDate) {
-    // O hafta verisinin girildiği tarihten 7 gün öncesine kadar girilen kayıtları say (basit yaklaşım)
-    const end = new Date(weekDate)
-    const start = new Date(end.getTime() - 7 * 86400000)
-    return leads.filter(l => {
-      const d = new Date(l.date)
-      return d >= start && d <= end
-    }).length
-  }
+function buildMessageMatch(adsData, leads) {
+  const messagesByDay = new Map()
+  const recordsByDay = new Map()
 
-  const rows = sorted.slice(0, 8).map(week => {
-    const recordCount = recordCountForWeek(week.date)
-    const adjusted = recordCount + (week.manual_adjustment || 0)
-    const total = week.messages || 0
-    const missing = Math.max(0, total - adjusted)
-    const pct = total > 0 ? Math.round((adjusted / total) * 100) : 100
-    return { week, recordCount, adjusted, total, missing, pct }
+  adsData.forEach(ad => {
+    const day = calendarDayKey(ad.date)
+    if (!day) return
+    const current = messagesByDay.get(day) || { messages: 0, manualAdjustment: 0 }
+    current.messages += Number(ad.messages) || 0
+    current.manualAdjustment += Number(ad.manual_adjustment) || 0
+    messagesByDay.set(day, current)
   })
 
-  const sumTotal = rows.reduce((s, r) => s + r.total, 0)
-  const sumAdjusted = rows.reduce((s, r) => s + r.adjusted, 0)
-  const sumMissing = rows.reduce((s, r) => s + r.missing, 0)
-  const avgPct = sumTotal > 0 ? Math.round((sumAdjusted / sumTotal) * 100) : 100
-  const avgColor = avgPct >= 90 ? '#1FAA6D' : avgPct >= 70 ? '#E5A536' : '#E5615F'
-  const maxTotal = Math.max(...rows.map(r => r.total), 1)
+  leads.forEach(lead => {
+    const day = calendarDayKey(lead.date)
+    if (!day) return
+    recordsByDay.set(day, (recordsByDay.get(day) || 0) + 1)
+  })
+
+  const rows = [...messagesByDay.entries()].map(([day, meta]) => {
+    const records = recordsByDay.get(day) || 0
+    const adjustedRecords = records + meta.manualAdjustment
+    const matched = Math.min(meta.messages, adjustedRecords)
+    const missing = Math.max(0, meta.messages - adjustedRecords)
+    const coverage = meta.messages > 0 ? Math.min(100, Math.round((adjustedRecords / meta.messages) * 100)) : 100
+    return { day, messages: meta.messages, records, manualAdjustment: meta.manualAdjustment, matched, missing, coverage }
+  }).sort((a, b) => b.day.localeCompare(a.day))
+
+  const messages = rows.reduce((sum, row) => sum + row.messages, 0)
+  const records = rows.reduce((sum, row) => sum + row.records + row.manualAdjustment, 0)
+  const matched = rows.reduce((sum, row) => sum + row.matched, 0)
+  const missing = rows.reduce((sum, row) => sum + row.missing, 0)
+  const coverage = messages > 0 ? Math.round((matched / messages) * 100) : 100
+  return { rows, messages, records, matched, missing, coverage, issues: rows.filter(row => row.missing > 0) }
+}
+
+function MessageMatchReport({ audit }) {
+  if (!audit || audit.rows.length === 0) return null
+  const coverageColor = audit.coverage >= 90 ? T.green : audit.coverage >= 70 ? T.orange : '#E5615F'
 
   return (
-    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem', marginTop: '1.5rem' }}>
-      <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>Mesaj / kayıt eşleşme raporu</p>
-      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 16px' }}>Meta'nın gösterdiği mesaj sayısı ile sisteme girilen kayıt sayısını karşılaştırır. Manuel düzeltme, kaçırılan mesajları telafi eder.</p>
-
-      {/* Özet kart */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10,
-        background: '#FAFAF9', borderRadius: 10, padding: '14px 16px', marginBottom: 18,
-      }}>
-        <div><div style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Toplam mesaj</div><div style={{ fontSize: 22, fontWeight: 800, color: T.text }}>{sumTotal}</div></div>
-        <div><div style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Toplam kayıt</div><div style={{ fontSize: 22, fontWeight: 800, color: T.text }}>{sumAdjusted}</div></div>
-        <div><div style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Kaçan müşteri</div><div style={{ fontSize: 22, fontWeight: 800, color: sumMissing > 0 ? '#E5615F' : '#1FAA6D' }}>{sumMissing}</div></div>
-        <div><div style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Ortalama oran</div><div style={{ fontSize: 22, fontWeight: 800, color: avgColor }}>%{avgPct}</div></div>
+    <div style={{ ...cardStyle, padding: '1.25rem', marginTop: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div>
+          <p style={{ fontWeight: 750, fontSize: 16, color: T.text, margin: '0 0 4px' }}>Kayıt kontrolü</p>
+          <p style={{ fontSize: 12.5, color: T.textSoft, margin: 0 }}>Meta mesajları ile aynı gün sisteme girilen danışan kayıtları karşılaştırılır.</p>
+        </div>
+        <span style={{ padding: '6px 10px', borderRadius: 999, background: audit.missing > 0 ? '#FFF1F0' : '#EAF8F0', color: audit.missing > 0 ? '#C2413B' : T.green, fontSize: 12, fontWeight: 750 }}>
+          {audit.missing > 0 ? `${audit.missing} kayıt kontrol bekliyor` : 'Kayıtlar uyumlu'}
+        </span>
       </div>
 
-      {rows.map(({ week, recordCount, total, missing, pct }) => {
-        const barColor = pct >= 90 ? '#1FAA6D' : pct >= 70 ? '#E5A536' : '#E5615F'
-        const dateLabel = new Date(week.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-        return (
-          <div key={week.id} style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
-              <span style={{ color: T.textSoft }}>{dateLabel}</span>
-              <span style={{ fontWeight: 700, color: barColor }}>%{pct} kayıt oranı</span>
-            </div>
-            {/* Mini bar: mesaj (arka plan) vs kayıt (dolu) */}
-            <div style={{ position: 'relative', height: 8, borderRadius: 4, background: '#EFEEEC', overflow: 'hidden', marginBottom: 6 }}>
-              <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(100, (total / maxTotal) * 100)}%`, background: '#D8D5CF' }} />
-              <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(100, (recordCount / maxTotal) * 100)}%`, background: barColor }} />
-            </div>
-            <span style={{ fontSize: 12.5, color: '#444' }}>
-              Mesaj: {total} · Kayıt: {recordCount}{week.manual_adjustment > 0 ? ` (+${week.manual_adjustment} manuel)` : ''} · {missing > 0 ? <strong style={{ color: '#E5615F' }}>{missing} eksik</strong> : 'eksik yok'}
-            </span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: audit.issues.length ? 16 : 0 }}>
+        {[
+          ['Meta mesaj', audit.messages, T.primary],
+          ['Sisteme girilen', audit.records, T.text],
+          ['Eksik kayıt', audit.missing, audit.missing > 0 ? '#E5615F' : T.green],
+          ['Kayıt oranı', `%${audit.coverage}`, coverageColor],
+        ].map(([label, value, color]) => (
+          <div key={label} style={{ border: `1px solid ${T.border}`, background: '#FCFCFD', borderRadius: 11, padding: '11px 12px' }}>
+            <div style={{ fontSize: 11, color: T.textSoft, fontWeight: 700 }}>{label}</div>
+            <div style={{ color, fontWeight: 800, fontSize: 22, marginTop: 3 }}>{value}</div>
           </div>
-        )
-      })}
+        ))}
+      </div>
+
+      {audit.issues.length > 0 && (
+        <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 8 }}>
+          <p style={{ fontSize: 12, color: T.textSoft, fontWeight: 700, margin: '8px 0 4px' }}>KONTROL GEREKTİREN GÜNLER</p>
+          {audit.issues.slice(0, 5).map(row => (
+            <div key={row.day} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${T.border}`, fontSize: 13 }}>
+              <span style={{ color: T.text, fontWeight: 700 }}>{new Date(`${row.day}T12:00:00`).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}</span>
+              <span style={{ color: T.textSoft, textAlign: 'right' }}>Meta: {row.messages} · Kayıt: {row.records}{row.manualAdjustment ? ` (+${row.manualAdjustment} manuel)` : ''}</span>
+              <span style={{ color: '#D64545', fontWeight: 750, whiteSpace: 'nowrap' }}>{row.missing} eksik</span>
+            </div>
+          ))}
+          {audit.issues.length > 5 && <p style={{ fontSize: 12, color: T.textSoft, margin: '10px 0 0' }}>Ayrıca {audit.issues.length - 5} gün daha kontrol gerektiriyor.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function dateInputValue(date) {
+  const pad = value => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function ReportMetricCard({ icon, label, value, detail, color }) {
+  return (
+    <div style={{ ...cardStyle, padding: '14px 15px', minWidth: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 750 }}>{label}</span>
+        <span style={{ width: 29, height: 29, display: 'grid', placeItems: 'center', borderRadius: 9, background: `${color}16`, color }}>{icon}</span>
+      </div>
+      <div style={{ color: T.text, fontWeight: 800, fontSize: 22, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
+      <div style={{ color: T.textFaint, fontSize: 11.5, marginTop: 5, minHeight: 15 }}>{detail}</div>
+    </div>
+  )
+}
+
+function ReportFunnel({ metrics }) {
+  const stages = [
+    { label: 'Meta mesaj', value: metrics.messages, color: '#7C5CFC' },
+    { label: 'Sistem kaydı', value: metrics.records, color: '#4D8CE3' },
+    { label: 'Randevu', value: metrics.appointments, color: '#E5A536' },
+    { label: 'Müşteri oldu', value: metrics.sales, color: T.green },
+  ]
+  const maxValue = Math.max(...stages.map(stage => stage.value), 1)
+
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: T.text, margin: '0 0 4px', fontWeight: 750 }}>Satış hunisi</p>
+      <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 16px' }}>Mesajdan satışa kadar seçili dönem görünümü.</p>
+      <div style={{ display: 'grid', gap: 13 }}>
+        {stages.map(stage => (
+          <div key={stage.label}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, marginBottom: 6 }}>
+              <span style={{ color: T.textSoft, fontWeight: 650 }}>{stage.label}</span>
+              <span style={{ color: T.text, fontWeight: 800 }}>{stage.value}</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 999, background: '#EEF0F5', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.max(4, (stage.value / maxValue) * 100)}%`, borderRadius: 'inherit', background: stage.color, transition: 'width .25s ease' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branchName, showBranch }) {
+  const now = new Date()
+  const [range, setRange] = useState('this_month')
+  const [customStart, setCustomStart] = useState(() => dateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
+  const [customEnd, setCustomEnd] = useState(() => dateInputValue(now))
+
+  const period = useMemo(() => {
+    const today = new Date()
+    const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+    const previousMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 1)
+    const lastThirtyStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)
+    const formatted = (start, end) => {
+      const lastIncludedDay = new Date(end.getTime() - 1)
+      const sameMonth = start.getFullYear() === lastIncludedDay.getFullYear() && start.getMonth() === lastIncludedDay.getMonth()
+      if (sameMonth) return `${start.getDate()}–${lastIncludedDay.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+      return `${start.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} – ${lastIncludedDay.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    }
+    if (range === 'last_month') return { start: previousMonthStart, end: previousMonthEnd, label: previousMonthStart.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) }
+    if (range === 'last_30') return { start: lastThirtyStart, end: endOfToday, label: 'Son 30 gün' }
+    if (range === 'custom') {
+      const start = customStart ? new Date(`${customStart}T00:00:00`) : monthStart
+      const end = customEnd ? new Date(`${customEnd}T00:00:00`) : endOfToday
+      const safeEnd = end >= start ? new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1) : endOfToday
+      return { start, end: safeEnd, label: formatted(start, safeEnd) }
+    }
+    return { start: monthStart, end: endOfToday, label: today.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) }
+  }, [range, customStart, customEnd])
+
+  const isInPeriod = (value) => {
+    const date = new Date(value)
+    return !Number.isNaN(date.getTime()) && date >= period.start && date < period.end
+  }
+  const periodLeads = useMemo(() => leads.filter(lead => isInPeriod(lead.date)), [leads, period])
+  const periodAds = useMemo(() => adsData.filter(ad => isInPeriod(ad.date)), [adsData, period])
+  const messageAudit = useMemo(() => buildMessageMatch(periodAds, periodLeads), [periodAds, periodLeads])
+
+  const metrics = useMemo(() => {
+    const spend = periodAds.reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
+    const messages = periodAds.reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
+    const appointments = periodLeads.filter(lead => lead.appointment_at || lead.result === 'Randevu aldı').length
+    const sales = periodLeads.filter(lead => lead.result === 'Müşteri oldu')
+    const revenue = sales.reduce((sum, lead) => sum + (Number(lead.sale_amount) || 0), 0)
+    return { spend, messages, records: periodLeads.length, appointments, sales: sales.length, revenue, roas: spend > 0 ? (revenue / spend).toFixed(1) : '—' }
+  }, [periodAds, periodLeads])
+
+  const insights = useMemo(() => {
+    const servicesByRevenue = {}
+    periodLeads.filter(lead => lead.result === 'Müşteri oldu').forEach(lead => {
+      const service = lead.service || 'Belirtilmemiş'
+      servicesByRevenue[service] = (servicesByRevenue[service] || 0) + (Number(lead.sale_amount) || 0)
+    })
+    const [topService, topRevenue] = Object.entries(servicesByRevenue).sort((a, b) => b[1] - a[1])[0] || []
+    const channelsByMessages = {}
+    periodAds.forEach(ad => { channelsByMessages[ad.channel || 'Meta'] = (channelsByMessages[ad.channel || 'Meta'] || 0) + (Number(ad.messages) || 0) })
+    const [topChannel, topMessages] = Object.entries(channelsByMessages).sort((a, b) => b[1] - a[1])[0] || []
+    return { topService, topRevenue, topChannel, topMessages }
+  }, [periodLeads, periodAds])
+
+  const optionStyle = (active) => ({
+    border: `1px solid ${active ? T.primary : T.border}`, background: active ? T.primaryLight : '#fff', color: active ? T.primary : T.textSoft,
+    borderRadius: 9, padding: '8px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap'
+  })
+  const visibleServices = useMemo(() => {
+    const configured = (services || []).map(service => service.name)
+    const used = periodLeads.map(lead => lead.service).filter(Boolean)
+    return [...new Set([...configured, ...used])].map(name => ({ name }))
+  }, [services, periodLeads])
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
+        <div>
+          <h1 style={{ fontSize: 23, fontWeight: 800, color: T.text, margin: '0 0 5px' }}>Raporlar</h1>
+          <p style={{ margin: 0, color: T.textSoft, fontSize: 13.5 }}>Reklam, randevu ve satış sonuçlarının tek ekrandaki özeti.</p>
+        </div>
+        {canExport && <ExportButtons rows={leadsToExportRows(periodLeads, branchName, showBranch)} baseFilename={`rapor-${dateInputValue(new Date())}`} sheetName="Rapor" />}
+      </div>
+
+      <div style={{ ...cardStyle, padding: '12px', marginBottom: 16, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        {[
+          ['this_month', 'Bu ay'], ['last_month', 'Geçen ay'], ['last_30', 'Son 30 gün'], ['custom', 'Özel tarih'],
+        ].map(([key, label]) => <button type="button" key={key} onClick={() => setRange(key)} style={optionStyle(range === key)}>{label}</button>)}
+        {range === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginLeft: 2 }}>
+            <input aria-label="Başlangıç tarihi" type="date" value={customStart} onChange={event => setCustomStart(event.target.value)} style={{ ...inputStyle, padding: '7px 9px', fontSize: 12 }} />
+            <span style={{ color: T.textFaint, fontSize: 12 }}>—</span>
+            <input aria-label="Bitiş tarihi" type="date" value={customEnd} onChange={event => setCustomEnd(event.target.value)} style={{ ...inputStyle, padding: '7px 9px', fontSize: 12 }} />
+          </div>
+        )}
+        <span style={{ marginLeft: 'auto', color: T.textFaint, fontSize: 12, fontWeight: 650 }}>{period.label}</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(6, minmax(0, 1fr))', gap: 11, marginBottom: 16 }}>
+        <ReportMetricCard icon={<Wallet size={15} />} label="Reklam harcaması" value={fmtTL(metrics.spend)} detail="Seçilen dönem" color={T.primary} />
+        <ReportMetricCard icon={<MessageCircle size={15} />} label="Meta mesaj" value={metrics.messages} detail="Reklam kaynaklı" color="#8B5CF6" />
+        <ReportMetricCard icon={<CalendarDays size={15} />} label="Randevu" value={metrics.appointments} detail={`${metrics.records} sistem kaydı`} color="#E5A536" />
+        <ReportMetricCard icon={<ShoppingCart size={15} />} label="Satış" value={metrics.sales} detail="Müşteri oldu" color={T.green} />
+        <ReportMetricCard icon={<TrendingUp size={15} />} label="Ciro" value={fmtTL(metrics.revenue)} detail="Gerçekleşen satış" color="#2F7FD1" />
+        <ReportMetricCard icon={<Megaphone size={15} />} label="ROAS" value={metrics.roas === '—' ? '—' : `${metrics.roas}x`} detail="Ciro / reklam harcaması" color="#A66B17" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '0.9fr 1.1fr', gap: 16, marginBottom: 16 }}>
+        <div style={{ ...cardStyle, padding: '1.15rem' }}><ReportFunnel metrics={metrics} /></div>
+        <div style={{ ...cardStyle, padding: '1.15rem' }}>
+          <p style={{ fontSize: 14, color: T.text, margin: '0 0 4px', fontWeight: 750 }}>Dönem özeti</p>
+          <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 16px' }}>Öne çıkan performans ve takip edilmesi gereken konu.</p>
+          <div style={{ display: 'grid', gap: 13 }}>
+            <div><div style={{ color: T.textFaint, fontSize: 11, fontWeight: 700 }}>EN ÇOK CİRO GETİREN HİZMET</div><div style={{ color: T.text, fontWeight: 750, fontSize: 14, marginTop: 3 }}>{insights.topService ? `${insights.topService} · ${fmtTL(insights.topRevenue)}` : 'Bu dönemde satış kaydı yok'}</div></div>
+            <div><div style={{ color: T.textFaint, fontSize: 11, fontWeight: 700 }}>EN ÇOK MESAJ GETİREN KANAL</div><div style={{ color: T.text, fontWeight: 750, fontSize: 14, marginTop: 3 }}>{insights.topChannel ? `${insights.topChannel} · ${insights.topMessages} mesaj` : 'Bu dönemde reklam mesajı yok'}</div></div>
+            <div style={{ padding: '10px 11px', borderRadius: 10, background: messageAudit.missing > 0 ? '#FFF5F3' : '#F0FAF5', color: messageAudit.missing > 0 ? '#BD3D37' : T.green, fontSize: 12.5, fontWeight: 700 }}>
+              {messageAudit.missing > 0 ? `${messageAudit.missing} Meta mesajının sistem kaydı kontrol edilmeli.` : 'Meta mesajları ile sistem kayıtları bu dönemde uyumlu.'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: (periodAds.length > 0 && !isMobile) ? '1fr 1fr' : '1fr', gap: 16 }}>
+        <div style={{ ...cardStyle, padding: '1.15rem' }}>
+          <p style={{ fontSize: 14, color: T.text, margin: '0 0 4px', fontWeight: 750 }}>Hizmete göre ciro</p>
+          <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>Satışa dönüşen hizmetlerin gelir karşılaştırması.</p>
+          <RevenueByServiceChart leads={periodLeads} services={visibleServices} />
+        </div>
+        {periodAds.length > 0 && (
+          <div style={{ ...cardStyle, padding: '1.15rem' }}>
+            <p style={{ fontSize: 14, color: T.text, margin: '0 0 4px', fontWeight: 750 }}>Günlük reklam harcaması</p>
+            <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>{period.label} içindeki harcama seyri.</p>
+            <MonthlySpendChart adsData={periodAds} />
+          </div>
+        )}
+      </div>
+
+      <MessageMatchReport audit={messageAudit} />
     </div>
   )
 }
@@ -1980,15 +2190,23 @@ function MessageMatchReport({ adsData, leads }) {
 function MonthlySpendChart({ adsData }) {
   const ref = useRef(null)
   const chartRef = useRef(null)
-  // Son 30 günlük veriyi göster - daha eskisi grafiği okunmaz kılar.
-  const sorted = useMemo(() => [...adsData].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-30), [adsData])
+  // Aynı güne ait birden fazla kanal/kayıt varsa grafikte tek günlük tutar olarak göster.
+  const sorted = useMemo(() => {
+    const byDay = new Map()
+    adsData.forEach(ad => {
+      const day = calendarDayKey(ad.date)
+      if (!day) return
+      byDay.set(day, (byDay.get(day) || 0) + (Number(ad.spend) || 0))
+    })
+    return [...byDay.entries()].map(([day, spend]) => ({ day, spend })).sort((a, b) => a.day.localeCompare(b.day))
+  }, [adsData])
   useEffect(() => {
     if (sorted.length === 0) return
     if (chartRef.current) chartRef.current.destroy()
     chartRef.current = new Chart(ref.current, {
       type: 'line',
       data: {
-        labels: sorted.map(w => new Date(w.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+        labels: sorted.map(w => new Date(`${w.day}T12:00:00`).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
         datasets: [{ label: 'Harcama (TL)', data: sorted.map(w => w.spend), borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.15)', fill: true, tension: 0.3 }]
       },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
@@ -3500,31 +3718,15 @@ export function PanelApp() {
         )}
 
         {activeTab === 'reports' && perms.can_see_revenue && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: 0 }}>Raporlar</h1>
-              {(isSuperAdmin || perms.can_export_data) && (
-                <ExportButtons
-                  rows={leadsToExportRows(scopedLeads, branchName, isSuperAdmin && filterBranch === 'all')}
-                  baseFilename={`rapor-${new Date().toISOString().slice(0, 10)}`}
-                  sheetName="Rapor"
-                />
-              )}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: (scopedAds.length > 0 && !isMobile) ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 16 }}>
-              <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '1rem' }}>
-                <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 8px', fontWeight: 600 }}>Hizmete göre ciro</p>
-                <RevenueByServiceChart leads={scopedLeads} services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(s => [s.name, s])).values()) : currentBranchServices} />
-              </div>
-              {scopedAds.length > 0 && (
-                <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: '1rem' }}>
-                  <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 8px', fontWeight: 600 }}>Günlük reklam harcaması (son 30 gün)</p>
-                  <MonthlySpendChart adsData={scopedAds} />
-                </div>
-              )}
-            </div>
-            {perms.can_enter_ads_data && scopedAds.length > 0 && <MessageMatchReport adsData={scopedAds} leads={scopedLeads} />}
-          </div>
+          <ReportsDashboard
+            leads={scopedLeads}
+            adsData={scopedAds}
+            services={isSuperAdmin && filterBranch === 'all' ? Array.from(new Map(branchServices.map(service => [service.name, service])).values()) : currentBranchServices}
+            isMobile={isMobile}
+            canExport={isSuperAdmin || perms.can_export_data}
+            branchName={branchName}
+            showBranch={isSuperAdmin && filterBranch === 'all'}
+          />
         )}
 
         {activeTab === 'ads' && perms.can_enter_ads_data && (
