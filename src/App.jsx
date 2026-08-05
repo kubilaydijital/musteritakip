@@ -2599,23 +2599,34 @@ function MonthlyTrendChart({ leads }) {
 
 function AdsPerformanceTable({ adsData, leads, isMobile }) {
   const rows = useMemo(() => {
+    // Kartın başlığındaki “Bu Ay” ifadesi gerçek bir takvim ayını anlatır.
+    // Geçmiş reklam ve danışan kayıtlarını silmeden, yalnızca bu hesaptan hariç tutuyoruz.
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const isThisMonth = (value) => {
+      const date = new Date(value)
+      return !Number.isNaN(date.getTime()) && date >= monthStart && date < nextMonthStart
+    }
+    const thisMonthAds = adsData.filter(ad => isThisMonth(ad.date))
+    const thisMonthLeads = leads.filter(lead => isThisMonth(lead.date))
     const byChannel = {}
-    adsData.forEach(w => {
+    thisMonthAds.forEach(w => {
       const ch = w.channel || 'Instagram'
       if (!byChannel[ch]) byChannel[ch] = { spend: 0, messages: 0 }
       byChannel[ch].spend += Number(w.spend) || 0
       byChannel[ch].messages += Number(w.messages) || 0
     })
     return Object.keys(byChannel).map(ch => {
-      const sales = leads.filter(l => l.channel === ch && l.result === 'Müşteri oldu').length
+      const sales = thisMonthLeads.filter(l => l.channel === ch && l.result === 'Müşteri oldu').length
       const spend = byChannel[ch].spend
-      const revenue = leads.filter(l => l.channel === ch && l.result === 'Müşteri oldu').reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
+      const revenue = thisMonthLeads.filter(l => l.channel === ch && l.result === 'Müşteri oldu').reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
       const roas = spend > 0 ? (revenue / spend).toFixed(1) : '—'
       return { channel: ch, spend, messages: byChannel[ch].messages, sales, roas }
     }).sort((a, b) => b.spend - a.spend)
   }, [adsData, leads])
 
-  if (rows.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Henüz reklam verisi girilmemiş.</p>
+  if (rows.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Bu ay için henüz reklam verisi yok.</p>
 
   if (isMobile) {
     return (
