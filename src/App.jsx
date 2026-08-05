@@ -2639,9 +2639,10 @@ function FunnelSection({ stats, isMobile }) {
         alignItems: 'stretch'
       }}>
         {stages.map((s, i) => (
-          <div key={s.label}>
+          <div key={s.label} style={{ minWidth: 0, height: '100%' }}>
             <div style={{
-              minHeight: isMobile ? 112 : 138,
+              height: '100%',
+              minHeight: isMobile ? 188 : 220,
               borderRadius: 15,
               padding: isMobile ? 13 : 16,
               background: s.bg,
@@ -2658,7 +2659,8 @@ function FunnelSection({ stats, isMobile }) {
                   color: T.textSoft,
                   margin: 0,
                   fontWeight: 700,
-                  lineHeight: 1.35
+                  lineHeight: 1.35,
+                  minHeight: 34
                 }}>
                   {s.label}
                 </p>
@@ -2672,11 +2674,13 @@ function FunnelSection({ stats, isMobile }) {
                 }}>
                   {s.value}
                 </p>
-                {stageRates[i] != null && (
-                  <span style={{ display: 'inline-flex', marginTop: 8, padding: '3px 7px', borderRadius: 999, fontSize: 10.5, fontWeight: 750, color: s.color, background: 'rgba(255,255,255,.7)' }}>
-                    Önceki adımdan %{stageRates[i]}
-                  </span>
-                )}
+                <div style={{ minHeight: 27, marginTop: 8 }}>
+                  {stageRates[i] != null && (
+                    <span style={{ display: 'inline-flex', padding: '4px 7px', borderRadius: 999, fontSize: 10.5, fontWeight: 750, color: s.color, background: 'rgba(255,255,255,.72)', whiteSpace: 'nowrap' }}>
+                      Dönüşüm %{stageRates[i]}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div style={{
@@ -3476,7 +3480,7 @@ export function PanelApp() {
               marginBottom: 18
             }}>
               <StatCard icon={<MessageCircle size={20} />} label="Yeni danışan" value={stats.total} subtitle="Bu ay sisteme giren" color="violet" />
-              <StatCard icon={<CalendarDays size={20} />} label="Randevuya ilerleyen" value={stats.appointed} subtitle="Bu ayki danışanlardan" color="blue" />
+              <StatCard icon={<CalendarDays size={20} />} label="Randevu verilen" value={stats.appointed} subtitle="Bu ayki danışanlardan" color="blue" />
               <StatCard icon={<ShoppingCart size={20} />} label="Satışa dönüşen" value={stats.customers} subtitle={`Dönüşüm %${stats.rate}`} color="amber" />
               {perms.can_see_revenue && <StatCard icon={<Wallet size={20} />} label="Bu ayki ciro" value={fmtTL(stats.revenue)} subtitle="Satışa dönüşen kayıtlar" color="green" />}
             </div>
