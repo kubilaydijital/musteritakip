@@ -1182,13 +1182,23 @@ const WHATSAPP_TEMPLATES = {
     `Merhaba ${name}, sizi bekliyoruz! ✨ Aklınıza gelen soruları şimdi sorabilirsiniz, hemen yanıtlayalım. Şimdi uygun musunuz?`,
 }
 
+function normalizeWhatsappPhone(phone) {
+  // Eski kayıtlar +90, 90, 0 ile başlayan ya da boşluklu yazılmış olabilir.
+  // WhatsApp'a her zaman Türkiye ülke kodu dahil, tek ve temiz numarayı gönderiyoruz.
+  let digits = String(phone || '').replace(/[^\d]/g, '')
+  if (digits.startsWith('00')) digits = digits.slice(2)
+  if (digits.startsWith('0')) digits = digits.slice(1)
+  if (/^5\d{9}$/.test(digits)) digits = `90${digits}`
+  return /^905\d{9}$/.test(digits) ? digits : null
+}
+
 function buildWhatsappUrl(lead) {
   const template = WHATSAPP_TEMPLATES[lead.result]
-  if (!template) return null
-  const digits = (lead.phone || '').replace(/[^\d]/g, '') // wa.me formatı: sadece rakamlar, + işareti olmadan
-  if (!digits || digits === '90') return null // telefon numarası girilmemiş (Instagram gibi kanallardan sıkça olur)
+  const phone = normalizeWhatsappPhone(lead.phone)
+  if (!template || !phone) return null
   const message = template(lead.name, lead.service)
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+  // api.whatsapp.com, iPhone'da wa.me yönlendirmesini atlayıp sohbeti doğrudan açar.
+  return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
 }
 
 function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile, noteCount = 0, rule = null }) {
