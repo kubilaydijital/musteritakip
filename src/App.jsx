@@ -1511,10 +1511,9 @@ function WorkingHoursEditor({ branch, onSave }) {
   )
 }
 
-// İşletme sahibinin kendi online randevu sayfası linkini görüp kopyalayabileceği/paylaşabileceği kart.
-function OnlineBookingLinkCard({ branchId, branchName }) {
+function BookingLinkActions({ link, branchName }) {
   const [copied, setCopied] = useState(false)
-  const link = `https://musteritakip.net/randevu/${branchId}`
+  const waShareUrl = `https://wa.me/?text=${encodeURIComponent(`${branchName} için online randevu sayfamız: ${link}`)}`
 
   function copyLink() {
     navigator.clipboard?.writeText(link)
@@ -1522,31 +1521,71 @@ function OnlineBookingLinkCard({ branchId, branchName }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const waShareUrl = `https://wa.me/?text=${encodeURIComponent(`${branchName} için online randevu sayfamız: ${link}`)}`
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      <button onClick={copyLink} style={{
+        padding: '9px 14px', borderRadius: 9, border: 'none', background: T.primary, color: '#fff',
+        fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap',
+      }}>{copied ? 'Kopyalandı ✓' : 'Linki kopyala'}</button>
+      <a href={waShareUrl} target="_blank" rel="noreferrer" style={{
+        padding: '9px 14px', borderRadius: 9, border: '1px solid #1FAA6D', color: '#147561', background: '#F4FBF7',
+        fontWeight: 700, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap',
+      }}>WhatsApp'ta paylaş</a>
+      <a href={link} target="_blank" rel="noreferrer" style={{
+        padding: '9px 14px', borderRadius: 9, border: `1px solid ${T.border}`, color: T.textSoft, background: '#fff',
+        fontWeight: 700, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap',
+      }}>Sayfayı gör</a>
+    </div>
+  )
+}
+
+// Her kullanıcı yalnızca kendi şubesinin, Süper Admin ise tüm aktif şubelerin
+// herkese açık randevu sayfasına hızlıca erişebilir.
+function OnlineBookingLinkCard({ branchId, branchName }) {
+  const link = `https://musteritakip.net/randevu/${branchId}`
 
   return (
-    <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: '1.25rem', marginBottom: 16 }}>
-      <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 4px' }}>🔗 Online Randevu Sayfanız</p>
-      <p style={{ fontSize: 12.5, color: T.textSoft, margin: '0 0 14px' }}>
-        Bu linki müşterilerinize (Instagram bio, WhatsApp durumu, kartvizit vb. üzerinden) paylaşın — sizi aramadan 7/24 randevu alabilirler.
-      </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{
-          flex: '1 1 260px', padding: '9px 12px', borderRadius: 9, border: `1px solid ${T.border}`,
-          background: T.bg, fontSize: 13, fontFamily: 'monospace', color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{link}</div>
-        <button onClick={copyLink} style={{
-          padding: '9px 14px', borderRadius: 9, border: 'none', background: T.primary, color: '#fff',
-          fontWeight: 600, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap',
-        }}>{copied ? 'Kopyalandı ✓' : 'Linki Kopyala'}</button>
-        <a href={waShareUrl} target="_blank" rel="noreferrer" style={{
-          padding: '9px 14px', borderRadius: 9, border: `1px solid #1FAA6D`, color: '#1FAA6D',
-          fontWeight: 600, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap',
-        }}>WhatsApp'ta Paylaş</a>
-        <a href={link} target="_blank" rel="noreferrer" style={{
-          padding: '9px 14px', borderRadius: 9, border: `1px solid ${T.border}`, color: T.textSoft,
-          fontWeight: 600, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap',
-        }}>Sayfayı Gör</a>
+    <div style={{ ...cardStyle, padding: '1.25rem', marginBottom: 16, background: 'linear-gradient(135deg, #FFFFFF 0%, #F7F5FF 100%)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+        <span style={{ width: 40, height: 40, borderRadius: 12, background: T.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 19, flexShrink: 0 }}>↗</span>
+        <div>
+          <p style={{ fontWeight: 800, fontSize: 15, margin: '0 0 4px', color: T.text }}>Online randevu linkiniz</p>
+          <p style={{ fontSize: 12.5, color: T.textSoft, margin: 0 }}>Bu linki müşterilerinizle paylaşarak 7/24 randevu alabilirsiniz.</p>
+        </div>
+      </div>
+      <div style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: '#fff', fontSize: 12.5, fontFamily: 'monospace', color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 10 }}>{link}</div>
+      <BookingLinkActions link={link} branchName={branchName} />
+    </div>
+  )
+}
+
+function BranchBookingLinksPanel({ branches, isMobile }) {
+  if (branches.length === 0) return null
+
+  return (
+    <div style={{ ...cardStyle, padding: isMobile ? 14 : 18, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div>
+          <p style={{ fontWeight: 800, fontSize: 16, margin: '0 0 4px', color: T.text }}>Şube randevu linkleri</p>
+          <p style={{ fontSize: 12.5, color: T.textSoft, margin: 0 }}>Her şubenin müşterilerle paylaşacağı herkese açık randevu sayfası.</p>
+        </div>
+        <span style={{ padding: '5px 9px', borderRadius: 999, background: T.primaryLight, color: T.primary, fontSize: 11.5, fontWeight: 800 }}>{branches.length} aktif şube</span>
+      </div>
+      <div style={{ display: 'grid', gap: 10 }}>
+        {branches.map(branch => {
+          const link = `https://musteritakip.net/randevu/${branch.id}`
+          return (
+            <div key={branch.id} style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: isMobile ? 12 : 14, background: '#FCFCFD' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0, flex: '1 1 280px' }}>
+                  <p style={{ fontWeight: 800, fontSize: 14, color: T.text, margin: '0 0 7px' }}>🏪 {branch.name}</p>
+                  <p title={link} style={{ fontFamily: 'monospace', color: T.textSoft, background: '#fff', border: `1px solid ${T.border}`, padding: '8px 10px', borderRadius: 8, margin: 0, fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link}</p>
+                </div>
+                <BookingLinkActions link={link} branchName={branch.name} />
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -2322,6 +2361,37 @@ const PERMISSION_LABELS = {
   can_export_data: 'Müşteri listesini dışa aktarabilir (CSV/Excel)'
 }
 
+const PERMISSION_GROUPS = [
+  { label: 'Veri erişimi', description: 'Hassas müşteri ve finans verileri', keys: ['can_see_phone', 'can_see_revenue', 'can_see_all_branches'] },
+  { label: 'Kayıt işlemleri', description: 'Danışan kayıtlarındaki yetkiler', keys: ['can_add_lead', 'can_edit_any_lead', 'can_delete_lead'] },
+  { label: 'Operasyon', description: 'Takvim, reklam ve dışa aktarma', keys: ['can_see_calendar', 'can_enter_ads_data', 'can_export_data'] },
+  { label: 'Yönetim', description: 'Kullanıcı ve şube yönetimi', keys: ['can_manage_users', 'can_manage_branches'] },
+]
+
+function PermissionSwitch({ checked, disabled, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onChange}
+      style={{
+        width: 42, height: 24, borderRadius: 999, border: 'none', padding: 3, flexShrink: 0,
+        background: checked ? T.primary : '#D9DEE8', cursor: disabled ? 'wait' : 'pointer',
+        opacity: disabled ? 0.65 : 1, transition: 'background .18s ease'
+      }}
+    >
+      <span style={{
+        display: 'block', width: 18, height: 18, borderRadius: '50%', background: '#fff',
+        transform: checked ? 'translateX(18px)' : 'translateX(0)', transition: 'transform .18s ease',
+        boxShadow: '0 1px 3px rgba(20,32,57,.2)'
+      }} />
+    </button>
+  )
+}
+
 function PermissionTemplateManager({ isMobile }) {
   const [templates, setTemplates] = useState([])
   const [loaded, setLoaded] = useState(false)
@@ -2332,12 +2402,15 @@ function PermissionTemplateManager({ isMobile }) {
   const [newTplName, setNewTplName] = useState('')
   const [creating, setCreating] = useState(false)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null)
+  const [expandedTemplateId, setExpandedTemplateId] = useState(null)
+  const [openActionsFor, setOpenActionsFor] = useState(null)
 
   useEffect(() => { load() }, [])
 
   async function load() {
     const { data } = await supabase.from('permission_templates').select('*').order('name')
     setTemplates(data || [])
+    setExpandedTemplateId(data?.[0]?.id || null)
     setLoaded(true)
   }
 
@@ -2403,60 +2476,84 @@ function PermissionTemplateManager({ isMobile }) {
   if (!loaded) return null
 
   return (
-    <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: isMobile ? '1rem' : '1.25rem', marginTop: isMobile ? '1rem' : '1.5rem' }}>
-      <p style={{ fontWeight: 600, fontSize: 16, margin: '0 0 4px' }}>İzin şablonları (Süper Admin)</p>
-      <p style={{ fontSize: 13, color: T.textSoft, margin: '0 0 14px' }}>Her şablonun hangi yetkilere sahip olduğunu buradan açıp kapatabilirsin. Değişiklik anında tüm o şablona bağlı kullanıcılara uygulanır.</p>
-      {err && <p style={{ fontSize: 13, color: '#c0392b', margin: '0 0 14px', fontWeight: 600 }}>{err}</p>}
-      {templates.map(tpl => (
-        <div key={tpl.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-            <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{tpl.name}{savingId === tpl.id ? ' · kaydediliyor...' : ''}</p>
-            <button onClick={() => { setEditingNameFor(editingNameFor === tpl.id ? null : tpl.id); setNameValue(tpl.name) }}
-              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.card, color: '#6C5CE7', cursor: 'pointer' }}>
-              Adı değiştir
-            </button>
-            {tpl.id !== 'tpl_super_admin' && (
-              <button onClick={() => deleteTemplate(tpl)} style={{
-                fontSize: 11, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                border: confirmingDeleteId === tpl.id ? '1px solid #c0392b' : '1px solid #ddd',
-                background: confirmingDeleteId === tpl.id ? '#c0392b' : '#fff',
-                color: confirmingDeleteId === tpl.id ? '#fff' : '#999'
-              }}>
-                {confirmingDeleteId === tpl.id ? 'Emin misin?' : 'Şablonu sil'}
+    <section style={{ ...cardStyle, padding: isMobile ? 14 : 20, marginTop: isMobile ? '1rem' : '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap' }}>
+        <div>
+          <p style={{ fontWeight: 800, fontSize: 17, margin: '0 0 5px', color: T.text }}>İzin şablonları</p>
+          <p style={{ fontSize: 12.5, lineHeight: 1.5, color: T.textSoft, margin: 0, maxWidth: 650 }}>Yetkileri şablon bazında yönetin. Değişiklikler, o şablona bağlı kullanıcılara anında uygulanır.</p>
+        </div>
+        <span style={{ padding: '6px 10px', borderRadius: 999, color: T.primary, background: T.primaryLight, fontSize: 11.5, fontWeight: 800 }}>Süper Admin</span>
+      </div>
+      {err && <p style={{ fontSize: 13, color: T.red, margin: '0 0 14px', fontWeight: 700 }}>{err}</p>}
+      {templates.map(tpl => {
+        const isExpanded = expandedTemplateId === tpl.id
+        const activePermissions = Object.keys(PERMISSION_LABELS).filter(key => !!tpl[key]).length
+        return (
+          <div key={tpl.id} style={{ marginBottom: 12, border: `1px solid ${isExpanded ? '#CFC9F8' : T.border}`, borderRadius: 14, overflow: 'visible', background: isExpanded ? '#FCFBFF' : '#fff', transition: 'border-color .18s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: isMobile ? '12px' : '14px 16px' }}>
+              <button type="button" onClick={() => setExpandedTemplateId(isExpanded ? null : tpl.id)} aria-expanded={isExpanded} style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0, border: 'none', background: 'transparent', padding: 0, textAlign: 'left', cursor: 'pointer', color: T.text }}>
+                <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', color: T.primary, background: T.primaryLight, fontWeight: 900, flexShrink: 0 }}>{(tpl.name || '?').trim().charAt(0).toLocaleUpperCase('tr')}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 800, fontSize: 14, color: T.text }}>{tpl.name}</span>
+                  <span style={{ display: 'block', marginTop: 2, color: T.textFaint, fontSize: 11.5 }}>{activePermissions} / {Object.keys(PERMISSION_LABELS).length} yetki açık{savingId === tpl.id ? ' · kaydediliyor…' : ''}</span>
+                </span>
               </button>
+              <span style={{ padding: '5px 8px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, color: isExpanded ? T.primary : T.textSoft, background: isExpanded ? T.primaryLight : T.cardSoft }}>{isExpanded ? 'Açık' : 'Kapalı'}</span>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <button type="button" aria-label={`${tpl.name} işlemleri`} onClick={() => setOpenActionsFor(openActionsFor === tpl.id ? null : tpl.id)} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.textSoft, cursor: 'pointer', fontSize: 17, lineHeight: 1 }}>•••</button>
+                {openActionsFor === tpl.id && (
+                  <div style={{ position: 'absolute', zIndex: 5, right: 0, top: 38, minWidth: 160, padding: 5, border: `1px solid ${T.border}`, borderRadius: 10, background: '#fff', boxShadow: '0 12px 28px rgba(20,32,57,.14)' }}>
+                    <button type="button" onClick={() => { setEditingNameFor(tpl.id); setNameValue(tpl.name); setExpandedTemplateId(tpl.id); setOpenActionsFor(null) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 9px', border: 'none', borderRadius: 7, background: 'transparent', color: T.text, fontSize: 12.5, cursor: 'pointer' }}>Adını değiştir</button>
+                    {tpl.id !== 'tpl_super_admin' && <button type="button" onClick={() => deleteTemplate(tpl)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 9px', border: 'none', borderRadius: 7, background: confirmingDeleteId === tpl.id ? T.redBg : 'transparent', color: T.red, fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>{confirmingDeleteId === tpl.id ? 'Silmek için tekrar tıkla' : 'Şablonu sil'}</button>}
+                  </div>
+                )}
+              </div>
+              <ChevronDown size={18} color={T.textFaint} style={{ flexShrink: 0, transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .18s ease' }} />
+            </div>
+            {isExpanded && (
+              <div style={{ borderTop: `1px solid ${T.border}`, padding: isMobile ? 12 : 16 }}>
+                {editingNameFor === tpl.id && (
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+                    <input type="text" aria-label="Şablon adı" placeholder="Şablon adı" value={nameValue} onChange={e => setNameValue(e.target.value)} style={{ ...inputStyle, flex: '1 1 200px', padding: '9px 11px', fontSize: 13 }} />
+                    <button type="button" onClick={() => submitNameChange(tpl)} style={{ padding: '9px 13px', borderRadius: 9, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 750 }}>Kaydet</button>
+                    <button type="button" onClick={() => { setEditingNameFor(null); setNameValue('') }} style={{ padding: '9px 11px', borderRadius: 9, background: '#fff', color: T.textSoft, border: `1px solid ${T.border}`, cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}>Vazgeç</button>
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                  {PERMISSION_GROUPS.map(group => (
+                    <section key={group.label} style={{ border: `1px solid ${T.border}`, borderRadius: 11, overflow: 'hidden', background: '#fff' }}>
+                      <div style={{ padding: '10px 12px', background: '#F8F8FA', borderBottom: `1px solid ${T.border}` }}>
+                        <p style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: 0 }}>{group.label}</p>
+                        <p style={{ color: T.textFaint, fontSize: 10.5, margin: '2px 0 0' }}>{group.description}</p>
+                      </div>
+                      <div style={{ padding: '2px 12px' }}>
+                        {group.keys.map(key => (
+                          <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: key === group.keys[group.keys.length - 1] ? 'none' : `1px solid ${T.border}` }}>
+                            <span style={{ color: T.text, fontSize: 12.5, fontWeight: 600, lineHeight: 1.35 }}>{PERMISSION_LABELS[key]}</span>
+                            <PermissionSwitch checked={!!tpl[key]} disabled={savingId === tpl.id} onChange={() => toggle(tpl, key)} label={PERMISSION_LABELS[key]} />
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-          {editingNameFor === tpl.id && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <input type="text" placeholder="Şablon adı" value={nameValue} onChange={e => setNameValue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-              <button onClick={() => submitNameChange(tpl)} style={{ padding: '8px 14px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13 }}>Kaydet</button>
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8 }}>
-            {Object.keys(PERMISSION_LABELS).map(key => (
-              <label key={key} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, cursor: 'pointer',
-                padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,.02)', border: '1px solid #eee', lineHeight: 1.35
-              }}>
-                <input type="checkbox" checked={!!tpl[key]} onChange={() => toggle(tpl, key)} style={{ marginTop: 2, flexShrink: 0, width: 16, height: 16 }} />
-                <span>{PERMISSION_LABELS[key]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      ))}
+        )
+      })}
 
-      <div style={{ marginTop: 8 }}>
-        <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 10px' }}>Yeni izin şablonu oluştur</p>
-        <form onSubmit={createTemplate} style={{ display: 'flex', gap: 10 }}>
-          <input type="text" placeholder="Şablon adı (örn. Muhasebe, Şube Yöneticisi)" value={newTplName} onChange={e => setNewTplName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-          <button type="submit" disabled={creating} style={{ padding: '8px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>
-            {creating ? 'Oluşturuluyor...' : 'Oluştur'}
+      <div style={{ marginTop: 16, padding: isMobile ? 12 : 14, borderRadius: 12, border: '1px dashed #C9C4F5', background: '#FAF9FF' }}>
+        <p style={{ fontWeight: 800, fontSize: 13.5, color: T.text, margin: '0 0 3px' }}>Yeni şablon oluştur</p>
+        <p style={{ color: T.textSoft, fontSize: 11.5, margin: '0 0 10px' }}>Varsayılan olarak yalnızca kayıt ekleme ve takvim görüntüleme açıktır.</p>
+        <form onSubmit={createTemplate} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input type="text" placeholder="Örn. Muhasebe veya Şube Yöneticisi" value={newTplName} onChange={e => setNewTplName(e.target.value)} style={{ ...inputStyle, flex: '1 1 220px', padding: '9px 11px', fontSize: 13 }} />
+          <button type="submit" disabled={creating} style={{ padding: '9px 14px', borderRadius: 9, background: T.primary, color: '#fff', border: 'none', cursor: creating ? 'wait' : 'pointer', fontWeight: 750, fontSize: 12.5 }}>
+            {creating ? 'Oluşturuluyor…' : 'Şablon oluştur'}
           </button>
         </form>
-        <p style={{ fontSize: 11, color: '#888', margin: '6px 0 0' }}>Yeni şablon, en kısıtlı haliyle (yalnızca kayıt ekleme ve takvim görme açık) oluşur. Oluşturduktan sonra yukarıdaki checkbox'larla yetkilerini ayarlayabilirsin.</p>
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -2467,7 +2564,7 @@ const NAV_ITEMS = [
   { key: 'appointments', label: 'Randevular', icon: <CalendarDays size={18} />, show: perms => perms.can_see_calendar },
   { key: 'reports', label: 'Raporlar', icon: <BarChart3 size={18} />, show: perms => perms.can_see_revenue },
   { key: 'ads', label: 'Reklam Kaynakları', icon: <Megaphone size={18} />, show: perms => perms.can_enter_ads_data },
-  { key: 'settings', label: 'Ayarlar', icon: <Settings size={18} />, show: (perms, isSuperAdmin, canSeeOwnDataOnly) => perms.can_manage_users || perms.can_manage_branches || (!isSuperAdmin && !canSeeOwnDataOnly) },
+  { key: 'settings', label: 'Ayarlar', icon: <Settings size={18} />, show: () => true },
   { key: 'admin', label: 'Yönetim', icon: <ShieldCheck size={18} />, show: (perms, isSuperAdmin) => isSuperAdmin },
 ]
 
@@ -3798,9 +3895,10 @@ export function PanelApp() {
         {activeTab === 'settings' && (
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: '0 0 18px' }}>Ayarlar</h1>
-            {!isSuperAdmin && !canSeeOwnDataOnly && (
+            {!isSuperAdmin && (
               <OnlineBookingLinkCard branchId={currentUser.branch_id} branchName={branchName(currentUser.branch_id)} />
             )}
+            {isSuperAdmin && <BranchBookingLinksPanel branches={activeBranches} isMobile={isMobile} />}
             {perms.can_manage_branches && <BranchManagement branches={branches} onAdd={addBranch} onToggleActive={toggleBranchActive} onDelete={deleteBranch} onSaveWorkingHours={saveWorkingHours} />}
             {!isSuperAdmin && !canSeeOwnDataOnly && (
               <BranchServiceManager
