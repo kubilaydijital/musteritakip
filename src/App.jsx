@@ -3461,10 +3461,24 @@ export function PanelApp() {
   const metaMessages = scopedAds
     .filter(ad => isThisMonth(new Date(ad.date)) && ad.channel === 'Meta (Otomatik)')
     .reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
+  const metaSpend = scopedAds
+    .filter(ad => isThisMonth(new Date(ad.date)) && ad.channel === 'Meta (Otomatik)')
+    .reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
   const customers = monthlyLeads.filter(l => l.result === 'Müşteri oldu')
   const withAmount = customers.filter(l => l.sale_amount != null)
   const revenue = customers.reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
   const avgTicket = withAmount.length ? Math.round(revenue / withAmount.length) : 0
+  const metaRevenue = customers
+    .filter(l => ['Instagram', 'WhatsApp'].includes(l.channel))
+    .reduce((sum, l) => sum + (Number(l.sale_amount) || 0), 0)
+  const followUpWaiting = visibleLeads.reduce((count, lead) => {
+    const reminder = staleness(
+      lead,
+      noteCountByLeadId[lead.id] || 0,
+      reminderRuleMap[`${lead.branch_id}__${lead.result}`] || null
+    )
+    return count + (reminder && reminder.level !== 'cold' ? 1 : 0)
+  }, 0)
   const noShow = monthlyLeads.filter(l => l.result === 'Randevuya gelmedi')
   const notBought = monthlyLeads.filter(l => l.result === 'Satın almadı')
   const noResponse = monthlyLeads.filter(l => l.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
@@ -3479,6 +3493,8 @@ export function PanelApp() {
     organik: monthlyLeads.filter(l => l.channel === 'Organik').length,
     rate: metaMessages ? Math.round((customers.length / metaMessages) * 100) : 0,
     revenue, avgTicket, withAmountCount: withAmount.length,
+    metaRoas: metaSpend > 0 ? (metaRevenue / metaSpend).toFixed(1) : '—',
+    followUpWaiting,
     appointed: appointed.length, arrived: arrived.length,
     noShowCount: noShow.length, notBoughtCount: notBought.length, noResponseCount: noResponse.length,
     pctAppointmentFromMeta: metaMessages ? Math.round((appointed.length / metaMessages) * 100) : 0,
@@ -3544,14 +3560,14 @@ export function PanelApp() {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: perms.can_see_revenue ? 'repeat(auto-fit, minmax(190px, 1fr))' : 'repeat(auto-fit, minmax(210px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
               gap: 14,
               marginBottom: 18
             }}>
-              <StatCard icon={<MessageCircle size={20} />} label="Meta mesajı" value={stats.metaMessages} subtitle="Bu ay reklamlardan gelen" color="violet" />
-              <StatCard icon={<CalendarDays size={20} />} label="Randevu verilen" value={stats.appointed} subtitle={`Meta mesajlarının %${stats.pctAppointmentFromMeta}'ı`} color="blue" />
-              <StatCard icon={<ShoppingCart size={20} />} label="Satışa dönüşen" value={stats.customers} subtitle={`Randevudan dönüşüm %${stats.pctSold}`} color="amber" />
-              {perms.can_see_revenue && <StatCard icon={<Wallet size={20} />} label="Bu ayki ciro" value={fmtTL(stats.revenue)} subtitle="Satışa dönüşen kayıtlar" color="green" />}
+              <StatCard icon={<Wallet size={20} />} label="Bu ayki ciro" value={perms.can_see_revenue ? fmtTL(stats.revenue) : 'Gizli'} subtitle={perms.can_see_revenue ? 'Gerçekleşen satışlar' : 'Ciro görüntüleme yetkisi gerekli'} color="green" />
+              <StatCard icon={<TrendingUp size={20} />} label="Ortalama satış" value={perms.can_see_revenue ? fmtTL(stats.avgTicket) : 'Gizli'} subtitle={perms.can_see_revenue ? (stats.withAmountCount ? `${stats.withAmountCount} satış tutarına göre` : 'Satış tutarı henüz yok') : 'Ciro görüntüleme yetkisi gerekli'} color="blue" />
+              <StatCard icon={<Megaphone size={20} />} label="Meta ROAS" value={perms.can_see_revenue ? (stats.metaRoas === '—' ? '—' : `${stats.metaRoas}x`) : 'Gizli'} subtitle={perms.can_see_revenue ? 'Meta cirosu / reklam harcaması' : 'Ciro görüntüleme yetkisi gerekli'} color="violet" />
+              <StatCard icon={<ClipboardList size={20} />} label="Takip bekleyen" value={stats.followUpWaiting} subtitle="Hatırlatma gerektiren danışanlar" color="amber" />
             </div>
 
             <div style={{ ...sectionGridStyle, gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.35fr) minmax(280px, .65fr)' }}>
