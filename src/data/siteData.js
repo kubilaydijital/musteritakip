@@ -25,6 +25,7 @@ export const references = [
   { name: 'ÇINAR', sub: 'HUKUK BÜROSU', icon: Scale },
   { name: 'SINERGY', sub: 'BAYAN KUAFÖRÜ', icon: Scissors },
   { name: 'ARİS EZGİ DOĞAN', sub: 'GÜZELLİK MERKEZİ - BALIKESİR', icon: Scissors },
+  { name: 'CLINICZER', sub: 'GÜZELLİK MERKEZİ · 3 ŞUBE', icon: Scissors },
 ]
 
 export const testimonials = [
