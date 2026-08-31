@@ -381,6 +381,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
   const [appointmentErr, setAppointmentErr] = useState('')
+  const [saleAmountErr, setSaleAmountErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [aiTip, setAiTip] = useState('')
@@ -391,7 +392,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
 
   useEffect(() => {
     setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
-    setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setConfirmingDelete(false)
+    setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setSaleAmountErr(''); setConfirmingDelete(false)
     setAiTip(''); setAiErr('')
     if (suppressNoticeReset.current) {
       // Bu geçiş bir çift-kayıt tespiti sonucu oldu (onFoundExisting) — uyarıyı silme.
@@ -459,6 +460,13 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     else setNoteErr('')
     if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
     else setAppointmentErr('')
+    const saleAmount = form.saleAmount.trim() === '' ? null : Number(form.saleAmount.replace(/\./g, ''))
+    if (form.result === 'Müşteri oldu' && (!Number.isFinite(saleAmount) || saleAmount <= 0)) {
+      setSaleAmountErr('Müşteri oldu seçildiğinde satış tutarı girilmesi zorunludur.')
+      ok = false
+    } else {
+      setSaleAmountErr('')
+    }
     if (!form.name.trim()) ok = false
     if (!ok) return
 
@@ -483,7 +491,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     setDuplicateNotice('')
 
     setSubmitting(true)
-    const saleAmount = form.result === 'Müşteri oldu' && form.saleAmount.trim() !== '' ? Number(form.saleAmount.replace(/\./g, '')) : null
+    const savedSaleAmount = form.result === 'Müşteri oldu' ? saleAmount : null
     const appointmentAt = (form.appointmentDate && form.appointmentTime) ? new Date(`${form.appointmentDate}T${form.appointmentTime}`).toISOString() : null
 
     // Kaydın gerçek tarihi otomatik belirlenir: Randevu/Görüşme Tarihi geçmişte
@@ -497,7 +505,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       const correctedDate = isHistorical ? appointmentAt : editing.date
       await onUpdate({
         id: editing.id, name: form.name, phone: cleanPhone, channel: form.channel,
-        service: form.service, note: form.newNote, result: form.result, sale_amount: saleAmount,
+        service: form.service, note: form.newNote, result: form.result, sale_amount: savedSaleAmount,
         appointment_at: appointmentAt, edited_at: new Date().toISOString(), date: correctedDate
       }, currentUser.full_name || currentUser.email)
     } else {
@@ -505,7 +513,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       await onAdd({
         id: uid(), branch_id: targetBranchId, name: form.name, phone: cleanPhone,
         channel: form.channel, service: form.service, note: form.note, result: form.result,
-        sale_amount: saleAmount, appointment_at: appointmentAt, entered_by: currentUser.full_name || currentUser.email, date: entryDate
+        sale_amount: savedSaleAmount, appointment_at: appointmentAt, entered_by: currentUser.full_name || currentUser.email, date: entryDate
       })
     }
     setSubmitting(false)
@@ -541,7 +549,10 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         <select value={form.channel} onChange={e => set('channel', e.target.value)} style={inputStyle}>
           {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={form.result} onChange={e => set('result', e.target.value)} style={inputStyle}>
+        <select value={form.result} onChange={e => {
+          set('result', e.target.value)
+          if (e.target.value !== 'Müşteri oldu') setSaleAmountErr('')
+        }} style={inputStyle}>
           {RESULTS.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
       </div>
@@ -571,12 +582,14 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       </div>
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
-          <input placeholder="Satış tutarı (TL) — isteğe bağlı" value={form.saleAmount} onChange={e => {
+          <input placeholder="Satış tutarı (TL) — zorunlu" value={form.saleAmount} onChange={e => {
             const digits = e.target.value.replace(/\D/g, '')
             const formatted = digits ? Number(digits).toLocaleString('tr-TR') : ''
             set('saleAmount', formatted)
-          }} type="text" inputMode="numeric" style={{ ...inputStyle, width: '100%' }} />
-          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Bu alan zorunlu değildir, doldurmak istemezseniz boş bırakabilirsiniz.</p>
+            setSaleAmountErr('')
+          }} type="text" inputMode="numeric" aria-required="true" aria-invalid={Boolean(saleAmountErr)} style={{ ...inputStyle, width: '100%', borderColor: saleAmountErr ? '#c0392b' : undefined }} />
+          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Müşteri oldu seçildiğinde satış tutarı zorunludur.</p>
+          {saleAmountErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{saleAmountErr}</p>}
         </div>
       )}
       {editing ? (
