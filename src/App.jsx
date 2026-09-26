@@ -1300,6 +1300,15 @@ function MetaConnectionPanel({ branchId, branchName }) {
   const [selecting, setSelecting] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [msg, setMsg] = useState('')
+  const [rangeStart, setRangeStart] = useState(() => {
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+    return `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`
+  })
+  const [rangeEnd, setRangeEnd] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  })
 
   useEffect(() => {
     if (!branchId) return
@@ -1349,16 +1358,26 @@ function MetaConnectionPanel({ branchId, branchName }) {
   }
 
   async function fetchInsights() {
+    if (!rangeStart || !rangeEnd) {
+      setMsg('Başlangıç ve bitiş tarihini seçin.')
+      return
+    }
+    if (rangeStart > rangeEnd) {
+      setMsg('Başlangıç tarihi bitiş tarihinden sonra olamaz.')
+      return
+    }
     setFetching(true)
     setMsg('')
     try {
       const res = await fetch('/.netlify/functions/fetch-meta-insights', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ branch_id: branchId }),
+        body: JSON.stringify({ branch_id: branchId, since: rangeStart, until: rangeEnd }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setMsg(`✅ ${data.inserted || 0} günlük veri çekildi.`)
+      setMsg(data.inserted > 0
+        ? `✅ ${data.since}–${data.until} aralığında ${data.inserted} günlük veri güncellendi.`
+        : `✅ ${data.since}–${data.until} aralığında Meta verisi bulunamadı.`)
     } catch (err) {
       setMsg('Veri çekilemedi: ' + err.message)
     }
@@ -1381,6 +1400,12 @@ function MetaConnectionPanel({ branchId, branchName }) {
       <p style={{ fontSize: 13, color: T.textSoft }}>Meta bağlantı durumu kontrol ediliyor...</p>
     </div>
   }
+
+  const expiresAt = connection && connection.token_expires_at ? new Date(connection.token_expires_at) : null
+  const validExpiry = expiresAt && !Number.isNaN(expiresAt.getTime())
+  const daysUntilExpiry = validExpiry ? Math.ceil((expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null
+  const tokenExpired = daysUntilExpiry != null && daysUntilExpiry <= 0
+  const tokenExpiringSoon = daysUntilExpiry != null && daysUntilExpiry > 0 && daysUntilExpiry <= 7
 
   return (
     <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.1rem', marginBottom: 16 }}>
@@ -1427,9 +1452,38 @@ function MetaConnectionPanel({ branchId, branchName }) {
       {connection && connection.ad_account_id && (
         <>
           <p style={{ fontSize: 13, color: '#2e7d32', margin: '0 0 4px' }}>✅ Bağlı: {connection.ad_account_name}</p>
-          <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-            <button onClick={fetchInsights} disabled={fetching} style={{ padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
-              {fetching ? 'Veriler çekiliyor...' : 'Meta Verilerini Çek (Son 7 Gün)'}
+          {(tokenExpired || tokenExpiringSoon) && (
+            <div style={{
+              marginTop: 10, padding: '10px 12px', borderRadius: 9,
+              border: `1px solid ${tokenExpired ? '#f2b8b5' : '#f0d28a'}`,
+              background: tokenExpired ? '#fff1f0' : '#fff8e6',
+              color: tokenExpired ? '#b42318' : '#8a5a00', fontSize: 12.5, lineHeight: 1.5,
+            }}>
+              <strong>{tokenExpired ? 'Meta bağlantısının süresi doldu.' : `Meta bağlantısı ${daysUntilExpiry} gün içinde sona erecek.`}</strong>{' '}
+              Verilerin kesilmemesi için bağlantıyı yenileyin.
+              <button type="button" onClick={connectMeta} style={{
+                display: 'block', marginTop: 8, padding: '7px 11px', borderRadius: 7,
+                border: 'none', background: '#1877F2', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 12,
+              }}>
+                Meta bağlantısını yenile
+              </button>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label style={{ display: 'grid', gap: 4, fontSize: 11.5, color: T.textSoft }}>
+              Başlangıç
+              <input type="date" value={rangeStart} max={rangeEnd} onChange={e => setRangeStart(e.target.value)} style={{ padding: '8px 10px', fontSize: 12.5, minWidth: 145 }} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 11.5, color: T.textSoft }}>
+              Bitiş
+              <input type="date" value={rangeEnd} min={rangeStart} max={toLocalDateValue(new Date())} onChange={e => setRangeEnd(e.target.value)} style={{ padding: '8px 10px', fontSize: 12.5, minWidth: 145 }} />
+            </label>
+            <button onClick={fetchInsights} disabled={fetching || tokenExpired} style={{
+              padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none',
+              cursor: fetching || tokenExpired ? 'not-allowed' : 'pointer', opacity: fetching || tokenExpired ? 0.6 : 1,
+              fontWeight: 600, fontSize: 13.5,
+            }}>
+              {fetching ? 'Veriler çekiliyor...' : 'Seçili Tarih Aralığını Çek'}
             </button>
             <button onClick={disconnectMeta} style={{ padding: '9px 16px', borderRadius: 8, background: 'transparent', color: '#c0392b', border: '1px solid #c0392b', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
               Bağlantıyı Kes
