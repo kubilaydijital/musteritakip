@@ -1,12 +1,31 @@
-// Netlify Function: Bağlı bir şubenin Meta reklam hesabından son 7 günün günlük
-// harcama/gösterim/mesaj verisini çeker ve ads_data tablosuna yazar.
-// Panelden "Meta Verilerini Çek" butonuyla manuel tetiklenir.
+// Netlify Function: Bağlı bir şubenin Meta reklam hesabından seçilen tarih
+// aralığındaki günlük harcama/gösterim/mesaj verisini çeker ve ads_data
+// tablosuna yazar. Panelden manuel tetiklenir.
 
 const SUPABASE_URL = 'https://rngahpybhgdqabbkldrr.supabase.co'
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const GRAPH_VERSION = 'v21.0'
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function dateKey(date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function isValidDateKey(value) {
+  if (!DATE_PATTERN.test(value || '')) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && dateKey(date) === value
+}
+
+function defaultRange() {
+  const untilDate = new Date()
+  const sinceDate = new Date(untilDate.getTime() - (6 * DAY_MS))
+  return { since: dateKey(sinceDate), until: dateKey(untilDate) }
+}
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -25,6 +44,26 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'branch_id gerekli' }) }
   }
 
+  const fallback = defaultRange()
+  const since = payload.since || fallback.since
+  const until = payload.until || fallback.until
+  if (!isValidDateKey(since) || !isValidDateKey(until)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Tarihleri YYYY-AA-GG biçiminde girin' }) }
+  }
+
+  const sinceTime = new Date(`${since}T00:00:00Z`).getTime()
+  const untilTime = new Date(`${until}T00:00:00Z`).getTime()
+  const todayTime = new Date(`${dateKey(new Date())}T00:00:00Z`).getTime()
+  if (sinceTime > untilTime) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Başlangıç tarihi bitiş tarihinden sonra olamaz' }) }
+  }
+  if (untilTime > todayTime) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'İleri bir tarih için Meta verisi çekilemez' }) }
+  }
+  if (((untilTime - sinceTime) / DAY_MS) + 1 > 92) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Tek seferde en fazla 92 günlük veri çekebilirsiniz' }) }
+  }
+
   try {
     // 1) Bağlantı bilgisini çek
     const connRes = await fetch(
@@ -37,20 +76,34 @@ export async function handler(event) {
     }
     const { access_token: accessToken, ad_account_id: adAccountId } = conns[0]
 
-    // 2) Meta Insights API'den son 7 günün GÜNLÜK kırılımını çek.
+    // 2) Meta Insights API'den seçilen aralığın GÜNLÜK kırılımını çek.
     // messaging_conversation_started_7d: Messenger/Instagram'da başlatılan mesajlaşma sayısı.
+    const timeRange = encodeURIComponent(JSON.stringify({ since, until }))
     const insightsUrl = `https://graph.facebook.com/${GRAPH_VERSION}/${adAccountId}/insights` +
       `?fields=spend,impressions,actions` +
-      `&date_preset=last_7d&time_increment=1&access_token=${accessToken}`
+      `&time_range=${timeRange}&time_increment=1&access_token=${accessToken}`
     const insightsRes = await fetch(insightsUrl)
     const insightsData = await insightsRes.json()
     if (!insightsRes.ok) {
-      throw new Error(insightsData.error?.message || 'Meta verisi alınamadı')
+      const metaError = insightsData.error || {}
+      const isExpiredToken = metaError.code === 190
+      return {
+        statusCode: isExpiredToken ? 401 : 502,
+        body: JSON.stringify({
+          error: isExpiredToken
+            ? 'Meta bağlantısının süresi dolmuş. Reklam Kaynakları bölümünden bağlantıyı yenileyin.'
+            : (metaError.message || 'Meta verisi alınamadı'),
+          code: metaError.code || null,
+        }),
+      }
     }
 
     const rows = insightsData.data || []
     if (rows.length === 0) {
-      return { statusCode: 200, body: JSON.stringify({ ok: true, inserted: 0, message: 'Son 7 günde veri bulunamadı' }) }
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ ok: true, inserted: 0, since, until, message: 'Seçilen tarih aralığında veri bulunamadı' }),
+      }
     }
 
     // 3) Her günü ads_data satırına çevir (channel: 'Meta (Otomatik)' olarak işaretlenir,
@@ -71,10 +124,14 @@ export async function handler(event) {
     // 4) Aynı gün için daha önce otomatik çekilmiş kayıt varsa, üzerine yazmak yerine
     // önce onları silip yeniden ekliyoruz (idempotent - tekrar tekrar çekmek güvenli).
     const dates = toInsert.map(r => r.date)
-    await fetch(
+    const deleteRes = await fetch(
       `${SUPABASE_URL}/rest/v1/ads_data?branch_id=eq.${encodeURIComponent(branch_id)}&channel=eq.${encodeURIComponent('Meta (Otomatik)')}&date=in.(${dates.join(',')})`,
       { method: 'DELETE', headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` } }
     )
+    if (!deleteRes.ok) {
+      const errText = await deleteRes.text()
+      throw new Error('Eski Meta verileri güncellenemedi: ' + errText)
+    }
 
     const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/ads_data`, {
       method: 'POST',
@@ -89,7 +146,10 @@ export async function handler(event) {
       throw new Error('Veri yazılamadı: ' + errText)
     }
 
-    return { statusCode: 200, body: JSON.stringify({ ok: true, inserted: toInsert.length }) }
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ok: true, inserted: toInsert.length, since, until }),
+    }
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) }
   }
