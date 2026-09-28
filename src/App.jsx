@@ -27,6 +27,29 @@ const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F7
 // Bu format, Meta/Google Ads gibi platformlara müşteri listesi yüklerken eşleşme oranını maksimize eder
 // (boşluksuz, tire/parantez yok, ülke kodu dahil, sabit 12 karakter).
 const PHONE_RE = /^\+905\d{9}$/
+const BLOCKED_NOTE_TEXTS = new Set([
+  'yok', 'bos', 'boş', 'notyok', 'bilgiyok', 'test', 'deneme', 'asdf', 'qwerty', 'gec', 'geç',
+])
+
+function meaningfulNoteError(value, { required = false } = {}) {
+  const note = String(value || '').trim()
+  if (!note) return required ? 'Görüşme notu olmadan kayıt eklenemez.' : ''
+
+  const words = note.toLocaleLowerCase('tr-TR').match(/[\p{L}\p{N}]+/gu) || []
+  const meaningfulCharacters = words.join('')
+  if (meaningfulCharacters.length < 10 || words.length < 2) {
+    return 'Not en az 2 kelime ve toplam 10 harf/rakam içermelidir. Örnek: WhatsApp mesajı gönderildi, dönüş bekleniyor.'
+  }
+
+  const compact = meaningfulCharacters.toLocaleLowerCase('tr-TR')
+  const uniqueCharacters = new Set([...compact])
+  const repeatedSameWord = words.length > 1 && new Set(words).size === 1
+  if (BLOCKED_NOTE_TEXTS.has(compact) || uniqueCharacters.size < 3 || repeatedSameWord) {
+    return 'Yazılan içerik anlamlı bir görüşme notu olarak kabul edilmedi. Örnek: Müşteri telefonla arandı, dönüş bekleniyor.'
+  }
+
+  return ''
+}
 // Her sonuç kategorisi için varsayılan (şubeye özel kural bulunamazsa kullanılan) eşikler.
 const DEFAULT_REMINDER_SCHEDULE = {
   'Randevu aldı': [1, 1, 1],
@@ -456,7 +479,8 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     } else {
       setPhoneErr('')
     }
-    if (!editing && !form.note.trim()) { setNoteErr('Görüşme notu olmadan kayıt eklenemez.'); ok = false }
+    const noteError = meaningfulNoteError(editing ? form.newNote : form.note, { required: !editing })
+    if (noteError) { setNoteErr(noteError); ok = false }
     else setNoteErr('')
     if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
     else setAppointmentErr('')
@@ -595,9 +619,11 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       {editing ? (
         <>
           <NoteHistory notes={notesForLead} />
-          <textarea placeholder="Yeni not ekle (isteğe bağlı)" value={form.newNote} onChange={e => set('newNote', e.target.value)} rows={2}
-            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
-          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 10px' }}>Not eklemek, bu kaydın "takip bekliyor" sayacını sıfırlar.</p>
+          <textarea placeholder="Yeni not ekle (isteğe bağlı)" value={form.newNote} onChange={e => { set('newNote', e.target.value); setNoteErr('') }} rows={2}
+            aria-invalid={Boolean(noteErr)}
+            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${noteErr ? '#c0392b' : T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
+          {noteErr && <div role="alert" style={{ fontSize: 12, color: '#a32d2d', background: '#fff1f0', border: '1px solid #f2b8b5', borderRadius: 8, padding: '9px 11px', margin: '0 0 8px', lineHeight: 1.5 }}><strong>Not kaydedilemedi.</strong><br />{noteErr}</div>}
+          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 10px' }}>Not isteğe bağlıdır; ancak yazılırsa en az 2 kelime ve 10 harf/rakam içermelidir. Geçerli bir not, “takip bekliyor” sayacını sıfırlar.</p>
           {(() => {
             // Yeni not yazılmadıysa, geçmişteki en son notu kullan - kullanıcı zaten girdiği
             // ilk notla ipucu isteyebilsin, tekrar yazmasına gerek kalmasın.
@@ -617,9 +643,11 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         </>
       ) : (
         <>
-          <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => set('note', e.target.value)} rows={2}
-            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
-          {noteErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{noteErr}</p>}
+          <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => { set('note', e.target.value); setNoteErr('') }} rows={2}
+            aria-required="true" aria-invalid={Boolean(noteErr)}
+            style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${noteErr ? '#c0392b' : T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
+          {noteErr && <div role="alert" style={{ fontSize: 12, color: '#a32d2d', background: '#fff1f0', border: '1px solid #f2b8b5', borderRadius: 8, padding: '9px 11px', margin: '0 0 10px', lineHeight: 1.5 }}><strong>Not kaydedilemedi.</strong><br />{noteErr}</div>}
+          {!noteErr && <p style={{ fontSize: 11, color: '#888', margin: '0 0 10px' }}>En az 2 kelime ve toplam 10 harf/rakamla görüşmeyi kısaca açıklayın.</p>}
           <button type="button" disabled={aiLoading || !form.note.trim()} onClick={() => getAiTip(form.note)} style={{
             fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
             color: T.primary, cursor: form.note.trim() ? 'pointer' : 'not-allowed', fontWeight: 500, marginBottom: 10, opacity: form.note.trim() ? 1 : 0.5
