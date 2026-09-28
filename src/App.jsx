@@ -11,7 +11,7 @@ import {
 import {
   MessageCircle, CalendarDays, ShoppingCart, TrendingUp, Wallet,
   Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
-  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Flame, Search, X
+  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Flame, Search, X, Bell
 } from 'lucide-react'
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
@@ -23,6 +23,21 @@ const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D
 const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A', 'Satın almadı': '#EF9F27', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#9CA3AF', 'Müşteri oldu': '#639922' }
 const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Telefon': '#3B82F6', 'Google Ads': '#EF9F27', 'Facebook Ads': '#4267B2', 'TikTok': '#25F4EE', 'Online Randevu': '#9B59B6', 'Organik': '#7F77DD', 'Kağıt Not': '#64748B' }
 const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#E24B4A', '#639922', '#854F0B']
+const LATEST_ANNOUNCEMENT_ID = '2026-09-28-notes-performance-pulse'
+const PRODUCT_UPDATES = [
+  {
+    title: 'Daha açıklayıcı görüşme notları',
+    icon: '📝',
+    description: 'Nokta, tek kelime veya anlamsız ifadeler artık görüşme notu olarak kabul edilmiyor.',
+    detail: 'Not kabul edilmezse nedeni ve doğru bir örnek ekranda gösteriliyor. Böylece takip geçmişi ve raporlar daha güvenilir kalıyor.',
+  },
+  {
+    title: 'Performans Nabzı',
+    icon: '📊',
+    description: 'Genel Bakış artık bu ayı geçen ayın aynı gün aralığıyla karşılaştırıyor.',
+    detail: 'Ciro, randevu, satış ve Meta ROAS değişimleriyle birlikte öne çıkan sonuç, risk ve önerilen aksiyon gösteriliyor.',
+  },
+]
 // E.164 formatına uygun Türkiye cep telefonu: +90 ardından 5 ile başlayan 9 hane (toplam +90 + 10 hane).
 // Bu format, Meta/Google Ads gibi platformlara müşteri listesi yüklerken eşleşme oranını maksimize eder
 // (boşluksuz, tire/parantez yok, ülke kodu dahil, sabit 12 karakter).
@@ -827,6 +842,55 @@ function PerformancePulse({ comparison, isMobile }) {
         ))}
       </div>
     </section>
+  )
+}
+
+function ProductUpdatesModal({ onRemindLater, onAcknowledge, isMobile }) {
+  return (
+    <div role="presentation" style={{
+      position: 'fixed', inset: 0, zIndex: 120, display: 'grid', placeItems: 'center',
+      padding: isMobile ? 14 : 24, background: 'rgba(10, 18, 35, 0.58)', backdropFilter: 'blur(5px)'
+    }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="product-updates-title" style={{
+        width: '100%', maxWidth: 610, maxHeight: 'calc(100vh - 28px)', overflowY: 'auto',
+        borderRadius: isMobile ? 18 : 22, background: T.card, border: `1px solid ${T.border}`,
+        boxShadow: '0 28px 80px rgba(10,18,35,.28)'
+      }}>
+        <div style={{
+          position: 'relative', overflow: 'hidden', padding: isMobile ? '22px 20px 20px' : '28px 30px 24px',
+          background: 'linear-gradient(135deg, #17233D 0%, #3B347A 58%, #6F61D9 100%)', color: '#fff'
+        }}>
+          <button type="button" onClick={onRemindLater} aria-label="Duyuruyu kapat" style={{
+            position: 'absolute', top: 14, right: 14, width: 34, height: 34, borderRadius: 10,
+            border: '1px solid rgba(255,255,255,.2)', background: 'rgba(255,255,255,.1)', color: '#fff',
+            display: 'grid', placeItems: 'center', cursor: 'pointer'
+          }}><X size={18} /></button>
+          <span style={{ display: 'inline-flex', padding: '5px 9px', borderRadius: 999, background: 'rgba(255,255,255,.14)', fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em' }}>YENİ GÜNCELLEME</span>
+          <h2 id="product-updates-title" style={{ fontSize: isMobile ? 24 : 29, margin: '12px 42px 5px 0', lineHeight: 1.15 }}>Müşteri Takip daha güçlü</h2>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,.78)', fontSize: 13, lineHeight: 1.5 }}>Son iki yenilik, daha düzenli kayıt ve daha net performans takibi sağlıyor.</p>
+        </div>
+
+        <div style={{ padding: isMobile ? 16 : 24 }}>
+          <div style={{ display: 'grid', gap: 11 }}>
+            {PRODUCT_UPDATES.map((update, index) => (
+              <article key={update.title} style={{ display: 'grid', gridTemplateColumns: '42px minmax(0, 1fr)', gap: 12, padding: isMobile ? 14 : 16, borderRadius: 14, border: `1px solid ${T.border}`, background: index === 0 ? '#FCFBFF' : '#F8FBFF' }}>
+                <span aria-hidden="true" style={{ width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', background: index === 0 ? T.primaryLight : T.blueBg, fontSize: 20 }}>{update.icon}</span>
+                <div>
+                  <h3 style={{ color: T.text, fontSize: 14.5, margin: '0 0 4px', fontWeight: 800 }}>{update.title}</h3>
+                  <p style={{ color: T.text, fontSize: 12.5, lineHeight: 1.5, margin: '0 0 5px', fontWeight: 650 }}>{update.description}</p>
+                  <p style={{ color: T.textSoft, fontSize: 11.8, lineHeight: 1.5, margin: 0 }}>{update.detail}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', flexDirection: isMobile ? 'column-reverse' : 'row', gap: 9, marginTop: 18 }}>
+            <button type="button" onClick={onRemindLater} style={{ padding: '10px 15px', borderRadius: 10, border: `1px solid ${T.border}`, background: '#fff', color: T.textSoft, fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Daha sonra hatırlat</button>
+            <button type="button" onClick={onAcknowledge} style={{ padding: '10px 17px', borderRadius: 10, border: 'none', background: T.primary, color: '#fff', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', boxShadow: '0 8px 20px rgba(111,97,217,.24)' }}>Okudum, devam et</button>
+          </div>
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -2773,7 +2837,7 @@ const NAV_ITEMS = [
   { key: 'admin', label: 'Yönetim', icon: <ShieldCheck size={18} />, show: (perms, isSuperAdmin) => isSuperAdmin },
 ]
 
-function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout, onQuickAction, trialDaysLeft }) {
+function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, canSeeOwnDataOnly, branchLabel, onLogout, onQuickAction, trialDaysLeft, onShowAnnouncements, hasUnreadAnnouncements }) {
   return (
     <div style={{
       width: 258, flexShrink: 0, background: T.sidebar, borderRight: 'none',
@@ -2800,6 +2864,20 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
           {trialDaysLeft > 0 ? `⏰ Deneme süresi: ${trialDaysLeft} gün kaldı` : '⏰ Deneme süresi bugün doluyor'}
         </div>
       )}
+
+      <button type="button" onClick={onShowAnnouncements} style={{
+        display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 11px', marginBottom: 12,
+        borderRadius: 10, border: hasUnreadAnnouncements ? '1px solid rgba(167,139,250,.55)' : '1px solid rgba(255,255,255,.08)',
+        background: hasUnreadAnnouncements ? 'rgba(111,97,217,.22)' : 'rgba(255,255,255,.035)',
+        color: hasUnreadAnnouncements ? '#fff' : T.sidebarMuted, cursor: 'pointer', textAlign: 'left', fontSize: 12.5, fontWeight: 700
+      }}>
+        <span style={{ position: 'relative', display: 'flex' }}>
+          <Bell size={16} />
+          {hasUnreadAnnouncements && <span style={{ position: 'absolute', width: 7, height: 7, borderRadius: '50%', background: '#F4B740', right: -2, top: -2, boxShadow: `0 0 0 2px ${T.sidebar}` }} />}
+        </span>
+        <span style={{ flex: 1 }}>Yenilikler</span>
+        {hasUnreadAnnouncements && <span style={{ padding: '3px 6px', borderRadius: 999, background: '#F4B740', color: '#3B2A04', fontSize: 9.5, fontWeight: 900 }}>2 YENİ</span>}
+      </button>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {items.map(item => {
@@ -2836,7 +2914,7 @@ function SidebarNav({ items, activeTab, onSelect, currentUser, isSuperAdmin, can
           background: 'transparent', color: T.sidebarMuted, fontWeight: 500, fontSize: 13, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
         }}><LogOut size={14} /> Çıkış yap</button>
-        <p style={{ fontSize: 10.5, color: '#8190A8', margin: '14px 0 0', textAlign: 'center' }}>Müşteri Takip v2.0.0</p>
+        <p style={{ fontSize: 10.5, color: '#8190A8', margin: '14px 0 0', textAlign: 'center' }}>Müşteri Takip v2.1.0</p>
       </div>
     </div>
   )
@@ -2882,7 +2960,7 @@ function BottomTabBar({ items, activeTab, onSelect, onMoreClick, isMoreActive })
   )
 }
 
-function MobileTopBar({ currentUser, branchLabel, onLogout, trialDaysLeft }) {
+function MobileTopBar({ currentUser, branchLabel, onLogout, trialDaysLeft, onShowAnnouncements, hasUnreadAnnouncements }) {
   return (
     <div style={{
       position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column',
@@ -2900,10 +2978,20 @@ function MobileTopBar({ currentUser, branchLabel, onLogout, trialDaysLeft }) {
           <p style={{ fontSize: 11, margin: 0, color: T.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.full_name || currentUser.email} · {branchLabel}</p>
         </div>
       </div>
-      <button onClick={onLogout} style={{
-        flexShrink: 0, padding: '7px 9px', borderRadius: 9, border: `1px solid ${T.border}`,
-        background: 'transparent', color: T.textSoft, cursor: 'pointer', display: 'flex', alignItems: 'center'
-      }}><LogOut size={15} /></button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+        <button type="button" onClick={onShowAnnouncements} aria-label="Yenilikleri aç" style={{
+          position: 'relative', padding: '7px 9px', borderRadius: 9, border: `1px solid ${hasUnreadAnnouncements ? '#CFC9F8' : T.border}`,
+          background: hasUnreadAnnouncements ? T.primaryLight : 'transparent', color: hasUnreadAnnouncements ? T.primary : T.textSoft,
+          cursor: 'pointer', display: 'flex', alignItems: 'center'
+        }}>
+          <Bell size={15} />
+          {hasUnreadAnnouncements && <span style={{ position: 'absolute', width: 7, height: 7, borderRadius: '50%', background: T.red, right: 5, top: 5, boxShadow: '0 0 0 2px #fff' }} />}
+        </button>
+        <button onClick={onLogout} style={{
+          padding: '7px 9px', borderRadius: 9, border: `1px solid ${T.border}`,
+          background: 'transparent', color: T.textSoft, cursor: 'pointer', display: 'flex', alignItems: 'center'
+        }}><LogOut size={15} /></button>
+      </div>
     </div>
     {trialDaysLeft != null && (
       <div style={{
@@ -2942,7 +3030,7 @@ function MobileMoreSheet({ items, onSelect, onLogout }) {
           Çıkış yap
         </button>
       </div>
-      <p style={{ fontSize: 11, color: T.textFaint, margin: '16px 0 0', textAlign: 'center' }}>Müşteri Takip v2.0.0</p>
+      <p style={{ fontSize: 11, color: T.textFaint, margin: '16px 0 0', textAlign: 'center' }}>Müşteri Takip v2.1.0</p>
     </div>
   )
 }
@@ -3330,6 +3418,27 @@ export function PanelApp() {
   const [activeTab, setActiveTab] = useState('overview')
   const isMobile = useIsMobile()
   const [showMobileMore, setShowMobileMore] = useState(false)
+  const [showProductUpdates, setShowProductUpdates] = useState(false)
+  const [hasUnreadAnnouncements, setHasUnreadAnnouncements] = useState(false)
+
+  function prepareProductUpdatesForUser(user) {
+    let hasSeen = false
+    try {
+      hasSeen = localStorage.getItem(`mt_announcement_${user.id}_${LATEST_ANNOUNCEMENT_ID}`) === 'seen'
+    } catch {
+      hasSeen = false
+    }
+    setHasUnreadAnnouncements(!hasSeen)
+    setShowProductUpdates(!hasSeen)
+  }
+
+  function acknowledgeProductUpdates() {
+    if (currentUser?.id) {
+      try { localStorage.setItem(`mt_announcement_${currentUser.id}_${LATEST_ANNOUNCEMENT_ID}`, 'seen') } catch {}
+    }
+    setHasUnreadAnnouncements(false)
+    setShowProductUpdates(false)
+  }
 
   // Her lead için, MEVCUT sonuç kategorisinde kaç not eklendiğini sayar.
   // Sonuç değiştiğinde (örn. Satın almadı -> Randevu aldı), eski kategorideki notlar sayılmaz,
@@ -3383,11 +3492,14 @@ export function PanelApp() {
 
   function loginAndPersist(user) {
     setCurrentUser(user)
+    prepareProductUpdatesForUser(user)
   }
 
   async function logoutAndClear() {
     await supabase.auth.signOut()
     setCurrentUser(null)
+    setShowProductUpdates(false)
+    setHasUnreadAnnouncements(false)
     setLoaded(false)
   }
 
@@ -3401,7 +3513,7 @@ export function PanelApp() {
           .eq('id', session.user.id)
           .maybeSingle()
         if (profile && profile.active !== false) {
-          setCurrentUser({ ...profile, permissions: profile.permission_templates })
+          loginAndPersist({ ...profile, permissions: profile.permission_templates })
         }
       }
       setAuthLoading(false)
@@ -3410,6 +3522,8 @@ export function PanelApp() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         setCurrentUser(null)
+        setShowProductUpdates(false)
+        setHasUnreadAnnouncements(false)
         setLoaded(false)
       }
     })
@@ -3914,13 +4028,14 @@ export function PanelApp() {
       `}</style>
 
       {isMobile ? (
-        <MobileTopBar currentUser={currentUser} branchLabel={branchLabel} onLogout={logoutAndClear} trialDaysLeft={trialDaysLeft} />
+        <MobileTopBar currentUser={currentUser} branchLabel={branchLabel} onLogout={logoutAndClear} trialDaysLeft={trialDaysLeft}
+          onShowAnnouncements={() => setShowProductUpdates(true)} hasUnreadAnnouncements={hasUnreadAnnouncements} />
       ) : (
         <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
           isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={(key) => {
             setActiveTab(key)
             if (key === 'clients') { setEditingLead(null); setIsLeadFormOpen(true) }
-          }} trialDaysLeft={trialDaysLeft} />
+          }} trialDaysLeft={trialDaysLeft} onShowAnnouncements={() => setShowProductUpdates(true)} hasUnreadAnnouncements={hasUnreadAnnouncements} />
       )}
 
 <div style={getPageWrapStyle(isMobile)} className="page-wrap">
@@ -4225,6 +4340,14 @@ export function PanelApp() {
           isMoreActive={showMobileMore}
           onSelect={(key) => { setActiveTab(key); setShowMobileMore(false) }}
           onMoreClick={() => setShowMobileMore(true)}
+        />
+      )}
+
+      {showProductUpdates && (
+        <ProductUpdatesModal
+          isMobile={isMobile}
+          onRemindLater={() => setShowProductUpdates(false)}
+          onAcknowledge={acknowledgeProductUpdates}
         />
       )}
     </div>
