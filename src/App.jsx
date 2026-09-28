@@ -107,6 +107,44 @@ function staleness(lead, noteCount = 0, rule = null) {
 }
 function fmtTL(n) { return Number(n || 0).toLocaleString('tr-TR') + ' TL' }
 
+function isInDateWindow(value, start, endExclusive) {
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime()) && date >= start && date < endExclusive
+}
+
+function relativePercentChange(current, previous) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
+  if (previous === 0) return current === 0 ? 0 : null
+  return Math.round(((current - previous) / Math.abs(previous)) * 100)
+}
+
+function buildPeriodPerformance(leads, ads) {
+  const metaAds = ads.filter(ad => ad.channel === 'Meta (Otomatik)')
+  const metaMessages = metaAds.reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
+  const metaSpend = metaAds.reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
+  const customers = leads.filter(lead => lead.result === 'Müşteri oldu')
+  const appointed = leads.filter(lead => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(lead.result))
+  const noShow = leads.filter(lead => lead.result === 'Randevuya gelmedi')
+  const withAmount = customers.filter(lead => lead.sale_amount != null)
+  const revenue = customers.reduce((sum, lead) => sum + (Number(lead.sale_amount) || 0), 0)
+  const metaRevenue = customers
+    .filter(lead => ['Instagram', 'WhatsApp'].includes(lead.channel))
+    .reduce((sum, lead) => sum + (Number(lead.sale_amount) || 0), 0)
+
+  return {
+    metaMessages,
+    metaSpend,
+    appointments: appointed.length,
+    customers: customers.length,
+    revenue,
+    avgTicket: withAmount.length ? Math.round(revenue / withAmount.length) : 0,
+    metaRoas: metaSpend > 0 ? metaRevenue / metaSpend : null,
+    appointmentRate: metaMessages > 0 ? (appointed.length / metaMessages) * 100 : null,
+    salesRate: appointed.length > 0 ? (customers.length / appointed.length) * 100 : null,
+    noShowRate: appointed.length > 0 ? (noShow.length / appointed.length) * 100 : null,
+  }
+}
+
 const inputStyle = { padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, boxSizing: 'border-box', fontSize: 14, fontFamily: 'inherit', background: '#fff', color: T.text, colorScheme: 'light' }
 const cardStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 15, boxShadow: '0 12px 28px rgba(20,32,57,0.045)' }
 const quickBtnStyle = {
@@ -717,6 +755,78 @@ function StatCard({ icon, label, value, color = 'violet', trend, trendLabel, sub
         </div>
       </div>
     </div>
+  )
+}
+
+function PerformancePulse({ comparison, isMobile }) {
+  const statusStyles = {
+    positive: { label: 'İyiye gidiyor', color: T.green, background: T.greenBg },
+    warning: { label: 'Dikkat gerekli', color: T.red, background: T.redBg },
+    neutral: { label: 'Dengeli ilerliyor', color: T.orange, background: T.orangeBg },
+    waiting: { label: 'Karşılaştırma oluşuyor', color: T.textSoft, background: T.cardSoft },
+  }
+  const status = statusStyles[comparison.status] || statusStyles.neutral
+
+  return (
+    <section style={{ ...cardStyle, padding: isMobile ? 15 : 20, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: 10, marginBottom: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: T.text }}>Performans Nabzı</h2>
+          <p style={{ fontSize: 12.5, color: T.textSoft, margin: '4px 0 0' }}>
+            {comparison.currentLabel} ile {comparison.previousLabel} karşılaştırması · aynı gün aralığı
+          </p>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          {comparison.forecast && (
+            <span style={{ padding: '6px 9px', borderRadius: 999, background: T.blueBg, color: T.blue, fontSize: 11.5, fontWeight: 700 }}>
+              Ay sonu ciro tahmini: {comparison.forecast}
+            </span>
+          )}
+          <span style={{ padding: '6px 9px', borderRadius: 999, background: status.background, color: status.color, fontSize: 11.5, fontWeight: 750 }}>
+            {status.label}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : `repeat(${Math.min(comparison.metrics.length, 4)}, minmax(0, 1fr))`, gap: 10, marginBottom: 14 }}>
+        {comparison.metrics.map(metric => {
+          const isPositive = metric.delta != null && metric.delta > 0
+          const isNegative = metric.delta != null && metric.delta < 0
+          const deltaColor = isPositive ? T.green : isNegative ? T.red : T.textFaint
+          const deltaText = metric.delta == null
+            ? (metric.isNew ? 'Yeni' : '—')
+            : metric.delta > 0
+              ? `+%${metric.delta}`
+              : metric.delta < 0
+                ? `-%${Math.abs(metric.delta)}`
+                : '%0'
+
+          return (
+            <div key={metric.label} style={{ padding: '12px 13px', borderRadius: 12, border: `1px solid ${T.border}`, background: '#FCFCFD', minWidth: 0 }}>
+              <p style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 700, margin: '0 0 5px' }}>{metric.label}</p>
+              <p style={{ fontSize: isMobile ? 18 : 21, color: T.text, fontWeight: 850, margin: 0, lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{metric.current}</p>
+              <p style={{ fontSize: 10.5, color: T.textFaint, margin: '5px 0 0' }}>
+                Önceki: {metric.previous}
+                <span style={{ marginLeft: 6, color: deltaColor, fontWeight: 750 }}>{deltaText}</span>
+              </p>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+        {[
+          { label: 'ÖNE ÇIKAN', text: comparison.gain, color: T.green, bg: T.greenBg },
+          { label: 'RİSK', text: comparison.risk, color: comparison.riskLevel === 'warning' ? T.red : T.orange, bg: comparison.riskLevel === 'warning' ? T.redBg : T.orangeBg },
+          { label: 'ÖNERİLEN AKSİYON', text: comparison.action, color: T.blue, bg: T.blueBg },
+        ].map(item => (
+          <div key={item.label} style={{ borderRadius: 11, padding: '11px 12px', background: item.bg, minWidth: 0 }}>
+            <p style={{ fontSize: 10, letterSpacing: '0.06em', color: item.color, fontWeight: 800, margin: '0 0 4px' }}>{item.label}</p>
+            <p style={{ fontSize: 12.5, lineHeight: 1.45, color: T.text, fontWeight: 600, margin: 0 }}>{item.text}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -3647,15 +3757,23 @@ export function PanelApp() {
   // böylece reklamdan gelen tüm mesajlar, henüz kayda dönüşmemiş olanlar dahil,
   // satış hunisinde görünür.
   const now = new Date()
-  const isThisMonth = d => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  const currentPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const previousPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const previousMonthLastDay = new Date(now.getFullYear(), now.getMonth(), 0).getDate()
+  const previousComparableDay = Math.min(now.getDate(), previousMonthLastDay)
+  const previousPeriodEnd = new Date(now.getFullYear(), now.getMonth() - 1, previousComparableDay + 1)
 
-  const monthlyLeads = scopedLeads.filter(l => isThisMonth(new Date(l.date)))
-  const metaMessages = scopedAds
-    .filter(ad => isThisMonth(new Date(ad.date)) && ad.channel === 'Meta (Otomatik)')
-    .reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
-  const metaSpend = scopedAds
-    .filter(ad => isThisMonth(new Date(ad.date)) && ad.channel === 'Meta (Otomatik)')
-    .reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
+  // Ay devam ederken adil bir kıyas için bu ayın yalnızca geçen günleri,
+  // önceki ayın aynı gün sayısıyla karşılaştırılır.
+  const monthlyLeads = scopedLeads.filter(lead => isInDateWindow(lead.date, currentPeriodStart, currentPeriodEnd))
+  const previousPeriodLeads = scopedLeads.filter(lead => isInDateWindow(lead.date, previousPeriodStart, previousPeriodEnd))
+  const currentPeriodAds = scopedAds.filter(ad => isInDateWindow(ad.date, currentPeriodStart, currentPeriodEnd))
+  const previousPeriodAds = scopedAds.filter(ad => isInDateWindow(ad.date, previousPeriodStart, previousPeriodEnd))
+  const currentPerformance = buildPeriodPerformance(monthlyLeads, currentPeriodAds)
+  const previousPerformance = buildPeriodPerformance(previousPeriodLeads, previousPeriodAds)
+  const metaMessages = currentPerformance.metaMessages
+  const metaSpend = currentPerformance.metaSpend
   const customers = monthlyLeads.filter(l => l.result === 'Müşteri oldu')
   const withAmount = customers.filter(l => l.sale_amount != null)
   const revenue = customers.reduce((s, l) => s + (Number(l.sale_amount) || 0), 0)
@@ -3696,6 +3814,84 @@ export function PanelApp() {
     pctNoShow: appointed.length ? Math.round((noShow.length / appointed.length) * 100) : 0,
     pctNotBought: arrived.length ? Math.round((notBought.length / arrived.length) * 100) : 0,
     pctNoResponse: monthlyLeads.length ? Math.round((noResponse.length / monthlyLeads.length) * 100) : 0,
+  }
+
+  const makeComparisonMetric = (label, current, previous, formatter) => ({
+    label,
+    current: Number.isFinite(current) ? formatter(current) : '—',
+    previous: Number.isFinite(previous) ? formatter(previous) : '—',
+    delta: relativePercentChange(current, previous),
+    isNew: Number.isFinite(current) && current > 0 && (!Number.isFinite(previous) || previous === 0),
+  })
+  const revenueChange = relativePercentChange(currentPerformance.revenue, previousPerformance.revenue)
+  const appointmentChange = relativePercentChange(currentPerformance.appointments, previousPerformance.appointments)
+  const customerChange = relativePercentChange(currentPerformance.customers, previousPerformance.customers)
+  const roasChange = relativePercentChange(currentPerformance.metaRoas, previousPerformance.metaRoas)
+  const appointmentRateChange = Number.isFinite(currentPerformance.appointmentRate) && Number.isFinite(previousPerformance.appointmentRate)
+    ? Math.round(currentPerformance.appointmentRate - previousPerformance.appointmentRate)
+    : null
+  const salesRateChange = Number.isFinite(currentPerformance.salesRate) && Number.isFinite(previousPerformance.salesRate)
+    ? Math.round(currentPerformance.salesRate - previousPerformance.salesRate)
+    : null
+  const noShowRateChange = Number.isFinite(currentPerformance.noShowRate) && Number.isFinite(previousPerformance.noShowRate)
+    ? Math.round(currentPerformance.noShowRate - previousPerformance.noShowRate)
+    : null
+  const hasPreviousPerformance = previousPeriodLeads.length > 0 || previousPeriodAds.length > 0
+  const movementCandidates = [
+    { label: 'Randevu sayısı', delta: appointmentChange },
+    { label: 'Satış sayısı', delta: customerChange },
+    ...(perms.can_see_revenue ? [
+      { label: 'Ciro', delta: revenueChange },
+      { label: 'Meta ROAS', delta: roasChange },
+    ] : []),
+  ].filter(item => item.delta != null)
+  const strongestGain = [...movementCandidates].filter(item => item.delta > 0).sort((a, b) => b.delta - a.delta)[0]
+  const strongestDecline = [...movementCandidates].filter(item => item.delta < 0).sort((a, b) => a.delta - b.delta)[0]
+  const noShowWorsened = noShowRateChange != null && noShowRateChange >= 2
+  const healthSignals = movementCandidates.filter(item => Math.abs(item.delta) >= 3).map(item => Math.sign(item.delta))
+  if (noShowWorsened) healthSignals.push(-1)
+  const healthScore = healthSignals.reduce((sum, value) => sum + value, 0)
+  const performanceStatus = !hasPreviousPerformance ? 'waiting' : healthScore > 0 ? 'positive' : healthScore < 0 ? 'warning' : 'neutral'
+  const gainText = !hasPreviousPerformance
+    ? 'Önceki dönemde karşılaştırılabilir veri bulunmuyor.'
+    : strongestGain
+      ? `${strongestGain.label} önceki döneme göre %${strongestGain.delta} arttı.`
+      : 'Ana göstergeler önceki döneme yakın seviyede.'
+  const riskText = noShowWorsened
+    ? `Randevuya gelmeme oranı %${Math.round(previousPerformance.noShowRate)} seviyesinden %${Math.round(currentPerformance.noShowRate)} seviyesine çıktı.`
+    : strongestDecline
+      ? `${strongestDecline.label} önceki döneme göre %${Math.abs(strongestDecline.delta)} geriledi.`
+      : followUpWaiting > 0
+        ? `${followUpWaiting} danışan için takip aksiyonu bekliyor.`
+        : 'Belirgin bir kayıp sinyali görünmüyor.'
+  const actionText = noShowWorsened
+    ? 'Gelmeyen danışanları bugün arayın; yeni tarih veya nedeni mutlaka kaydedin.'
+    : appointmentRateChange != null && appointmentRateChange <= -2
+      ? 'Meta mesajlarından randevuya dönüşmeyen kayıtları ve ilk cevap hızını kontrol edin.'
+      : salesRateChange != null && salesRateChange <= -2
+        ? 'Görüşmeye gelip satın almayan danışanların notlarını ve itiraz nedenlerini inceleyin.'
+        : followUpWaiting > 0
+          ? 'Önce gecikmiş takipleri tamamlayın; gün sonunda bekleyen sayısını yeniden kontrol edin.'
+          : 'İyi çalışan süreci koruyup günlük kayıt ve takip disiplinini sürdürün.'
+  const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const projectedRevenue = perms.can_see_revenue && currentPerformance.revenue > 0
+    ? Math.round((currentPerformance.revenue / Math.max(now.getDate(), 1)) * daysInCurrentMonth)
+    : null
+  const performanceComparison = {
+    status: performanceStatus,
+    currentLabel: `1–${now.getDate()} ${MONTH_NAMES[now.getMonth()]}`,
+    previousLabel: `1–${previousComparableDay} ${MONTH_NAMES[previousPeriodStart.getMonth()]}`,
+    forecast: projectedRevenue ? fmtTL(projectedRevenue) : null,
+    gain: gainText,
+    risk: riskText,
+    riskLevel: (noShowWorsened || strongestDecline) ? 'warning' : 'neutral',
+    action: actionText,
+    metrics: [
+      ...(perms.can_see_revenue ? [makeComparisonMetric('Ciro', currentPerformance.revenue, previousPerformance.revenue, fmtTL)] : []),
+      makeComparisonMetric('Randevu', currentPerformance.appointments, previousPerformance.appointments, value => Number(value).toLocaleString('tr-TR')),
+      makeComparisonMetric('Satış', currentPerformance.customers, previousPerformance.customers, value => Number(value).toLocaleString('tr-TR')),
+      ...(perms.can_see_revenue ? [makeComparisonMetric('Meta ROAS', currentPerformance.metaRoas, previousPerformance.metaRoas, value => `${Number(value).toFixed(1)}x`)] : []),
+    ],
   }
 
   const visibleNavItems = NAV_ITEMS.filter(item => item.show(perms, isSuperAdmin, canSeeOwnDataOnly))
@@ -3761,6 +3957,8 @@ export function PanelApp() {
               <StatCard icon={<Megaphone size={20} />} label="Meta ROAS" value={perms.can_see_revenue ? (stats.metaRoas === '—' ? '—' : `${stats.metaRoas}x`) : 'Gizli'} subtitle={perms.can_see_revenue ? 'Meta cirosu / reklam harcaması' : 'Ciro görüntüleme yetkisi gerekli'} color="violet" />
               <StatCard icon={<ClipboardList size={20} />} label="Takip bekleyen" value={stats.followUpWaiting} subtitle="Hatırlatma gerektiren danışanlar" color="amber" />
             </div>
+
+            <PerformancePulse comparison={performanceComparison} isMobile={isMobile} />
 
             <div style={{ ...sectionGridStyle, gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.35fr) minmax(280px, .65fr)' }}>
               <FunnelSection stats={stats} isMobile={isMobile} />
