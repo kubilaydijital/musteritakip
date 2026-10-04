@@ -1,110 +1,41 @@
-// Netlify Function: Müşterinin herkese açık randevu sayfasından gönderdiği bilgiyi alır,
-// seçilen saatin hâlâ boş olduğunu TEKRAR kontrol eder (iki kişi aynı anda aynı saati
-// seçmeye çalışırsa ikincisi reddedilir), ve leads tablosuna otomatik bir kayıt oluşturur.
-//
-// Çakışma koruması: Bu kontrol burada (sunucu tarafında, kayıt anında) tekrar yapılıyor,
-// çünkü müşterinin tarayıcısındaki "boş slot" listesi birkaç saniye/dakika eskimiş olabilir.
-
-const SUPABASE_URL = 'https://rngahpybhgdqabbkldrr.supabase.co'
-const SUPABASE_KEY = 'sb_publishable_IzGAUw3EEdYfsPVT4VZOtA_PH3cVJmy'
+import { bookingAppointmentIso, isValidBookingTime } from '../../src/lib/booking.js'
+import { BookingError, bookingDatabaseRequest, bookingFailure, bookingResponse, publicBookingState } from './_booking.js'
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
 
-const PHONE_RE = /^\+905\d{9}$/
-
 export async function handler(event) {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
-  }
-
+  if (event.httpMethod !== 'POST') return bookingResponse(405, { error: 'Method not allowed' })
   let payload
   try {
     payload = JSON.parse(event.body || '{}')
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Geçersiz istek gövdesi' }) }
-  }
-
-  const { branch_id, name, phone, service, date, time } = payload
-
-  if (!branch_id || !name || !phone || !date || !time) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Eksik bilgi: isim, telefon, tarih ve saat gerekli' }) }
-  }
-  if (!PHONE_RE.test(phone.trim())) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Geçerli bir telefon numarası girin (örn. +905551234567)' }) }
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Geçersiz tarih/saat formatı' }) }
+    return bookingResponse(400, { error: 'Geçersiz istek gövdesi.' })
   }
 
   try {
-    // 1) Şube var ve aktif mi kontrol et
-    const branchRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/branches?id=eq.${encodeURIComponent(branch_id)}&select=id,name,active`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-    )
-    const branches = await branchRes.json()
-    if (!Array.isArray(branches) || branches.length === 0 || branches[0].active === false) {
-      return { statusCode: 404, body: JSON.stringify({ error: 'Şube bulunamadı' }) }
-    }
+    const { branch_id, name, phone, service, date, time } = payload || {}
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 120) throw new BookingError(400, 'Ad soyad girin (en fazla 120 karakter).')
+    if (typeof phone !== 'string' || !/^\+905\d{9}$/.test(phone.trim())) throw new BookingError(400, 'Geçerli bir telefon numarası girin (örn. +905551234567).')
+    if (service != null && (typeof service !== 'string' || service.trim().length > 180)) throw new BookingError(400, 'Geçerli bir hizmet bilgisi girin.')
+    if (!isValidBookingTime(time)) throw new BookingError(400, 'Geçerli bir saat seçin.')
 
-    // 2) Seçilen saatin appointment_at değerini hesapla (Türkiye saati -> UTC).
-    // Panel de aynı mantıkla kaydediyor: new Date('YYYY-MM-DDTHH:mm').toISOString()
-    // tarayıcı Türkiye saat diliminde çalıştığında otomatik UTC'ye çevirir. Sunucu
-    // tarafında bunu manuel yapıyoruz: Türkiye saati - 3 saat = UTC.
-    const [year, month, day] = date.split('-').map(Number)
-    const [hour, minute] = time.split(':').map(Number)
-    const appointmentUtc = new Date(Date.UTC(year, month - 1, day, hour - 3, minute, 0))
-    const appointmentIso = appointmentUtc.toISOString()
+    const state = await publicBookingState(branch_id, date)
+    if (!state.slots.includes(time)) throw new BookingError(409, 'Seçtiğiniz saat artık müsait değil. Lütfen başka bir saat seçin.')
 
-    // 3) ÇAKIŞMA KONTROLÜ: bu saat hâlâ boş mu? (race condition koruması)
-    // appointment_at tam olarak bu zamana eşit bir kayıt var mı diye bakıyoruz.
-    const conflictRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/leads?branch_id=eq.${encodeURIComponent(branch_id)}&appointment_at=eq.${appointmentIso}&select=id`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-    )
-    const conflicts = await conflictRes.json()
-    if (Array.isArray(conflicts) && conflicts.length > 0) {
-      return { statusCode: 409, body: JSON.stringify({ error: 'Bu saat az önce başka biri tarafından alındı. Lütfen başka bir saat seçin.' }) }
-    }
-
-    // 4) Kaydı oluştur
-    const leadId = uid()
-    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+    // Kontrol ve iki kayıt tek veritabanı işlemi içindedir. Aynı şube/gün için
+    // eşzamanlı online talepler kilit altında tekrar kontrol edilir.
+    // Gerekli fonksiyon: supabase/online_booking_atomic.sql (önce uygulanmalıdır).
+    const result = await bookingDatabaseRequest('rpc/book_online_appointment', {
       method: 'POST',
-      headers: {
-        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json', Prefer: 'return=minimal',
+      body: {
+        p_lead_id: uid(), p_note_id: uid(), p_branch_id: branch_id,
+        p_name: name.trim(), p_phone: phone.trim(), p_service: service?.trim() || null,
+        p_appointment_at: bookingAppointmentIso(date, time),
       },
-      body: JSON.stringify({
-        id: leadId, branch_id, name: name.trim(), phone: phone.trim(),
-        channel: 'Online Randevu', service: service || null,
-        note: 'Müşteri online randevu sayfasından kendisi randevu oluşturdu.',
-        result: 'Randevu aldı', appointment_at: appointmentIso,
-        entered_by: 'Online Randevu Sistemi', date: new Date().toISOString(),
-        last_note_at: new Date().toISOString(),
-      }),
     })
-
-    if (!insertRes.ok) {
-      const errText = await insertRes.text()
-      return { statusCode: 502, body: JSON.stringify({ error: 'Randevu kaydedilemedi', detail: errText }) }
-    }
-
-    // 5) İlk not kaydı (lead_notes) - panelin not geçmişi sisteminde görünmesi için
-    await fetch(`${SUPABASE_URL}/rest/v1/lead_notes`, {
-      method: 'POST',
-      headers: {
-        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json', Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({
-        id: uid(), lead_id: leadId, note: 'Müşteri online randevu sayfasından kendisi randevu oluşturdu.',
-        created_by: 'Online Randevu Sistemi', result_at_time: 'Randevu aldı',
-      }),
-    })
-
-    return { statusCode: 200, body: JSON.stringify({ ok: true, branch_name: branches[0].name }) }
-  } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) }
+    if (result?.ok !== true || typeof result.branch_name !== 'string') throw new BookingError(503, 'Randevu kaydı doğrulanamadı. Lütfen işletmeyle iletişime geçin.')
+    return bookingResponse(200, { ok: true, branch_name: result.branch_name })
+  } catch (error) {
+    return bookingFailure(error)
   }
 }
