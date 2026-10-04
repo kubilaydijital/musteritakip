@@ -65,6 +65,56 @@ function meaningfulNoteError(value, { required = false } = {}) {
 
   return ''
 }
+
+// Ücretli bir AI servisine ihtiyaç duymadan, görüşmenin durumu ve nottaki anahtar
+// ifadeler üzerinden uygulanabilir bir sonraki adım önerir. Tüm değerlendirme
+// kullanıcının tarayıcısında yapılır; not hiçbir harici servise gönderilmez.
+function buildLocalLeadAction({ note, result, service }) {
+  const normalized = String(note || '').toLocaleLowerCase('tr-TR')
+  const includesAny = words => words.some(word => normalized.includes(word))
+  const serviceText = service ? `${service} hakkında ` : ''
+
+  if (result === 'Müşteri oldu') {
+    return 'Hizmet sonrasında memnuniyetini kontrol etmek için uygun bir takip tarihi belirleyin. Görüşme sonucunu yeni bir notla kaydedin.'
+  }
+
+  if (includesAny(['eş', 'aile', 'izin', 'partner'])) {
+    return 'Karar sürecini zorlamadan anlayışla yaklaşın; isterse birlikte değerlendirebilmeleri için kısa ve net bilgi paylaşmayı teklif edin. 3–4 gün sonrası için takip tarihi belirleyin.'
+  }
+
+  if (includesAny(['fiyat', 'pahalı', 'bütçe', 'ücret', 'maddi', 'taksit'])) {
+    return 'Önce bütçe endişesini netleştirin; işletmede gerçekten mevcutsa ödeme veya alternatif hizmet seçeneklerini sade biçimde anlatın. “Hangi seçenek sizin için daha uygun olur?” diye sorarak görüşmeyi açık bırakın.'
+  }
+
+  if (includesAny(['kork', 'çekin', 'endiş', 'acı', 'tereddüt'])) {
+    return `${serviceText}karar vermeden önce hangi konuda tereddüt yaşadığını sorun ve yalnızca uzman tarafından doğrulanmış bilgileri paylaşın. Baskı kurmadan kısa bir bilgilendirme görüşmesi önerin.`
+  }
+
+  if (includesAny(['yoğun', 'vakit', 'zaman', 'işi çıktı', 'iş çıktı', 'uygun değil'])) {
+    return 'Uygun olmadığı zamanı anlayışla karşılayın ve iki farklı gün/saat seçeneği sunun. Seçtiği zamanı netleştirip takvime kaydedin.'
+  }
+
+  if (includesAny(['ulaşamad', 'cevap vermedi', 'dönüş yapmadı', 'yanıt vermedi'])) {
+    return 'Farklı bir saat diliminde tek ve kısa bir hatırlatma mesajı gönderin. Yanıt gelmezse tekrar iletişim kurulacak tarihi nota ekleyin.'
+  }
+
+  if (includesAny(['şikayet', 'memnun değil', 'kızgın', 'sorun yaşadı'])) {
+    return 'Önce yaşadığı sorunu savunmaya geçmeden dinleyin ve anladığınızı özetleyin. Çözüm için yetkili kişiye ne zaman dönüş yapılacağını net biçimde bildirin.'
+  }
+
+  if (includesAny(['düşünecek', 'düşünüyor', 'kararsız'])) {
+    return 'Karar vermesi için alan tanıyın ve hangi bilginin kararını kolaylaştıracağını sorun. Belirsiz bırakmak yerine uygun bir takip günü belirleyin.'
+  }
+
+  const actionsByResult = {
+    'Randevu aldı': 'Randevudan bir gün önce kısa bir teyit mesajı gönderin. Saat, konum ve hazırlık bilgilerini yalnızca gerekli olduğu ölçüde hatırlatın.',
+    'Randevuya gelmedi': 'Önce gelememe nedenini yargılamadan sorun. Uygunsa iki yeni tarih seçeneği sunun ve sonucu yeni bir notla kaydedin.',
+    'Satın almadı': 'Satın almama nedenini açık uçlu bir soruyla netleştirin. İtiraza uygun bilgi verdikten sonra tekrar aranacağı tarihi belirleyin.',
+    'Cevap yazıldı, müşteriden dönüş gelmedi': 'Kısa ve kişisel bir hatırlatma gönderip tek bir net soru sorun. Yanıt gelmezse bir sonraki takip tarihini kaydedin.',
+  }
+
+  return actionsByResult[result] || 'Görüşmenin sonucunu netleştiren kısa bir soru sorun ve bir sonraki temas tarihini belirleyin. Yapılan işlemi yeni bir notla kaydedin.'
+}
 // Her sonuç kategorisi için varsayılan (şubeye özel kural bulunamazsa kullanılan) eşikler.
 const DEFAULT_REMINDER_SCHEDULE = {
   'Randevu aldı': [1, 1, 1],
@@ -460,16 +510,14 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [saleAmountErr, setSaleAmountErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [aiTip, setAiTip] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiErr, setAiErr] = useState('')
+  const [suggestedAction, setSuggestedAction] = useState('')
   const [duplicateNotice, setDuplicateNotice] = useState('')
   const suppressNoticeReset = useRef(false)
 
   useEffect(() => {
     setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
     setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setSaleAmountErr(''); setConfirmingDelete(false)
-    setAiTip(''); setAiErr('')
+    setSuggestedAction('')
     if (suppressNoticeReset.current) {
       // Bu geçiş bir çift-kayıt tespiti sonucu oldu (onFoundExisting) — uyarıyı silme.
       suppressNoticeReset.current = false
@@ -487,27 +535,9 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
-  async function getAiTip(noteText) {
+  function getSuggestedAction(noteText) {
     if (!noteText || !noteText.trim()) return
-    setAiLoading(true)
-    setAiErr('')
-    setAiTip('')
-    try {
-      const res = await authenticatedNetlifyFetch('/.netlify/functions/lead-tip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: noteText, result: form.result, service: form.service }),
-      })
-      const data = await res.json()
-      if (res.ok && data.tip) {
-        setAiTip(data.tip)
-      } else {
-        setAiErr('İpucu alınamadı, lütfen tekrar deneyin.')
-      }
-    } catch {
-      setAiErr('İpucu alınamadı, lütfen tekrar deneyin.')
-    }
-    setAiLoading(false)
+    setSuggestedAction(buildLocalLeadAction({ note: noteText, result: form.result, service: form.service }))
   }
 
   async function handleDelete() {
@@ -628,12 +658,13 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         </select>
         <select value={form.result} onChange={e => {
           set('result', e.target.value)
+          setSuggestedAction('')
           if (e.target.value !== 'Müşteri oldu') setSaleAmountErr('')
         }} style={inputStyle}>
           {RESULTS.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
       </div>
-      <select value={form.service} onChange={e => set('service', e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
+      <select value={form.service} onChange={e => { set('service', e.target.value); setSuggestedAction('') }} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {(!services || services.length === 0) && <option value="">Hizmet listesi tanımlanmamış</option>}
         {(services || []).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
       </select>
@@ -672,7 +703,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       {editing ? (
         <>
           <NoteHistory notes={notesForLead} />
-          <textarea placeholder="Yeni not ekle (isteğe bağlı)" value={form.newNote} onChange={e => { set('newNote', e.target.value); setNoteErr('') }} rows={2}
+          <textarea placeholder="Yeni not ekle (isteğe bağlı)" value={form.newNote} onChange={e => { set('newNote', e.target.value); setNoteErr(''); setSuggestedAction('') }} rows={2}
             aria-invalid={Boolean(noteErr)}
             style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${noteErr ? '#c0392b' : T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
           {noteErr && <div role="alert" style={{ fontSize: 12, color: '#a32d2d', background: '#fff1f0', border: '1px solid #f2b8b5', borderRadius: 8, padding: '9px 11px', margin: '0 0 8px', lineHeight: 1.5 }}><strong>Not kaydedilemedi.</strong><br />{noteErr}</div>}
@@ -685,36 +716,35 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
               : ''
             const noteToUse = form.newNote.trim() || lastOldNote
             return (
-              <button type="button" disabled={aiLoading || !noteToUse.trim()} onClick={() => getAiTip(noteToUse)} style={{
+              <button type="button" disabled={!noteToUse.trim()} onClick={() => getSuggestedAction(noteToUse)} style={{
                 fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
                 color: T.primary, cursor: noteToUse.trim() ? 'pointer' : 'not-allowed', fontWeight: 500, marginBottom: 10, opacity: noteToUse.trim() ? 1 : 0.5
               }}>
-                {aiLoading ? '💡 Düşünüyor...' : '💡 İpucu Al'}
+                💡 Önerilen Aksiyon
               </button>
             )
           })()}
         </>
       ) : (
         <>
-          <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => { set('note', e.target.value); setNoteErr('') }} rows={2}
+          <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => { set('note', e.target.value); setNoteErr(''); setSuggestedAction('') }} rows={2}
             aria-required="true" aria-invalid={Boolean(noteErr)}
             style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${noteErr ? '#c0392b' : T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
           {noteErr && <div role="alert" style={{ fontSize: 12, color: '#a32d2d', background: '#fff1f0', border: '1px solid #f2b8b5', borderRadius: 8, padding: '9px 11px', margin: '0 0 10px', lineHeight: 1.5 }}><strong>Not kaydedilemedi.</strong><br />{noteErr}</div>}
           {!noteErr && <p style={{ fontSize: 11, color: '#888', margin: '0 0 10px' }}>En az 2 kelime ve toplam 10 harf/rakamla görüşmeyi kısaca açıklayın.</p>}
-          <button type="button" disabled={aiLoading || !form.note.trim()} onClick={() => getAiTip(form.note)} style={{
+          <button type="button" disabled={!form.note.trim()} onClick={() => getSuggestedAction(form.note)} style={{
             fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
             color: T.primary, cursor: form.note.trim() ? 'pointer' : 'not-allowed', fontWeight: 500, marginBottom: 10, opacity: form.note.trim() ? 1 : 0.5
           }}>
-            {aiLoading ? '💡 Düşünüyor...' : '💡 İpucu Al'}
+            💡 Önerilen Aksiyon
           </button>
         </>
       )}
-      {aiTip && (
+      {suggestedAction && (
         <div style={{ background: T.primaryLight || 'rgba(124,92,255,.1)', border: `1px solid ${T.primary}`, borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: T.text, lineHeight: 1.5 }}>
-          <strong style={{ color: T.primary }}>💡 İpucu:</strong> {aiTip}
+          <strong style={{ color: T.primary }}>💡 Önerilen aksiyon:</strong> {suggestedAction}
         </div>
       )}
-      {aiErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '0 0 10px' }}>{aiErr}</p>}
       {duplicateNotice && (
         <div style={{ background: '#fff7e6', border: '1px solid #e6a817', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: '#7a5400', lineHeight: 1.5 }}>
           ⚠️ {duplicateNotice}
