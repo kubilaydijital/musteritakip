@@ -4,6 +4,7 @@ import { authenticatedNetlifyFetch } from './lib/netlify'
 import { T } from './panel/theme'
 import { ExportButtons } from './panel/ExportButtons'
 import { leadsToExportRows } from './panel/exportRows'
+import { leadServiceOptions, leadServiceSelection, resolveLeadFormBranchId } from './lib/leadServices.js'
 import {
   Chart, BarController, BarElement, DoughnutController, ArcElement,
   LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip
@@ -502,7 +503,8 @@ function NoteHistory({ notes }) {
 }
 
 function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, onSaved, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile, notesForLead, existingLeads = [], onFoundExisting }) {
-  const [form, setForm] = useState(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
+  const [formState, setForm] = useState(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
+  const form = { ...formState, service: leadServiceSelection(services, formState.service, Boolean(editing)) }
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
@@ -526,12 +528,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     }
   }, [editing])
 
-  useEffect(() => {
-    if (!editing && !form.service && services && services.length > 0) {
-      set('service', services[0].name)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [services])
+  const serviceOptions = leadServiceOptions(services, form.service)
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -665,8 +662,8 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         </select>
       </div>
       <select value={form.service} onChange={e => { set('service', e.target.value); setSuggestedAction('') }} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
-        {(!services || services.length === 0) && <option value="">Hizmet listesi tanımlanmamış</option>}
-        {(services || []).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+        {serviceOptions.length === 0 && <option value="">Hizmet listesi tanımlanmamış</option>}
+        {serviceOptions.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
       </select>
       <div style={{ marginBottom: 10 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -3856,6 +3853,8 @@ export function PanelApp() {
   const relevantBranchId = isSuperAdmin && filterBranch !== 'all' ? filterBranch : currentUser.branch_id
   const currentBranchServices = branchServices.filter(s => s.branch_id === relevantBranchId)
   const activeBranches = branches.filter(b => b.active !== false)
+  const leadFormBranchId = resolveLeadFormBranchId({ editingLead, isSuperAdmin, filterBranch, currentUserBranchId: currentUser.branch_id, activeBranches })
+  const leadFormServices = branchServices.filter(service => service.branch_id === leadFormBranchId)
 
   const scopedLeads = isSuperAdmin ? (filterBranch === 'all' ? leads : leads.filter(l => l.branch_id === filterBranch)) : leads.filter(l => l.branch_id === currentUser.branch_id)
   // Not: Personel artık şubedeki TÜM kayıtları görebiliyor (eskiden sadece kendi girdiğini görürdü).
@@ -4211,9 +4210,9 @@ export function PanelApp() {
                 <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead}
                   onCancelEdit={() => { setEditingLead(null); setIsLeadFormOpen(false) }}
                   onSaved={() => { setEditingLead(null); setIsLeadFormOpen(false) }}
-                  services={currentBranchServices} isMobile={isMobile}
-                  targetBranchId={isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || null)) : currentUser.branch_id}
-                  targetBranchName={isSuperAdmin ? (filterBranch !== 'all' ? branchName(filterBranch) : branchName(activeBranches[0]?.id)) : branchName(currentUser.branch_id)}
+                  services={leadFormServices} isMobile={isMobile}
+                  targetBranchId={leadFormBranchId}
+                  targetBranchName={branchName(leadFormBranchId)}
                   isSuperAdmin={isSuperAdmin}
                   notesForLead={editingLead ? leadNotes.filter(n => n.lead_id === editingLead.id) : []}
                   existingLeads={visibleLeads}
