@@ -4,6 +4,8 @@ import { authenticatedNetlifyFetch } from './lib/netlify'
 import { T } from './panel/theme'
 import { ExportButtons } from './panel/ExportButtons'
 import { leadsToExportRows } from './panel/exportRows'
+import { FollowUpCenter } from './panel/FollowUpCenter.jsx'
+import { activeFollowUpReminder, canManageFollowUp, fetchFollowUpRows, followUpWriteError } from './lib/followUps.js'
 import { leadServiceOptions, leadServiceSelection, resolveLeadFormBranchId } from './lib/leadServices.js'
 import { turkeyDateString } from './lib/booking.js'
 import {
@@ -142,6 +144,10 @@ function lastTouch(lead) { return lead.last_note_at || lead.edited_at || lead.da
 // eklenmiş TAKİP notu sayısı (bkz. PanelApp'teki noteCountByLeadId — ilk not sayılmaz).
 // Süre, "Randevu aldı" için randevu tarihinden, diğerleri için kayıt/son temas tarihinden işler.
 function staleness(lead, noteCount = 0, rule = null) {
+  if (lead.followupUnavailable) return null
+  return activeFollowUpReminder(lead, legacyStaleness(lead, noteCount, rule))
+}
+function legacyStaleness(lead, noteCount = 0, rule = null) {
   const schedule = rule ? [rule.day_1, rule.day_2, rule.day_3] : DEFAULT_REMINDER_SCHEDULE[lead.result]
   const coldAfter = rule ? rule.cold_after : DEFAULT_COLD_AFTER[lead.result]
   if (!schedule || lead.result === 'Müşteri oldu') return null // Müşteri oldu -> takip yok
@@ -1217,7 +1223,7 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMa
           <div key={lead.id} style={{ padding: '9px 10px', background: '#fff', border: '1px solid rgba(232,170,164,.6)', borderRadius: 9, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
               <span style={{ color: T.text, fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name}</span>
-              <span style={{ color: s.level === 'critical' ? '#C2413B' : '#A87412', fontSize: 11.5, fontWeight: 750, whiteSpace: 'nowrap' }}>{s.days} gün</span>
+              <span style={{ color: s.level === 'critical' ? '#C2413B' : '#A87412', fontSize: 11.5, fontWeight: 750, whiteSpace: 'nowrap' }}>{s.scheduled ? (s.dueDays ? `${s.dueDays} gün gecikmiş` : 'Bugün') : `${s.days} gün`}</span>
             </div>
             <p style={{ fontSize: 11.5, color: T.textSoft, margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.result}{canSeePhone ? ` · ${lead.phone}` : ''}</p>
           </div>
@@ -1235,51 +1241,12 @@ const REMINDER_RULE_LABELS = {
 }
 const REMINDER_RULE_ORDER = ['Randevuya gelmedi', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Satın almadı', 'Randevu aldı']
 
-function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap, canEditRules, isSuperAdmin, filterBranch, activeBranches, branchName, onSaveRule, canSeePhone, onOpenLead }) {
+function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap, canEditRules, isSuperAdmin, filterBranch, activeBranches, branchName, onSaveRule, canSeePhone, onOpenLead, users, currentUser, canEditAny, canEditLead, followUpEvents, onSaveFollowUp, followUpError }) {
   const [ruleBranchId, setRuleBranchId] = useState(
     isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || '')) : null
   )
   const [editValues, setEditValues] = useState({})
   const [savingKey, setSavingKey] = useState(null)
-  const [followUpFilter, setFollowUpFilter] = useState('all')
-
-  const opportunities = useMemo(() =>
-    leads
-      .map(l => ({ lead: l, s: staleness(l, noteCountMap[l.id] || 0, ruleMap[`${l.branch_id}__${l.result}`] || null) }))
-      .filter(x => x.s && x.s.level !== 'cold')
-      .sort((a, b) => {
-        const aUrgent = a.s.level === 'critical' || a.s.dueDays >= 3
-        const bUrgent = b.s.level === 'critical' || b.s.dueDays >= 3
-        if (aUrgent !== bUrgent) return aUrgent ? -1 : 1
-        if (a.s.level !== b.s.level) return a.s.level === 'critical' ? -1 : 1
-        return b.s.days - a.s.days
-      }),
-    [leads, noteCountMap, ruleMap])
-
-  const latestNoteByLeadId = useMemo(() => {
-    const map = {}
-    leadNotes.forEach(note => {
-      if (!map[note.lead_id]) map[note.lead_id] = note.note
-    })
-    return map
-  }, [leadNotes])
-
-  function isUrgent(item) { return item.s.level === 'critical' || item.s.dueDays >= 3 }
-  function matchesFilter(item, filter) {
-    if (filter === 'urgent') return isUrgent(item)
-    if (filter === 'today') return item.s.dueDays === 0
-    if (filter === 'week') return item.s.dueDays >= 0 && item.s.dueDays <= 7
-    return true
-  }
-
-  const followUpFilters = [
-    { key: 'all', label: 'Tümü' },
-    { key: 'urgent', label: 'Acil' },
-    { key: 'today', label: 'Bugün takip' },
-    { key: 'week', label: 'Bu hafta' },
-  ]
-  const filteredOpportunities = opportunities.filter(item => matchesFilter(item, followUpFilter))
-
   const targetBranchId = isSuperAdmin ? ruleBranchId : (leads[0]?.branch_id || null)
   const branchRules = rules.filter(r => r.branch_id === targetBranchId)
 
@@ -1305,81 +1272,11 @@ function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap,
 
   return (
     <div>
-      <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Takip Merkezi</h1>
-      <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>Takip bekleyen danışanlar, son notlar ve hatırlatma kuralları</p>
-
-      {/* AKSİYON LİSTESİ */}
-      <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '1.25rem', marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
-          <div>
-            <p style={{ fontWeight: 750, fontSize: 16, margin: 0, color: T.text }}>Takip sırası</p>
-            <p style={{ fontSize: 12.5, color: T.textSoft, margin: '4px 0 0' }}>
-              {opportunities.length} danışan için aksiyon bekleniyor
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-            {followUpFilters.map(filter => {
-              const active = followUpFilter === filter.key
-              const count = opportunities.filter(item => matchesFilter(item, filter.key)).length
-              return (
-                <button key={filter.key} type="button" onClick={() => setFollowUpFilter(filter.key)} style={{
-                  border: `1px solid ${active ? T.primary : T.border}`,
-                  background: active ? '#F0ECFF' : '#fff', color: active ? T.primary : T.textSoft,
-                  padding: '6px 9px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                }}>
-                  {filter.label} · {count}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-        {opportunities.length === 0 && (
-          <p style={{ fontSize: 13.5, color: T.textSoft }}>Şu anda takip bekleyen bir danışan yok, harika iş!</p>
-        )}
-        {opportunities.length > 0 && filteredOpportunities.length === 0 && (
-          <p style={{ fontSize: 13.5, color: T.textSoft, margin: '18px 0 4px' }}>Bu filtrede takip bekleyen danışan yok.</p>
-        )}
-        {filteredOpportunities.map(({ lead, s }) => {
-          const waUrl = buildWhatsappUrl(lead)
-          const isUrgentLead = isUrgent({ lead, s })
-          const latestNote = (latestNoteByLeadId[lead.id] || lead.note || '').replace(/\s+/g, ' ').trim()
-          const notePreview = latestNote.length > 105 ? `${latestNote.slice(0, 105)}…` : latestNote
-          const followUpLabel = s.dueDays === 0 ? 'Bugün takip' : `${s.dueDays} gün gecikmiş`
-          return (
-            <div key={lead.id} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14,
-              padding: '14px 0', borderTop: `1px solid ${T.border}`,
-            }}>
-              <div style={{ minWidth: 200, flex: '1 1 380px' }}>
-                <div style={{ fontWeight: 750, fontSize: 14.5, color: T.text }}>{lead.name}</div>
-                <div style={{ fontSize: 12.5, color: T.textSoft, marginTop: 2 }}>
-                  {canSeePhone ? lead.phone : '••• gizli'} · {lead.result}
-                </div>
-                {notePreview && <p style={{ fontSize: 12.5, lineHeight: 1.45, color: T.textSoft, margin: '6px 0 0', maxWidth: 560 }}><strong style={{ color: T.text, fontWeight: 650 }}>Son not:</strong> {notePreview}</p>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{
-                  fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                  background: isUrgentLead ? '#FCEAEA' : '#FCF3E1',
-                  color: isUrgentLead ? '#C84B46' : '#A87412',
-                }}>
-                  {followUpLabel} · {s.reminderNumber}. temas
-                </span>
-                {waUrl && (
-                  <a href={waUrl} target="_blank" rel="noreferrer" style={{
-                    fontSize: 12.5, fontWeight: 600, color: '#1FAA6D', textDecoration: 'none',
-                    border: '1px solid #1FAA6D', borderRadius: 8, padding: '6px 10px',
-                  }}>WhatsApp</a>
-                )}
-                <button onClick={() => onOpenLead(lead)} style={{
-                  fontSize: 12.5, fontWeight: 600, color: '#fff', background: '#7C5CFC', border: 'none',
-                  borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
-                }}>Not Ekle</button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      <FollowUpCenter leads={leads} leadNotes={leadNotes} users={users} currentUser={currentUser}
+        canEditAny={canEditAny} canSeePhone={canSeePhone} branchName={branchName} showBranch={isSuperAdmin && filterBranch === 'all'}
+        getLegacyReminder={lead => legacyStaleness(lead, noteCountMap[lead.id] || 0, ruleMap[`${lead.branch_id}__${lead.result}`] || null)}
+        buildWhatsappUrl={buildWhatsappUrl} onOpenLead={onOpenLead} canEditLead={canEditLead}
+        onSave={onSaveFollowUp} events={followUpEvents} loadError={followUpError} />
 
       {/* HATIRLATMA KURALLARI */}
       <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '1.25rem' }}>
@@ -1476,7 +1373,12 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
 
   let nextStep = 'Kayıt bekliyor'
   let nextStepColor = T.textSoft
-  if (status === 'needs_result') {
+  if (lead.followup?.closed_at) {
+    nextStep = `Takip kapalı · ${lead.followup.close_reason}`
+  } else if (lead.followup?.next_followup_at) {
+    nextStep = `Takip · ${new Date(lead.followup.next_followup_at).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+    nextStepColor = followUp?.level === 'critical' ? T.red : T.primary
+  } else if (status === 'needs_result') {
     nextStep = hasAppointment ? `Sonucu güncelle · ${appointment.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}` : 'Sonucu güncelle'
     nextStepColor = T.orange
   } else if (status === 'upcoming') {
@@ -3420,7 +3322,14 @@ export function PanelApp() {
   const [authLoading, setAuthLoading] = useState(true)
   const [branches, setBranches] = useState([])
   const [users, setUsers] = useState([])
-  const [leads, setLeads] = useState([])
+  const [rawLeads, setLeads] = useState([])
+  const [followUps, setFollowUps] = useState([])
+  const [followUpEvents, setFollowUpEvents] = useState([])
+  const [followUpError, setFollowUpError] = useState('')
+  const leads = useMemo(() => {
+    const byLead = new Map(followUps.map(item => [item.lead_id, item]))
+    return rawLeads.map(lead => ({ ...lead, followup: byLead.get(lead.id), followupUnavailable: Boolean(followUpError) }))
+  }, [rawLeads, followUps, followUpError])
   const [reminderRules, setReminderRules] = useState([])
   const [leadNotes, setLeadNotes] = useState([])
   const [adsData, setAdsData] = useState([])
@@ -3564,7 +3473,7 @@ export function PanelApp() {
 
   async function loadAll() {
     setLoaded(false)
-    const [b, u, l, a, t, bs, ln, rr] = await Promise.all([
+    const [b, u, l, a, t, bs, ln, rr, fu, fe] = await Promise.all([
       supabase.from('branches').select('*').order('name'),
       supabase.from('app_users').select('*'),
       supabase.from('leads').select('*').order('date', { ascending: false }),
@@ -3572,7 +3481,9 @@ export function PanelApp() {
       supabase.from('permission_templates').select('*'),
       supabase.from('branch_services').select('*').order('name'),
       supabase.from('lead_notes').select('*').order('created_at', { ascending: false }),
-      supabase.from('reminder_rules').select('*')
+      supabase.from('reminder_rules').select('*'),
+      fetchFollowUpRows(supabase, 'lead_followups'),
+      fetchFollowUpRows(supabase, 'lead_followup_events')
     ])
     setBranches(b.data || [])
     setUsers(u.data || [])
@@ -3582,6 +3493,9 @@ export function PanelApp() {
     setBranchServices(bs.data || [])
     setLeadNotes(ln.data || [])
     setReminderRules(rr.data || [])
+    setFollowUps(fu.data || [])
+    setFollowUpEvents((fe.data || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || Number(b.id) - Number(a.id)))
+    setFollowUpError(fu.error || fe.error ? followUpWriteError(fu.error || fe.error) : '')
     if (b.data && b.data.length > 0) setAdsSelectedBranch(b.data[0].id)
     setLoaded(true)
 
@@ -3637,6 +3551,16 @@ export function PanelApp() {
     setLeads(prev => prev.filter(l => l.id !== id))
     setLeadNotes(prev => prev.filter(n => n.lead_id !== id))
     setEditingLead(null)
+  }
+  async function saveFollowUp(payload) {
+    const lead = leads.find(item => item.id === payload.p_lead_id)
+    if (!lead || !canManageFollowUp(lead, currentUser, perms.can_edit_any_lead, users)) throw new Error('Bu takip için düzenleme yetkiniz yok. Şube yöneticisinin size ataması gerekebilir.')
+    const { data, error } = await supabase.rpc('manage_lead_followup', payload)
+    if (error || !data?.followup || !data?.event || !data?.lead) throw new Error(followUpWriteError(error))
+    setFollowUps(previous => [data.followup, ...previous.filter(item => item.lead_id !== data.followup.lead_id)])
+    setFollowUpEvents(previous => [data.event, ...previous])
+    setLeads(previous => previous.map(item => item.id === data.lead.id ? data.lead : item))
+    if (data.note) setLeadNotes(previous => [data.note, ...previous])
   }
   async function addAdsWeek(week) {
     const { data } = await supabase.from('ads_data').insert(week).select()
@@ -3756,6 +3680,7 @@ export function PanelApp() {
   async function deleteBranch(id) {
     const branch = branches.find(b => b.id === id)
     if (!branch) return
+    if (followUpError) throw new Error('Takip geçmişi okunamadığı için şube arşivlenemez. Önce bağlantı/kurulum sorununu giderin.')
 
     const archiveId = uid()
     const branchLeads = leads.filter(l => l.branch_id === id)
@@ -3768,16 +3693,19 @@ export function PanelApp() {
 
     // 2) Leads'i arşive kopyala
     if (branchLeads.length > 0) {
-      await supabase.from('archived_leads').insert(
+      const { error: archiveError } = await supabase.from('archived_leads').insert(
         branchLeads.map(l => ({
           id: uid(), archive_id: archiveId, original_lead_id: l.id,
           name: l.name, phone: l.phone, channel: l.channel, service: l.service,
           note: l.note, result: l.result, sale_amount: l.sale_amount,
           sold_at: l.sold_at || null,
+          followup_snapshot: l.followup || null,
+          followup_history: followUpEvents.filter(event => event.lead_id === l.id),
           appointment_at: l.appointment_at, entered_by: l.entered_by, date: l.date,
           edited_at: l.edited_at, last_note_at: l.last_note_at,
         }))
       )
+      if (archiveError) throw new Error('Danışan/takip geçmişi arşivlenemedi. Şube silinmedi.')
     }
 
     // 3) Kullanıcıları arşive kopyala
@@ -4098,7 +4026,7 @@ export function PanelApp() {
               <StatCard icon={<Wallet size={20} />} label="Bu ayki ciro" value={perms.can_see_revenue ? fmtTL(stats.revenue) : 'Gizli'} subtitle={perms.can_see_revenue ? 'Bu ay gerçekleşen satışlar' : 'Ciro görüntüleme yetkisi gerekli'} color="green" />
               <StatCard icon={<TrendingUp size={20} />} label="Ortalama satış" value={perms.can_see_revenue ? fmtTL(stats.avgTicket) : 'Gizli'} subtitle={perms.can_see_revenue ? (stats.withAmountCount ? `${stats.withAmountCount} satış tutarına göre` : 'Satış tutarı henüz yok') : 'Ciro görüntüleme yetkisi gerekli'} color="blue" />
               <StatCard icon={<Megaphone size={20} />} label="Meta ROAS" value={perms.can_see_revenue ? (stats.metaRoas === '—' ? '—' : `${stats.metaRoas}x`) : 'Gizli'} subtitle={perms.can_see_revenue ? 'Meta cirosu / reklam harcaması' : 'Ciro görüntüleme yetkisi gerekli'} color="violet" />
-              <StatCard icon={<ClipboardList size={20} />} label="Takip bekleyen" value={stats.followUpWaiting} subtitle="Hatırlatma gerektiren danışanlar" color="amber" />
+              <StatCard icon={<ClipboardList size={20} />} label="Takip bekleyen" value={followUpError ? '—' : stats.followUpWaiting} subtitle={followUpError ? 'Takip verisi okunamadı' : 'Bugün ve geciken takipler'} color="amber" />
             </div>
 
             {perms.can_see_revenue && <SalesDateNotice sales={monthlySales} />}
@@ -4179,6 +4107,8 @@ export function PanelApp() {
             onSaveRule={saveReminderRule}
             canSeePhone={perms.can_see_phone}
             onOpenLead={(lead) => { setEditingLead(lead); setIsLeadFormOpen(true); setActiveTab('clients') }}
+            users={users} currentUser={currentUser} canEditAny={perms.can_edit_any_lead} canEditLead={canEditLead}
+            followUpEvents={followUpEvents} onSaveFollowUp={saveFollowUp} followUpError={followUpError}
           />
         )}
 
