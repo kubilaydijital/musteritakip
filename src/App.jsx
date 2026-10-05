@@ -6,6 +6,7 @@ import { ExportButtons } from './panel/ExportButtons'
 import { leadsToExportRows } from './panel/exportRows'
 import { FollowUpCenter } from './panel/FollowUpCenter.jsx'
 import { activeFollowUpReminder, canManageFollowUp, fetchFollowUpRows, followUpWriteError } from './lib/followUps.js'
+import { followUpConversionWriteError } from './lib/followUpConversions.js'
 import { leadServiceOptions, leadServiceSelection, resolveLeadFormBranchId } from './lib/leadServices.js'
 import { turkeyDateString } from './lib/booking.js'
 import {
@@ -1241,7 +1242,7 @@ const REMINDER_RULE_LABELS = {
 }
 const REMINDER_RULE_ORDER = ['Randevuya gelmedi', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Satın almadı', 'Randevu aldı']
 
-function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap, canEditRules, isSuperAdmin, filterBranch, activeBranches, branchName, onSaveRule, canSeePhone, onOpenLead, users, currentUser, canEditAny, canEditLead, followUpEvents, onSaveFollowUp, followUpError }) {
+function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap, canEditRules, isSuperAdmin, filterBranch, activeBranches, branchName, onSaveRule, canSeePhone, canSeeRevenue, onOpenLead, users, currentUser, canEditAny, canEditLead, followUpEvents, onSaveFollowUp, followUpError }) {
   const [ruleBranchId, setRuleBranchId] = useState(
     isSuperAdmin ? (filterBranch !== 'all' ? filterBranch : (activeBranches[0]?.id || '')) : null
   )
@@ -1273,7 +1274,7 @@ function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap,
   return (
     <div>
       <FollowUpCenter key={isSuperAdmin ? filterBranch : currentUser.branch_id} leads={leads} leadNotes={leadNotes} users={users} currentUser={currentUser}
-        canEditAny={canEditAny} canSeePhone={canSeePhone} branchName={branchName} showBranch={isSuperAdmin && filterBranch === 'all'}
+        canEditAny={canEditAny} canSeePhone={canSeePhone} canSeeRevenue={canSeeRevenue} branchName={branchName} showBranch={isSuperAdmin && filterBranch === 'all'}
         scopeBranchIds={isSuperAdmin && filterBranch === 'all' ? activeBranches.map(branch => branch.id) : [isSuperAdmin ? filterBranch : currentUser.branch_id].filter(Boolean)}
         getLegacyReminder={lead => legacyStaleness(lead, noteCountMap[lead.id] || 0, ruleMap[`${lead.branch_id}__${lead.result}`] || null)}
         buildWhatsappUrl={buildWhatsappUrl} onOpenLead={onOpenLead} canEditLead={canEditLead}
@@ -3556,10 +3557,13 @@ export function PanelApp() {
   async function saveFollowUp(payload) {
     const lead = leads.find(item => item.id === payload.p_lead_id)
     if (!lead || !canManageFollowUp(lead, currentUser, perms.can_edit_any_lead, users)) throw new Error('Bu takip için düzenleme yetkiniz yok. Şube yöneticisinin size ataması gerekebilir.')
-    const { data, error } = await supabase.rpc('manage_lead_followup', payload)
-    if (error || !data?.followup || !data?.event || !data?.lead) throw new Error(followUpWriteError(error))
+    const conversion = ['appointment', 'sale'].includes(payload.p_action)
+    if (conversion && !canEditLead(lead)) throw new Error('Bu danışanın randevu/satış kaydını düzenleme yetkiniz yok.')
+    const { data, error } = await supabase.rpc(conversion ? 'complete_lead_followup' : 'manage_lead_followup', payload)
+    if (error || !data?.followup || !data?.event || !data?.lead) throw new Error(conversion ? followUpConversionWriteError(error) : followUpWriteError(error))
     setFollowUps(previous => [data.followup, ...previous.filter(item => item.lead_id !== data.followup.lead_id)])
-    setFollowUpEvents(previous => [data.event, ...previous])
+    const newEvents = data.events || [data.event]
+    setFollowUpEvents(previous => [...newEvents, ...previous.filter(item => !newEvents.some(event => String(event.id) === String(item.id)))])
     setLeads(previous => previous.map(item => item.id === data.lead.id ? data.lead : item))
     if (data.note) setLeadNotes(previous => [data.note, ...previous])
   }
@@ -4108,7 +4112,7 @@ export function PanelApp() {
             onSaveRule={saveReminderRule}
             canSeePhone={perms.can_see_phone}
             onOpenLead={(lead) => { setEditingLead(lead); setIsLeadFormOpen(true); setActiveTab('clients') }}
-            users={users} currentUser={currentUser} canEditAny={perms.can_edit_any_lead} canEditLead={canEditLead}
+            users={users} currentUser={currentUser} canEditAny={perms.can_edit_any_lead} canEditLead={canEditLead} canSeeRevenue={perms.can_see_revenue}
             followUpEvents={followUpEvents} onSaveFollowUp={saveFollowUp} followUpError={followUpError}
           />
         )}
