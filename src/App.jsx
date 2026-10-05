@@ -5,6 +5,8 @@ import { T } from './panel/theme'
 import { ExportButtons } from './panel/ExportButtons'
 import { leadsToExportRows } from './panel/exportRows'
 import { FollowUpCenter } from './panel/FollowUpCenter.jsx'
+import { MetaDataHealth } from './panel/MetaDataHealth.jsx'
+import { EMPTY_META_HEALTH, fetchMetaHealth, fetchMetaRows, maskMetaPerformance, metaPeriodHealth } from './lib/metaHealth.js'
 import { activeFollowUpReminder, canManageFollowUp, fetchFollowUpRows, followUpWriteError } from './lib/followUps.js'
 import { followUpConversionWriteError } from './lib/followUpConversions.js'
 import { leadServiceOptions, leadServiceSelection, resolveLeadFormBranchId } from './lib/leadServices.js'
@@ -1451,21 +1453,17 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
 const META_APP_ID_PUBLIC = '2419489471794373' // Public App ID, gizli değil - OAuth URL'inde kullanılır
 const META_REDIRECT_URI = 'https://musteritakip.net/.netlify/functions/meta-oauth-callback'
 
-function MetaConnectionPanel({ branchId, branchName }) {
+function MetaConnectionPanel({ branchId, branchName, healthReport, onSynced }) {
   const [connection, setConnection] = useState(null) // null: yükleniyor, false: bağlı değil, obje: bağlı
+  const [connectionError, setConnectionError] = useState('')
   const [accounts, setAccounts] = useState(null)
   const [selecting, setSelecting] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [msg, setMsg] = useState('')
   const [rangeStart, setRangeStart] = useState(() => {
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    return `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`
+    return `${turkeyDateString().slice(0, 7)}-01`
   })
-  const [rangeEnd, setRangeEnd] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  })
+  const [rangeEnd, setRangeEnd] = useState(() => turkeyDateString())
 
   useEffect(() => {
     if (!branchId) return
@@ -1475,8 +1473,15 @@ function MetaConnectionPanel({ branchId, branchName }) {
 
   async function loadConnection() {
     setConnection(null)
-    const { data } = await supabase.from('meta_connections').select('branch_id, ad_account_id, ad_account_name, token_expires_at').eq('branch_id', branchId).maybeSingle()
-    setConnection(data || false)
+    setConnectionError('')
+    try {
+      const { data, error } = await supabase.rpc('get_meta_connection_health')
+      if (error || !Array.isArray(data)) throw new Error('Bağlantı bilgisi okunamadı. Güncelleme 6 SQL kurulumunu kontrol edip paneli yenileyin.')
+      setConnection(data.find(c => c.branch_id === branchId) || false)
+    } catch (error) {
+      setConnectionError(error.message)
+      setConnection(false)
+    }
   }
 
   function connectMeta() {
@@ -1508,7 +1513,8 @@ function MetaConnectionPanel({ branchId, branchName }) {
       if (!res.ok) throw new Error(data.error)
       setSelecting(false)
       setAccounts(null)
-      loadConnection()
+      await loadConnection()
+      await onSynced?.()
     } catch (err) {
       setMsg('Hesap kaydedilemedi: ' + err.message)
     }
@@ -1526,18 +1532,17 @@ function MetaConnectionPanel({ branchId, branchName }) {
     setFetching(true)
     setMsg('')
     try {
-      const res = await fetch('/.netlify/functions/fetch-meta-insights', {
+      const res = await authenticatedNetlifyFetch('/.netlify/functions/fetch-meta-insights', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ branch_id: branchId, since: rangeStart, until: rangeEnd }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setMsg(data.inserted > 0
-        ? `✅ ${data.since}–${data.until} aralığında ${data.inserted} günlük veri güncellendi.`
-        : `✅ ${data.since}–${data.until} aralığında Meta verisi bulunamadı.`)
+      setMsg(`✅ ${data.since}–${data.until} aralığında ${data.inserted} gün doğrulandı; sıfır sonuçlu günler dahil. Bugünkü sonuçlar geçicidir.`)
     } catch (err) {
       setMsg('Veri çekilemedi: ' + err.message)
     }
+    await onSynced?.()
     setFetching(false)
   }
 
@@ -1545,8 +1550,10 @@ function MetaConnectionPanel({ branchId, branchName }) {
     if (!window.confirm('Meta bağlantısını kesmek istediğinize emin misiniz? Yeniden bağlanmanız gerekecek.')) return
     setMsg('')
     try {
-      await supabase.from('meta_connections').delete().eq('branch_id', branchId)
-      loadConnection()
+      const { error } = await supabase.from('meta_connections').delete().eq('branch_id', branchId)
+      if (error) throw error
+      await loadConnection()
+      await onSynced?.()
     } catch (err) {
       setMsg('Bağlantı kesilemedi: ' + err.message)
     }
@@ -1557,6 +1564,7 @@ function MetaConnectionPanel({ branchId, branchName }) {
       <p style={{ fontSize: 13, color: T.textSoft }}>Meta bağlantı durumu kontrol ediliyor...</p>
     </div>
   }
+  if (connectionError) return <div role="alert" style={{ padding: 16, marginBottom: 16, background: '#FFF8EA', borderRadius: 12 }}>{connectionError}</div>
 
   const expiresAt = connection && connection.token_expires_at ? new Date(connection.token_expires_at) : null
   const validExpiry = expiresAt && !Number.isNaN(expiresAt.getTime())
@@ -1567,6 +1575,7 @@ function MetaConnectionPanel({ branchId, branchName }) {
   return (
     <div style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.1rem', marginBottom: 16 }}>
       <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 4px' }}>📊 Meta Reklam Hesabı — {branchName}</p>
+      {healthReport && <MetaDataHealth report={healthReport} expanded />}
 
       {!connection && (
         <>
@@ -1633,7 +1642,7 @@ function MetaConnectionPanel({ branchId, branchName }) {
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 11.5, color: T.textSoft }}>
               Bitiş
-              <input type="date" value={rangeEnd} min={rangeStart} max={toLocalDateValue(new Date())} onChange={e => setRangeEnd(e.target.value)} style={{ padding: '8px 10px', fontSize: 12.5, minWidth: 145 }} />
+              <input type="date" value={rangeEnd} min={rangeStart} max={turkeyDateString()} onChange={e => setRangeEnd(e.target.value)} style={{ padding: '8px 10px', fontSize: 12.5, minWidth: 145 }} />
             </label>
             <button onClick={fetchInsights} disabled={fetching || tokenExpired} style={{
               padding: '9px 16px', borderRadius: 8, background: T.primary, color: '#fff', border: 'none',
@@ -1642,6 +1651,7 @@ function MetaConnectionPanel({ branchId, branchName }) {
             }}>
               {fetching ? 'Veriler çekiliyor...' : 'Seçili Tarih Aralığını Çek'}
             </button>
+            {!tokenExpired && !tokenExpiringSoon && <button type="button" onClick={connectMeta} style={{ padding: '9px 12px', borderRadius: 8, background: '#fff', color: '#1877F2', border: '1px solid #1877F2', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>Meta bağlantısını yenile</button>}
             <button onClick={disconnectMeta} style={{ padding: '9px 16px', borderRadius: 8, background: 'transparent', color: '#c0392b', border: '1px solid #c0392b', cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
               Bağlantıyı Kes
             </button>
@@ -2347,10 +2357,10 @@ function ReportFunnel({ metrics }) {
           <div key={stage.label}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, marginBottom: 6 }}>
               <span style={{ color: T.textSoft, fontWeight: 650 }}>{stage.label}</span>
-              <span style={{ color: T.text, fontWeight: 800 }}>{stage.value}</span>
+              <span style={{ color: T.text, fontWeight: 800 }}>{stage.value ?? '—'}</span>
             </div>
             <div style={{ height: 8, borderRadius: 999, background: '#EEF0F5', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.max(4, (stage.value / maxValue) * 100)}%`, borderRadius: 'inherit', background: stage.color, transition: 'width .25s ease' }} />
+              <div style={{ height: '100%', width: `${stage.value == null ? 0 : Math.max(4, (stage.value / maxValue) * 100)}%`, borderRadius: 'inherit', background: stage.color, transition: 'width .25s ease' }} />
             </div>
           </div>
         ))}
@@ -2359,7 +2369,7 @@ function ReportFunnel({ metrics }) {
   )
 }
 
-function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branchName, showBranch }) {
+function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branchName, showBranch, metaHealth, metaBranches, adsError, onReviewMeta }) {
   const now = new Date(`${turkeyDateString()}T12:00:00`)
   const [range, setRange] = useState('this_month')
   const [customStart, setCustomStart] = useState(() => dateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
@@ -2393,6 +2403,7 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
   const periodLeads = useMemo(() => leads.filter(lead => isInReportPeriod(lead.date, period.start, period.end)), [leads, period])
   const periodSales = useMemo(() => salesInPeriod(leads, period.start, period.end), [leads, period])
   const periodAds = useMemo(() => adsData.filter(ad => isInReportPeriod(ad.date, period.start, period.end)), [adsData, period])
+  const metaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: adsData, start: period.start, end: period.end, adsError })
   const messageAudit = useMemo(() => buildMessageComparison(periodAds, periodLeads), [periodAds, periodLeads])
   const exportLeads = useMemo(() => {
     const includedIds = new Set([...periodLeads, ...periodSales].map(lead => lead.id))
@@ -2401,12 +2412,14 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
 
   const metrics = useMemo(() => {
     const spend = periodAds.reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
-    const messages = periodAds.reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
+    const metaAds = periodAds.filter(ad => ad.channel === 'Meta (Otomatik)')
+    const messages = metaAds.reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
+    const metaSpend = metaAds.reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
     const appointments = periodLeads.filter(lead => lead.appointment_at || lead.result === 'Randevu aldı').length
     const summary = summarizeSales(periodSales)
     return { spend, messages, records: periodLeads.length, appointments, sales: summary.count,
       cohortSales: periodLeads.filter(lead => lead.result === 'Müşteri oldu').length,
-      revenue: summary.revenue, roas: spend > 0 ? (summary.revenue / spend).toFixed(1) : '—' }
+      revenue: summary.revenue, metaSpend, roas: metaSpend > 0 ? (summary.metaRevenue / metaSpend).toFixed(1) : '—' }
   }, [periodAds, periodLeads, periodSales])
 
   const insights = useMemo(() => {
@@ -2456,27 +2469,28 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
         <span style={{ marginLeft: 'auto', color: T.textFaint, fontSize: 12, fontWeight: 650 }}>{period.label}</span>
       </div>
 
+      <MetaDataHealth report={metaReport} onReview={onReviewMeta} />
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(6, minmax(0, 1fr))', gap: 11, marginBottom: 16 }}>
-        <ReportMetricCard icon={<Wallet size={15} />} label="Reklam harcaması" value={fmtTL(metrics.spend)} detail="Seçilen dönem" color={T.primary} />
-        <ReportMetricCard icon={<MessageCircle size={15} />} label="Meta mesaj" value={metrics.messages} detail="Reklam kaynaklı" color="#8B5CF6" />
+        <ReportMetricCard icon={<Wallet size={15} />} label="Reklam harcaması" value={metaReport.ready ? fmtTL(metrics.spend) : '—'} detail={metaReport.ready ? (metaReport.provisional ? 'Bugün geçici' : 'Seçilen dönem') : 'Meta verisi eksik'} color={T.primary} />
+        <ReportMetricCard icon={<MessageCircle size={15} />} label="Meta mesaj" value={metaReport.ready ? metrics.messages : '—'} detail={metaReport.ready ? 'Reklam kaynaklı' : 'Veri doğrulanmadı'} color="#8B5CF6" />
         <ReportMetricCard icon={<CalendarDays size={15} />} label="Randevu" value={metrics.appointments} detail={`${metrics.records} sistem kaydı`} color="#E5A536" />
         <ReportMetricCard icon={<ShoppingCart size={15} />} label="Satış" value={metrics.sales} detail="Bu dönemde gerçekleşen" color={T.green} />
         <ReportMetricCard icon={<TrendingUp size={15} />} label="Ciro" value={fmtTL(metrics.revenue)} detail="Satış tarihine göre" color="#2F7FD1" />
-        <ReportMetricCard icon={<Megaphone size={15} />} label="ROAS" value={metrics.roas === '—' ? '—' : `${metrics.roas}x`} detail="Ciro / reklam harcaması" color="#A66B17" />
+        <ReportMetricCard icon={<Megaphone size={15} />} label="Meta ROAS" value={!metaReport.ready || metrics.roas === '—' ? '—' : `${metrics.roas}x`} detail={!metaReport.ready ? 'Meta verisi eksik' : metrics.metaSpend === 0 ? 'Harcama yok; ROAS yok' : metaReport.provisional ? 'Bugün geçici' : 'Meta ciro / Meta harcama'} color="#A66B17" />
       </div>
 
       <SalesDateNotice sales={periodSales} />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '0.9fr 1.1fr', gap: 16, marginBottom: 16 }}>
-        <div style={{ ...cardStyle, padding: '1.15rem' }}><ReportFunnel metrics={metrics} /></div>
+        <div style={{ ...cardStyle, padding: '1.15rem' }}><ReportFunnel metrics={{ ...metrics, messages: metaReport.ready ? metrics.messages : null }} /></div>
         <div style={{ ...cardStyle, padding: '1.15rem' }}>
           <p style={{ fontSize: 14, color: T.text, margin: '0 0 4px', fontWeight: 750 }}>Dönem özeti</p>
           <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 16px' }}>Öne çıkan performans ve takip edilmesi gereken konu.</p>
           <div style={{ display: 'grid', gap: 13 }}>
             <div><div style={{ color: T.textFaint, fontSize: 11, fontWeight: 700 }}>EN ÇOK CİRO GETİREN HİZMET</div><div style={{ color: T.text, fontWeight: 750, fontSize: 14, marginTop: 3 }}>{insights.topService ? `${insights.topService} · ${fmtTL(insights.topRevenue)}` : 'Bu dönemde satış kaydı yok'}</div></div>
-            <div><div style={{ color: T.textFaint, fontSize: 11, fontWeight: 700 }}>EN ÇOK MESAJ GETİREN KANAL</div><div style={{ color: T.text, fontWeight: 750, fontSize: 14, marginTop: 3 }}>{insights.topChannel ? `${insights.topChannel} · ${insights.topMessages} mesaj` : 'Bu dönemde reklam mesajı yok'}</div></div>
+            <div><div style={{ color: T.textFaint, fontSize: 11, fontWeight: 700 }}>EN ÇOK MESAJ GETİREN KANAL</div><div style={{ color: T.text, fontWeight: 750, fontSize: 14, marginTop: 3 }}>{!metaReport.ready ? 'Meta verisi doğrulanmadan karşılaştırılamaz' : insights.topChannel ? `${insights.topChannel} · ${insights.topMessages} mesaj` : 'Bu dönemde reklam mesajı yok'}</div></div>
             <div style={{ padding: '10px 11px', borderRadius: 10, background: messageAudit.gap > 0 ? '#FFF7E8' : '#F4F5F8', color: messageAudit.gap > 0 ? T.orange : T.textSoft, fontSize: 12.5, fontWeight: 700 }}>
-              {!messageAudit.hasMetaData ? 'Bu dönemde Meta mesaj verisi bulunmuyor; mesaj–kayıt karşılaştırması yapılamıyor.' : messageAudit.gap > 0 ? `${messageAudit.gap} sayısal fark kontrol edilmeli; bu kesin kayıp müşteri sayısı değildir.` : 'Pozitif günlük fark görünmüyor; kişi bazında eşleşme anlamına gelmez.'}
+              {!metaReport.ready ? 'Meta verisi eksik; eksik veri üzerinden kayıp müşteri yorumu yapılmaz.' : !messageAudit.hasMetaData ? 'Bu dönemde Meta mesaj verisi bulunmuyor; mesaj–kayıt karşılaştırması yapılamıyor.' : messageAudit.gap > 0 ? `${messageAudit.gap} sayısal fark kontrol edilmeli; bu kesin kayıp müşteri sayısı değildir.` : 'Pozitif günlük fark görünmüyor; kişi bazında eşleşme anlamına gelmez.'}
             </div>
           </div>
         </div>
@@ -2491,13 +2505,13 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
         {periodAds.length > 0 && (
           <div style={{ ...cardStyle, padding: '1.15rem' }}>
             <p style={{ fontSize: 14, color: T.text, margin: '0 0 4px', fontWeight: 750 }}>Günlük reklam harcaması</p>
-            <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>{period.label} içindeki harcama seyri.</p>
+            <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>{period.label} içindeki {metaReport.ready ? (metaReport.provisional ? 'bugünü geçici olan' : 'doğrulanmış') : 'eksik/doğrulanmamış'} harcama seyri.</p>
             <MonthlySpendChart adsData={periodAds} />
           </div>
         )}
       </div>
 
-      <MessageMatchReport audit={messageAudit} />
+      {metaReport.ready && <MessageMatchReport audit={messageAudit} />}
     </div>
   )
 }
@@ -3012,7 +3026,7 @@ function FunnelSection({ stats, isMobile }) {
           fontSize: 12,
           fontWeight: 700
         }}>
-          Meta'dan satışa dönüşüm %{stats.rate}
+          {stats.rate == null ? 'Meta dönüşümü hesaplanamıyor' : `Meta'dan satışa dönüşüm %${stats.rate}`}
         </span>
       </div>
 
@@ -3056,7 +3070,7 @@ function FunnelSection({ stats, isMobile }) {
                   color: T.text,
                   letterSpacing: '-0.03em'
                 }}>
-                  {s.value}
+                  {s.value ?? '—'}
                 </p>
                 <div style={{ minHeight: 27, marginTop: 8 }}>
                   {stageRates[i] != null && (
@@ -3183,7 +3197,7 @@ function MonthlyTrendChart({ leads }) {
   return <div style={{ position: 'relative', width: '100%', height: 176 }}><canvas ref={ref} /></div>
 }
 
-function AdsPerformanceTable({ adsData, leads, isMobile }) {
+function AdsPerformanceTable({ adsData, leads, isMobile, metaReady = false, canSeeRevenue = false }) {
   const rows = useMemo(() => {
     // Kartın başlığındaki “Bu Ay” ifadesi gerçek bir takvim ayını anlatır.
     // Geçmiş reklam ve danışan kayıtlarını silmeden, yalnızca bu hesaptan hariç tutuyoruz.
@@ -3213,7 +3227,7 @@ function AdsPerformanceTable({ adsData, leads, isMobile }) {
       const sales = attributedSales.length
       const spend = byChannel[ch].spend
       const revenue = attributedSales.reduce((sum, lead) => sum + (Number(lead.sale_amount) || 0), 0)
-      const roas = spend > 0 ? (revenue / spend).toFixed(1) : '—'
+      const roas = canSeeRevenue && (ch !== 'Meta (Otomatik)' || metaReady) && spend > 0 ? (revenue / spend).toFixed(1) : '—'
       return {
         channel: ch,
         label: ch === 'Meta (Otomatik)' ? 'Meta reklamları' : ch,
@@ -3221,9 +3235,9 @@ function AdsPerformanceTable({ adsData, leads, isMobile }) {
         spend, messages: byChannel[ch].messages, sales, revenue, roas
       }
     }).sort((a, b) => b.spend - a.spend)
-  }, [adsData, leads])
+  }, [adsData, leads, metaReady, canSeeRevenue])
 
-  if (rows.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>Bu ay için henüz reklam verisi yok.</p>
+  if (rows.length === 0) return <p style={{ fontSize: 13, color: T.textSoft }}>{metaReady ? 'Bu ay için reklam sonucu yok.' : 'Bu ayın Meta verisi henüz doğrulanmadı. Reklam Kaynakları’ndan seçili dönemi çekin.'}</p>
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
@@ -3237,8 +3251,8 @@ function AdsPerformanceTable({ adsData, leads, isMobile }) {
             <span style={{ color: r.roas !== '—' && Number(r.roas) >= 2 ? T.green : T.orange, fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap' }}>{r.roas}{r.roas !== '—' ? 'x ROAS' : ''}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-            <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>HARCAMA</div><div style={{ color: T.text, fontWeight: 800, fontSize: isMobile ? 14 : 15, marginTop: 3 }}>{fmtTL(Math.round(r.spend))}</div></div>
-            <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>MESAJ</div><div style={{ color: T.text, fontWeight: 800, fontSize: isMobile ? 16 : 18, marginTop: 3 }}>{r.messages}</div></div>
+            <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>HARCAMA</div><div style={{ color: T.text, fontWeight: 800, fontSize: isMobile ? 14 : 15, marginTop: 3 }}>{r.channel === 'Meta (Otomatik)' && !metaReady ? '—' : fmtTL(Math.round(r.spend))}</div></div>
+            <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>MESAJ</div><div style={{ color: T.text, fontWeight: 800, fontSize: isMobile ? 16 : 18, marginTop: 3 }}>{r.channel === 'Meta (Otomatik)' && !metaReady ? '—' : r.messages}</div></div>
             <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>META SATIŞ</div><div style={{ color: r.sales > 0 ? T.green : T.text, fontWeight: 800, fontSize: isMobile ? 16 : 18, marginTop: 3 }}>{r.sales}</div></div>
           </div>
         </div>
@@ -3335,6 +3349,8 @@ export function PanelApp() {
   const [reminderRules, setReminderRules] = useState([])
   const [leadNotes, setLeadNotes] = useState([])
   const [adsData, setAdsData] = useState([])
+  const [metaHealth, setMetaHealth] = useState(EMPTY_META_HEALTH)
+  const [adsError, setAdsError] = useState('')
   const [templates, setTemplates] = useState([])
   const [branchServices, setBranchServices] = useState([])
   const [loaded, setLoaded] = useState(false)
@@ -3475,22 +3491,25 @@ export function PanelApp() {
 
   async function loadAll() {
     setLoaded(false)
-    const [b, u, l, a, t, bs, ln, rr, fu, fe] = await Promise.all([
+    const [b, u, l, a, t, bs, ln, rr, fu, fe, mh] = await Promise.all([
       supabase.from('branches').select('*').order('name'),
       supabase.from('app_users').select('*'),
       fetchFollowUpRows(supabase, 'leads'),
-      supabase.from('ads_data').select('*').order('date', { ascending: false }),
+      fetchMetaRows(supabase, 'ads_data'),
       supabase.from('permission_templates').select('*'),
       supabase.from('branch_services').select('*').order('name'),
       supabase.from('lead_notes').select('*').order('created_at', { ascending: false }),
       supabase.from('reminder_rules').select('*'),
       fetchFollowUpRows(supabase, 'lead_followups'),
-      fetchFollowUpRows(supabase, 'lead_followup_events')
+      fetchFollowUpRows(supabase, 'lead_followup_events'),
+      fetchMetaHealth(supabase)
     ])
     setBranches(b.data || [])
     setUsers(u.data || [])
     setLeads((l.data || []).sort((a, b) => new Date(b.date) - new Date(a.date)))
     setAdsData(a.data || [])
+    setAdsError(a.error ? 'Reklam kayıtları tam okunamadı. Bağlantıyı kontrol edip paneli yenileyin.' : '')
+    setMetaHealth(mh)
     setTemplates(t.data || [])
     setBranchServices(bs.data || [])
     setLeadNotes(ln.data || [])
@@ -3508,6 +3527,13 @@ export function PanelApp() {
         logoutAndClear()
       }
     }
+  }
+
+  async function refreshMetaData() {
+    const [ads, health] = await Promise.all([fetchMetaRows(supabase, 'ads_data'), fetchMetaHealth(supabase)])
+    if (!ads.error) setAdsData(ads.data)
+    setAdsError(ads.error ? 'Çekim sonrası reklam kayıtları okunamadı. Paneli yenileyin; eski ekran verisini güncel kabul etmeyin.' : '')
+    setMetaHealth(health)
   }
 
   async function addLead(lead) {
@@ -3850,9 +3876,12 @@ export function PanelApp() {
   const monthlySales = salesInPeriod(scopedLeads, currentPeriodStart, currentPeriodEnd)
   const previousPeriodSales = salesInPeriod(scopedLeads, previousPeriodStart, previousPeriodEnd)
   const monthlySalesSummary = summarizeSales(monthlySales)
-  const currentPerformance = buildPeriodPerformance(monthlyLeads, currentPeriodAds, monthlySales)
-  const previousPerformance = buildPeriodPerformance(previousPeriodLeads, previousPeriodAds, previousPeriodSales)
-  const metaMessages = currentPerformance.metaMessages
+  const metaBranches = isSuperAdmin && filterBranch === 'all' ? branches : branches.filter(b => b.id === relevantBranchId)
+  const currentMetaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: scopedAds, start: currentPeriodStart, end: currentPeriodEnd, adsError })
+  const previousMetaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: scopedAds, start: previousPeriodStart, end: previousPeriodEnd, adsError })
+  const currentPerformance = maskMetaPerformance(buildPeriodPerformance(monthlyLeads, currentPeriodAds, monthlySales), currentMetaReport)
+  const previousPerformance = maskMetaPerformance(buildPeriodPerformance(previousPeriodLeads, previousPeriodAds, previousPeriodSales), previousMetaReport)
+  const metaMessages = currentMetaReport.ready ? currentPerformance.metaMessages : null
   const metaSpend = currentPerformance.metaSpend
   const customers = monthlyLeads.filter(l => l.result === 'Müşteri oldu')
   const { revenue, avgTicket, metaRevenue } = monthlySalesSummary
@@ -3876,13 +3905,13 @@ export function PanelApp() {
     ig: monthlyLeads.filter(l => l.channel === 'Instagram').length,
     wa: monthlyLeads.filter(l => l.channel === 'WhatsApp').length,
     organik: monthlyLeads.filter(l => l.channel === 'Organik').length,
-    rate: metaMessages ? Math.round((customers.length / metaMessages) * 100) : 0,
+    rate: metaMessages ? Math.round((customers.length / metaMessages) * 100) : null,
     revenue, avgTicket, withAmountCount: monthlySalesSummary.withAmountCount,
-    metaRoas: metaSpend > 0 ? (metaRevenue / metaSpend).toFixed(1) : '—',
+    metaRoas: currentMetaReport.ready && metaSpend > 0 ? (metaRevenue / metaSpend).toFixed(1) : '—',
     followUpWaiting,
     appointed: appointed.length, arrived: arrived.length,
     noShowCount: noShow.length, notBoughtCount: notBought.length, noResponseCount: noResponse.length,
-    pctAppointmentFromMeta: metaMessages ? Math.round((appointed.length / metaMessages) * 100) : 0,
+    pctAppointmentFromMeta: metaMessages ? Math.round((appointed.length / metaMessages) * 100) : null,
     pctAppointed: monthlyLeads.length ? Math.round((appointed.length / monthlyLeads.length) * 100) : 0,
     pctArrived: appointed.length ? Math.round((arrived.length / appointed.length) * 100) : 0,
     pctSold: appointed.length ? Math.round((customers.length / appointed.length) * 100) : 0,
@@ -3896,7 +3925,7 @@ export function PanelApp() {
     current: Number.isFinite(current) ? formatter(current) : '—',
     previous: Number.isFinite(previous) ? formatter(previous) : '—',
     delta: relativePercentChange(current, previous),
-    isNew: Number.isFinite(current) && current > 0 && (!Number.isFinite(previous) || previous === 0),
+    isNew: Number.isFinite(current) && current > 0 && Number.isFinite(previous) && previous === 0,
   })
   const revenueChange = relativePercentChange(currentPerformance.revenue, previousPerformance.revenue)
   const appointmentChange = relativePercentChange(currentPerformance.appointments, previousPerformance.appointments)
@@ -4020,6 +4049,7 @@ export function PanelApp() {
               {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
               {' · '}{now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })} · Ciro satış tarihine, huni kayıt açılış tarihine göre
             </p>
+            <MetaDataHealth report={currentMetaReport} onReview={perms.can_enter_ads_data ? () => setActiveTab('ads') : undefined} />
             <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} ruleMap={reminderRuleMap} onViewAll={() => setActiveTab('opportunities')} />
 
             <div style={{
@@ -4030,7 +4060,7 @@ export function PanelApp() {
             }}>
               <StatCard icon={<Wallet size={20} />} label="Bu ayki ciro" value={perms.can_see_revenue ? fmtTL(stats.revenue) : 'Gizli'} subtitle={perms.can_see_revenue ? 'Bu ay gerçekleşen satışlar' : 'Ciro görüntüleme yetkisi gerekli'} color="green" />
               <StatCard icon={<TrendingUp size={20} />} label="Ortalama satış" value={perms.can_see_revenue ? fmtTL(stats.avgTicket) : 'Gizli'} subtitle={perms.can_see_revenue ? (stats.withAmountCount ? `${stats.withAmountCount} satış tutarına göre` : 'Satış tutarı henüz yok') : 'Ciro görüntüleme yetkisi gerekli'} color="blue" />
-              <StatCard icon={<Megaphone size={20} />} label="Meta ROAS" value={perms.can_see_revenue ? (stats.metaRoas === '—' ? '—' : `${stats.metaRoas}x`) : 'Gizli'} subtitle={perms.can_see_revenue ? 'Meta cirosu / reklam harcaması' : 'Ciro görüntüleme yetkisi gerekli'} color="violet" />
+              <StatCard icon={<Megaphone size={20} />} label="Meta ROAS" value={perms.can_see_revenue ? (stats.metaRoas === '—' ? '—' : `${stats.metaRoas}x`) : 'Gizli'} subtitle={perms.can_see_revenue ? (!currentMetaReport.ready ? 'Meta verisi eksik' : currentMetaReport.provisional ? 'Bugün geçici · son çekime göre' : 'Meta cirosu / reklam harcaması') : 'Ciro görüntüleme yetkisi gerekli'} color="violet" />
               <StatCard icon={<ClipboardList size={20} />} label="Takip bekleyen" value={followUpError ? '—' : stats.followUpWaiting} subtitle={followUpError ? 'Takip verisi okunamadı' : 'Bugün ve geciken takipler'} color="amber" />
             </div>
 
@@ -4059,7 +4089,7 @@ export function PanelApp() {
                 <div style={{ ...cardStyle, padding: '1.1rem' }}>
                   <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 4px', fontWeight: 800 }}>Meta reklam özeti</p>
                   <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>Bu ayın harcama, mesaj, Meta kaynaklı satış ve ROAS sonucu.</p>
-                  <AdsPerformanceTable adsData={scopedAds} leads={monthlySales} isMobile={isMobile} />
+                  <AdsPerformanceTable adsData={scopedAds} leads={monthlySales} isMobile={isMobile} metaReady={currentMetaReport.ready} canSeeRevenue={perms.can_see_revenue} />
                 </div>
               )}
             </div>
@@ -4247,6 +4277,8 @@ export function PanelApp() {
             canExport={isSuperAdmin || perms.can_export_data}
             branchName={branchName}
             showBranch={isSuperAdmin && filterBranch === 'all'}
+            metaHealth={metaHealth} metaBranches={metaBranches} adsError={adsError}
+            onReviewMeta={perms.can_enter_ads_data ? () => setActiveTab('ads') : undefined}
           />
         )}
 
@@ -4259,7 +4291,10 @@ export function PanelApp() {
               <AdsBranchSelector branches={activeBranches.filter(b => b.id === currentUser.branch_id)} selectedBranch={currentUser.branch_id} onSelectBranch={() => {}} isMobile={isMobile} />
             )}
             {(isSuperAdmin ? adsSelectedBranch : currentUser.branch_id) && (
-              <MetaConnectionPanel branchId={isSuperAdmin ? adsSelectedBranch : currentUser.branch_id} branchName={branchName(isSuperAdmin ? adsSelectedBranch : currentUser.branch_id)} />
+              <MetaConnectionPanel key={isSuperAdmin ? adsSelectedBranch : currentUser.branch_id}
+                branchId={isSuperAdmin ? adsSelectedBranch : currentUser.branch_id} branchName={branchName(isSuperAdmin ? adsSelectedBranch : currentUser.branch_id)}
+                healthReport={metaPeriodHealth({ health: metaHealth, branches: branches.filter(b => b.id === (isSuperAdmin ? adsSelectedBranch : currentUser.branch_id)), ads: adsData, start: currentPeriodStart, end: currentPeriodEnd, adsError })}
+                onSynced={refreshMetaData} />
             )}
           </div>
         )}
