@@ -88,7 +88,7 @@ export function followUpWriteError(error) {
 
 // Supabase'in tek sorgu satır sınırı eski/kapalı takipleri sessizce düşürmesin.
 export async function fetchFollowUpRows(client, table) {
-  if (!['lead_followups', 'lead_followup_events'].includes(table)) throw new Error('Geçersiz takip tablosu')
+  if (!['leads', 'lead_followups', 'lead_followup_events'].includes(table)) throw new Error('Geçersiz takip tablosu')
   const rows = []
   try {
     for (let offset = 0; ;) {
