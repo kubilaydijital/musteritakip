@@ -13,6 +13,7 @@ import { leadServiceOptions, leadServiceSelection, resolveLeadFormBranchId } fro
 import { turkeyDateString } from './lib/booking.js'
 import {
   buildMessageComparison, isInReportPeriod, leadWriteError, reportingDayKey,
+  hasMissingSaleAmount, parseSaleAmountInput, saleAmountError,
   saleDateError, salesInPeriod, savedSaleAt, summarizeSales, turkeyDayStart,
 } from './lib/salesReporting.js'
 import {
@@ -521,6 +522,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [noteErr, setNoteErr] = useState('')
   const [appointmentErr, setAppointmentErr] = useState('')
   const [saleAmountErr, setSaleAmountErr] = useState('')
+  const saleAmountRef = useRef(null)
   const [saleDateErr, setSaleDateErr] = useState('')
   const [saveErr, setSaveErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -579,18 +581,18 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     else setNoteErr('')
     if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
     else setAppointmentErr('')
-    const saleAmount = form.saleAmount.trim() === '' ? null : Number(form.saleAmount.replace(/\./g, ''))
-    if (form.result === 'Müşteri oldu' && (!Number.isFinite(saleAmount) || saleAmount <= 0)) {
-      setSaleAmountErr('Müşteri oldu seçildiğinde satış tutarı girilmesi zorunludur.')
-      ok = false
-    } else {
-      setSaleAmountErr('')
-    }
+    const saleAmount = parseSaleAmountInput(form.saleAmount)
+    const amountError = saleAmountError(form.result, saleAmount)
+    setSaleAmountErr(amountError)
+    if (amountError) ok = false
     const dateError = saleDateError(form.result, form.saleDate, editing)
     setSaleDateErr(dateError)
     if (dateError) ok = false
     if (!form.name.trim()) ok = false
-    if (!ok) return
+    if (!ok) {
+      if (amountError) saleAmountRef.current?.focus()
+      return
+    }
 
     const cleanPhone = phoneIsEffectivelyEmpty ? '' : phoneTrimmed
 
@@ -712,14 +714,17 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       </div>
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
-          <input placeholder="Satış tutarı (TL) — zorunlu" value={form.saleAmount} onChange={e => {
-            const digits = e.target.value.replace(/\D/g, '')
-            const formatted = digits ? Number(digits).toLocaleString('tr-TR') : ''
-            set('saleAmount', formatted)
+          {hasMissingSaleAmount(editing) && <div role="status" style={{ fontSize: 12, color: '#854F0B', background: '#FCF3DE', border: '1px solid #EED5A6', borderRadius: 8, padding: '9px 11px', marginBottom: 9, lineHeight: 1.5 }}>Bu satışın tutarı eksik veya geçersiz. Kaydı güncellemek için gerçek satış tutarını girin. Sistem eski kaydı silmez veya tutar tahmin etmez.</div>}
+          <label htmlFor="lead-sale-amount" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, margin: '0 0 5px' }}>Satış tutarı (TL) — zorunlu</label>
+          <input id="lead-sale-amount" ref={saleAmountRef} autoFocus={hasMissingSaleAmount(editing)} placeholder="Satış tutarı (TL) — zorunlu" value={form.saleAmount} onChange={e => {
+            set('saleAmount', e.target.value)
             setSaleAmountErr('')
-          }} type="text" inputMode="numeric" aria-required="true" aria-invalid={Boolean(saleAmountErr)} style={{ ...inputStyle, width: '100%', borderColor: saleAmountErr ? '#c0392b' : undefined }} />
-          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Müşteri oldu seçildiğinde satış tutarı zorunludur.</p>
-          {saleAmountErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{saleAmountErr}</p>}
+          }} onBlur={() => {
+            const amount = parseSaleAmountInput(form.saleAmount)
+            if (amount != null) set('saleAmount', amount.toLocaleString('tr-TR', { maximumFractionDigits: 2 }))
+          }} type="text" inputMode="decimal" aria-required="true" aria-describedby={saleAmountErr ? 'lead-sale-amount-error' : 'lead-sale-amount-help'} aria-invalid={Boolean(saleAmountErr)} style={{ ...inputStyle, width: '100%', borderColor: saleAmountErr ? '#c0392b' : undefined }} />
+          <p id="lead-sale-amount-help" style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>Boş veya 0 TL ile satış tamamlanamaz. Örnek: 15.000 veya 15.000,50 TL. Kuruş için virgül kullanın.</p>
+          {saleAmountErr && <div id="lead-sale-amount-error" role="alert" style={{ fontSize: 12, color: '#a32d2d', background: '#fff1f0', border: '1px solid #f2b8b5', borderRadius: 8, padding: '9px 11px', margin: '6px 0 0', lineHeight: 1.5 }}>{saleAmountErr}</div>}
           <label htmlFor="lead-sale-date" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, margin: '12px 0 5px' }}>Satışın gerçekleştiği tarih</label>
           <input id="lead-sale-date" type="date" value={form.saleDate} max={turkeyDateString()}
             onChange={e => { set('saleDate', e.target.value); setSaleDateErr('') }}
@@ -1368,16 +1373,78 @@ function buildWhatsappUrl(lead) {
   return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
 }
 
+function clientListData(leads, { search = '', statusFilter = 'all', sort = 'priority' } = {}) {
+  const normalizedSearch = search.trim().toLocaleLowerCase('tr')
+  const counts = leads.reduce((result, lead) => {
+    const status = getAppointmentStatus(lead)
+    result[status] = (result[status] || 0) + 1
+    if (hasMissingSaleAmount(lead)) result.missing_amount = (result.missing_amount || 0) + 1
+    return result
+  }, {})
+  const rows = leads.filter(lead => {
+    if (statusFilter === 'missing_amount') {
+      if (!hasMissingSaleAmount(lead)) return false
+    } else if (statusFilter !== 'all' && getAppointmentStatus(lead) !== statusFilter) return false
+    return !normalizedSearch || [lead.name, lead.phone, lead.service, lead.channel, lead.note]
+      .some(value => String(value || '').toLocaleLowerCase('tr').includes(normalizedSearch))
+  }).sort((a, b) => {
+    if (sort === 'newest') return new Date(b.date) - new Date(a.date)
+    const priority = { needs_result: 0, upcoming: 1, no_show: 2, not_bought: 3, awaiting_reply: 4, customer: 5 }
+    const rank = priority[getAppointmentStatus(a)] - priority[getAppointmentStatus(b)]
+    if (rank !== 0) return rank
+    return new Date(b.appointment_at || b.date) - new Date(a.appointment_at || a.date)
+  })
+  return { counts, rows }
+}
+
+function ClientStatusFilters({ counts, total, selected, onSelect }) {
+  return <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
+    {[
+      ['all', 'Tümü'], ['needs_result', 'Sonuç bekliyor'], ['upcoming', 'Yaklaşan'],
+      ['customer', 'Müşteri oldu'], ['missing_amount', 'Tutar girilmemiş'], ['no_show', 'Gelmedi'],
+    ].map(([value, label]) => {
+      const active = selected === value
+      const config = value === 'missing_amount' ? { color: '#854F0B', bg: '#FCF3DE' } : APPOINTMENT_STATUS[value]
+      const count = value === 'all' ? total : (counts[value] || 0)
+      return <button key={value} type="button" onClick={() => onSelect(value)} aria-pressed={active} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 99, padding: '6px 10px',
+        border: active ? `1px solid ${config?.color || T.primary}` : `1px solid ${T.border}`,
+        background: active ? (config?.bg || T.primaryLight) : '#fff', color: active ? (config?.color || T.primary) : T.textSoft,
+        fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+      }}>
+        {config && <span style={{ width: 6, height: 6, borderRadius: '50%', background: config.color }} />}
+        {label} <span style={{ opacity: .72 }}>{count}</span>
+      </button>
+    })}
+  </div>
+}
+
+function MissingSaleAmountNotice({ count, filtered, onFilter }) {
+  if (!count) return null
+  return <div role="status" style={{ background: '#FCF3DE', border: '1px solid #EED5A6', borderRadius: 9, padding: '11px 13px', marginBottom: 14, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+    <div style={{ flex: '1 1 230px', minWidth: 0, color: '#854F0B', fontSize: 12, lineHeight: 1.5 }}>
+      <strong>{count} satış kaydında geçerli tutar yok.</strong><br />
+      {filtered ? 'Bu listede tutarı boş, sıfır veya geçersiz satışlar var. Yetkiniz varsa “Tutar gir” ile gerçek tutarı tamamlayın.' : 'Eski satışların tutarını tamamlayın. Yeni ve düzenlenen satışlar geçerli tutar olmadan kaydedilemez.'}
+      {' '}Gerçek tutar bilinmiyorsa 1 TL gibi geçici bir değer yazmayın.
+    </div>
+    {!filtered && <button type="button" onClick={onFilter} style={{ border: '1px solid #D4AE67', borderRadius: 8, padding: '7px 10px', color: '#854F0B', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Eksik tutarları aç</button>}
+  </div>
+}
+
 function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, isMobile, noteCount = 0, rule = null }) {
   const followUp = staleness(lead, noteCount, rule)
   const status = getAppointmentStatus(lead)
   const appointment = lead.appointment_at ? new Date(lead.appointment_at) : null
   const hasAppointment = appointment && !Number.isNaN(appointment.getTime())
   const whatsappUrl = canSeePhone ? buildWhatsappUrl(lead) : null
+  const missingAmount = hasMissingSaleAmount(lead)
 
   let nextStep = 'Kayıt bekliyor'
   let nextStepColor = T.textSoft
-  if (lead.followup?.closed_at) {
+  if (missingAmount) {
+    nextStep = 'Satış tutarını tamamla'
+    nextStepColor = T.orange
+  } else if (lead.followup?.closed_at) {
     nextStep = `Takip kapalı · ${lead.followup.close_reason}`
   } else if (lead.followup?.next_followup_at) {
     nextStep = `Takip · ${new Date(lead.followup.next_followup_at).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
@@ -1401,7 +1468,7 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
     <button onClick={() => onEdit(lead)} style={{
       border: `1px solid ${T.border}`, background: '#fff', color: T.text, borderRadius: 8,
       padding: isMobile ? '6px 9px' : '7px 10px', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
-    }}>Detay</button>
+    }}>{missingAmount ? 'Tutar gir' : 'Detay'}</button>
   ) : null
 
   if (isMobile) {
@@ -1416,7 +1483,7 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
         </div>
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
           <AppointmentStatusBadge status={status} compact />
-          {lead.sale_amount != null && <span style={{ fontSize: 11, fontWeight: 700, color: T.green, background: T.greenBg, padding: '3px 8px', borderRadius: 99 }}>{fmtTL(lead.sale_amount)}</span>}
+          {missingAmount ? <span style={{ fontSize: 11, fontWeight: 700, color: '#854F0B', background: '#FCF3DE', padding: '3px 8px', borderRadius: 99 }}>Tutar girilmemiş</span> : lead.sale_amount != null && <span style={{ fontSize: 11, fontWeight: 700, color: T.green, background: T.greenBg, padding: '3px 8px', borderRadius: 99 }}>{fmtTL(lead.sale_amount)}</span>}
           {whatsappUrl && <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" style={{ color: T.green, fontSize: 12, textDecoration: 'none', fontWeight: 700 }}>WhatsApp</a>}
         </div>
         <p style={{ margin: '8px 0 0', color: nextStepColor, fontSize: 12.5, fontWeight: 600 }}>{nextStep}</p>
@@ -1442,9 +1509,9 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
         <p style={{ color: T.text, margin: 0, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lead.service || 'Hizmet belirtilmedi'}</p>
         <p style={{ color: T.textSoft, margin: '3px 0 0', fontSize: 11.5 }}>{lead.channel}</p>
       </div>
-      <span><AppointmentStatusBadge status={status} compact /></span>
+      <span><AppointmentStatusBadge status={status} compact />{missingAmount && <span style={{ display: 'block', color: '#854F0B', fontSize: 11, fontWeight: 700, marginTop: 5 }}>Tutar girilmemiş</span>}</span>
       <span style={{ color: nextStepColor, fontSize: 12, fontWeight: 600, lineHeight: 1.35 }}>{nextStep}</span>
-      <span style={{ color: lead.sale_amount != null ? T.green : T.textFaint, fontSize: 12.5, fontWeight: lead.sale_amount != null ? 700 : 500 }}>{lead.sale_amount != null ? fmtTL(lead.sale_amount) : '—'}</span>
+      <span style={{ color: missingAmount ? '#854F0B' : lead.sale_amount != null ? T.green : T.textFaint, fontSize: 12.5, fontWeight: missingAmount || lead.sale_amount != null ? 700 : 500 }}>{missingAmount ? 'Eksik' : lead.sale_amount != null ? fmtTL(lead.sale_amount) : '—'}</span>
       <span>{detailButton}</span>
     </div>
   )
@@ -3537,6 +3604,8 @@ export function PanelApp() {
   }
 
   async function addLead(lead) {
+    const amountError = saleAmountError(lead.result, lead.sale_amount)
+    if (amountError) throw new Error(amountError)
     const { data, error } = await supabase.from('leads').insert({ ...lead, last_note_at: lead.date }).select()
     if (error || !data?.[0]) throw new Error(leadWriteError(error))
     if (data?.[0]) {
@@ -3552,6 +3621,8 @@ export function PanelApp() {
   // updated içindeki 'note' alanı her zaman YENİ bir not olarak eklenir (üzerine yazmaz).
   // Diğer alanlar (result, channel, vb.) normal şekilde güncellenir.
   async function updateLead(updated, currentUsername) {
+    const amountError = saleAmountError(updated.result, updated.sale_amount)
+    if (amountError) throw new Error(amountError)
     const { note: newNoteText, ...leadFields } = updated
     const nowIso = new Date().toISOString()
     const hasNewNote = newNoteText && newNoteText.trim()
@@ -3824,26 +3895,7 @@ export function PanelApp() {
 
   // Danışan ekranı için arama, durum filtresi ve öncelikli sıralama. Bu yalnızca
   // ekrandaki görünümü değiştirir; kayıtların kendisine veya raporlara dokunmaz.
-  const normalizedClientSearch = clientSearch.trim().toLocaleLowerCase('tr')
-  const clientStatusCounts = visibleLeads.reduce((counts, lead) => {
-    const status = getAppointmentStatus(lead)
-    counts[status] = (counts[status] || 0) + 1
-    return counts
-  }, {})
-  const clientRows = [...visibleLeads]
-    .filter(lead => {
-      if (clientStatusFilter !== 'all' && getAppointmentStatus(lead) !== clientStatusFilter) return false
-      if (!normalizedClientSearch) return true
-      return [lead.name, lead.phone, lead.service, lead.channel, lead.note]
-        .some(value => String(value || '').toLocaleLowerCase('tr').includes(normalizedClientSearch))
-    })
-    .sort((a, b) => {
-      if (clientSort === 'newest') return new Date(b.date) - new Date(a.date)
-      const priority = { needs_result: 0, upcoming: 1, no_show: 2, not_bought: 3, awaiting_reply: 4, customer: 5 }
-      const rank = priority[getAppointmentStatus(a)] - priority[getAppointmentStatus(b)]
-      if (rank !== 0) return rank
-      return new Date(b.appointment_at || b.date) - new Date(a.appointment_at || a.date)
-    })
+  const { counts: clientStatusCounts, rows: clientRows } = clientListData(visibleLeads, { search: clientSearch, statusFilter: clientStatusFilter, sort: clientSort })
 
   function canEditLead(lead) {
     if (perms.can_edit_any_lead) return true
@@ -4209,30 +4261,8 @@ export function PanelApp() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
-                {[
-                  ['all', 'Tümü'],
-                  ['needs_result', 'Sonuç bekliyor'],
-                  ['upcoming', 'Yaklaşan'],
-                  ['customer', 'Müşteri oldu'],
-                  ['no_show', 'Gelmedi'],
-                ].map(([value, label]) => {
-                  const active = clientStatusFilter === value
-                  const config = value === 'all' ? null : APPOINTMENT_STATUS[value]
-                  const count = value === 'all' ? visibleLeads.length : (clientStatusCounts[value] || 0)
-                  return (
-                    <button key={value} type="button" onClick={() => setClientStatusFilter(value)} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 99, padding: '6px 10px',
-                      border: active ? `1px solid ${config?.color || T.primary}` : `1px solid ${T.border}`,
-                      background: active ? (config?.bg || T.primaryLight) : '#fff', color: active ? (config?.color || T.primary) : T.textSoft,
-                      fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-                    }}>
-                      {config && <span style={{ width: 6, height: 6, borderRadius: '50%', background: config.color }} />}
-                      {label} <span style={{ opacity: .72 }}>{count}</span>
-                    </button>
-                  )
-                })}
-              </div>
+              <ClientStatusFilters counts={clientStatusCounts} total={visibleLeads.length} selected={clientStatusFilter} onSelect={setClientStatusFilter} />
+              <MissingSaleAmountNotice count={clientStatusCounts.missing_amount || 0} filtered={clientStatusFilter === 'missing_amount'} onFilter={() => setClientStatusFilter('missing_amount')} />
 
               {clientRows.length === 0 ? (
                 <div style={{ padding: '34px 8px', textAlign: 'center', color: T.textSoft, fontSize: 13 }}>
