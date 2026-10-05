@@ -2,6 +2,35 @@ import { isValidBookingDate, turkeyDateString } from './booking.js'
 
 export const CUSTOMER_RESULT = 'Müşteri oldu'
 
+export const MAX_SALE_AMOUNT = 999999999.99
+
+// Veritabanındaki tutar ham sayı/ondalık metindir; formdaki Türkçe tutar ise
+// ayrı ayrıştırılır. Boşluk, sıfır, NaN ve kesirli kuruş geçerli satış değildir.
+export function isValidSaleAmount(value) {
+  if (typeof value !== 'number' && typeof value !== 'string') return false
+  if (typeof value === 'string' && !/^\d+(?:\.\d{1,2}0*)?$/.test(value.trim())) return false
+  const amount = Number(value)
+  if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_SALE_AMOUNT) return false
+  const cents = amount * 100
+  return Math.abs(cents - Math.round(cents)) <= Number.EPSILON * Math.max(1, Math.abs(cents)) * 2
+}
+
+export function parseSaleAmountInput(value) {
+  const text = String(value ?? '').trim()
+  if (!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(text)) return null
+  const amount = Number(text.replace(/\./g, '').replace(',', '.'))
+  return isValidSaleAmount(amount) ? amount : null
+}
+
+export function saleAmountError(result, value) {
+  if (result !== CUSTOMER_RESULT || isValidSaleAmount(value)) return ''
+  return 'Müşteri oldu kaydı tamamlanamadı. Sıfırdan büyük satış tutarı girin; en fazla iki kuruş hanesi kullanın. Örnek: 15.000 veya 15.000,50 TL. En fazla 999.999.999,99 TL kabul edilir.'
+}
+
+export function hasMissingSaleAmount(lead) {
+  return lead?.result === CUSTOMER_RESULT && !isValidSaleAmount(lead.sale_amount)
+}
+
 function validTimestamp(value) {
   return value != null && value !== '' && Number.isFinite(new Date(value).getTime())
 }
@@ -67,6 +96,9 @@ export function savedSaleAt(result, day, editing = null) {
 
 export function leadWriteError(error) {
   const details = `${error?.message || ''} ${error?.details || ''}`
+  if (error?.code === '23514' && details.includes('leads_customer_requires_sale_amount')) {
+    return saleAmountError(CUSTOMER_RESULT, null)
+  }
   if (details.includes('sold_at') && ['42703', 'PGRST204'].includes(error?.code)) {
     return 'Satış tarihi güncellemesi veritabanında henüz kurulmamış. Yönetici önce satış tarihi SQL dosyasını çalıştırmalı. Kayıt kaydedilmedi.'
   }
