@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ClipboardList, Search, X } from 'lucide-react'
 import { T } from './theme.js'
 import { bookingAppointmentIso, turkeyDateString } from '../lib/booking.js'
+import { buildFollowUpPerformance, followUpPersonKey } from '../lib/followUpPerformance.js'
+import { FollowUpPerformance } from './FollowUpPerformance.jsx'
 import {
   FOLLOW_UP_CLOSE_REASONS, FOLLOW_UP_OUTCOMES, canManageFollowUp,
   followUpDateParts, followUpInputError, followUpState, followUpWriteError,
@@ -84,20 +86,31 @@ function FollowUpEditor({ lead, action, users, currentUser, canEditAny, events, 
   </section>
 }
 
-export function FollowUpCenter({ leads, leadNotes, users, currentUser, canEditAny, canSeePhone, branchName, showBranch, getLegacyReminder, buildWhatsappUrl, onOpenLead, canEditLead, onSave, events, loadError }) {
+export function FollowUpCenter({ leads, leadNotes, users, currentUser, canEditAny, canSeePhone, branchName, showBranch, scopeBranchIds, getLegacyReminder, buildWhatsappUrl, onOpenLead, canEditLead, onSave, events, loadError }) {
   const [filter, setFilter] = useState('open')
   const [ownerFilter, setOwnerFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [selection, setSelection] = useState(null)
+  const [period, setPeriod] = useState('month')
+  const [inspection, setInspection] = useState(null)
+  const [clock, setClock] = useState(() => new Date())
   const editorRef = useRef(null)
+  const queueRef = useRef(null)
   useEffect(() => { if (selection) editorRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }, [selection])
-  const items = useMemo(() => leads.map(lead => ({ lead, state: followUpState(lead, getLegacyReminder(lead)) })), [leads, getLegacyReminder])
+  useEffect(() => { if (inspection) queueRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }, [inspection])
+  useEffect(() => { const timer = setInterval(() => setClock(new Date()), 60000); return () => clearInterval(timer) }, [])
+  const items = useMemo(() => leads.map(lead => ({ lead, state: followUpState(lead, getLegacyReminder(lead), clock) })), [leads, getLegacyReminder, clock])
+  const report = useMemo(() => canEditAny && !loadError ? buildFollowUpPerformance({ items, users, events, branchIds: scopeBranchIds, period, now: clock }) : null, [canEditAny, loadError, items, users, events, scopeBranchIds, period, clock])
+  const activeInspection = report ? inspection : null
+  const inspectionRow = report?.rows.find(row => row.key === inspection?.rowKey)
+  const inspectionFields = { open: 'openLeadIds', overdue: 'overdueLeadIds', today: 'todayLeadIds', contacted: 'contactLeadIds' }
+  const inspectedLeadIds = new Set(inspectionRow?.[inspectionFields[inspection?.metric]] || [])
   const latestNotes = useMemo(() => {
     const notes = {}
     for (const note of leadNotes) if (!notes[note.lead_id] || new Date(note.created_at) > new Date(notes[note.lead_id].created_at)) notes[note.lead_id] = note
     return notes
   }, [leadNotes])
-  const matchingOwner = item => ownerFilter === 'all' || (ownerFilter === 'mine' ? item.lead.followup?.owner_id === currentUser.id : !item.lead.followup?.owner_id)
+  const matchingOwner = item => ownerFilter === 'all' || (ownerFilter === 'mine' ? item.lead.followup?.owner_id === currentUser.id : ownerFilter === 'unassigned' ? !item.lead.followup?.owner_id : followUpPersonKey(item.lead.branch_id, item.lead.followup?.owner_id) === ownerFilter)
   const counts = { open: 0, overdue: 0, today: 0, planned: 0, closed: 0 }
   for (const item of items) {
     if (!item.state || !matchingOwner(item)) continue
@@ -106,8 +119,9 @@ export function FollowUpCenter({ leads, leadNotes, users, currentUser, canEditAn
   }
   const query = search.trim().toLocaleLowerCase('tr-TR')
   const rows = items.filter(item => {
-    if (!matchingOwner(item)) return false
+    if (activeInspection ? !inspectedLeadIds.has(item.lead.id) : !matchingOwner(item)) return false
     if (query) return [item.lead.name, canSeePhone ? item.lead.phone : '', item.lead.service, branchName(item.lead.branch_id)].some(value => String(value || '').toLocaleLowerCase('tr-TR').includes(query))
+    if (activeInspection) return true
     return filter === 'open' ? item.state && item.state.bucket !== 'closed' : item.state?.bucket === filter
   }).sort((a, b) => {
     const rank = { overdue: 0, today: 1, planned: 2, closed: 3 }
@@ -121,16 +135,18 @@ export function FollowUpCenter({ leads, leadNotes, users, currentUser, canEditAn
     <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 18px' }}>Kimin, ne zaman, hangi danışanla görüşeceği net olsun.</p>
     {loadError && <div role="alert" style={{ padding: 12, border: '1px solid #F3C4C0', background: '#FFF5F3', color: '#B83B34', borderRadius: 10, marginBottom: 14, fontSize: 13 }}>{loadError} Yeni takip işlemleri kapalı; kurulum/bağlantı düzeldikten sonra paneli yenileyin.</div>}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: 10, marginBottom: 16 }}>
-      {tiles.map(tile => <button key={tile.key} onClick={() => { setFilter(tile.key); setSearch('') }} style={{ ...buttonStyle, textAlign: 'left', padding: 14, borderColor: filter === tile.key ? tile.color : T.border }}><span style={{ display: 'block', color: T.textSoft, fontSize: 12 }}>{tile.label}</span><strong style={{ display: 'block', fontSize: 25, color: tile.color, marginTop: 5 }}>{counts[tile.key]}</strong></button>)}
+      {tiles.map(tile => <button key={tile.key} onClick={() => { setFilter(tile.key); setSearch(''); setInspection(null) }} style={{ ...buttonStyle, textAlign: 'left', padding: 14, borderColor: !activeInspection && filter === tile.key ? tile.color : T.border }}><span style={{ display: 'block', color: T.textSoft, fontSize: 12 }}>{tile.label}</span><strong style={{ display: 'block', fontSize: 25, color: tile.color, marginTop: 5 }}>{counts[tile.key]}</strong></button>)}
     </div>
-    <section aria-label="Takip sırası" style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: 16, marginBottom: 22 }}>
+    {report && <FollowUpPerformance report={report} period={period} onPeriodChange={value => { setPeriod(value); setInspection(null) }} branchName={branchName} showBranch={showBranch} inspection={inspection} onInspect={(rowKey, metric) => { setInspection({ rowKey, metric }); setOwnerFilter('all'); setSelection(null); setSearch('') }} />}
+    <section ref={queueRef} aria-label="Takip sırası" style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: 16, marginBottom: 22 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <h2 style={{ fontSize: 16, margin: 0 }}>Takip sırası</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <button onClick={() => { setFilter('open'); setSearch('') }} style={{ ...buttonStyle, color: filter === 'open' ? T.primary : T.textSoft }}>Tüm açık takipler · {counts.open}</button>
-          <select aria-label="Sorumlu filtresi" value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)} style={{ ...fieldStyle, width: 'auto' }}><option value="all">Tüm sorumlular</option><option value="mine">Bana atanan</option><option value="unassigned">Atanmayan</option></select>
+          <button onClick={() => { setFilter('open'); setSearch(''); setInspection(null) }} style={{ ...buttonStyle, color: !activeInspection && filter === 'open' ? T.primary : T.textSoft }}>Tüm açık takipler · {counts.open}</button>
+          <select aria-label="Sorumlu filtresi" value={ownerFilter} onChange={e => { setOwnerFilter(e.target.value); setInspection(null) }} style={{ ...fieldStyle, width: 'auto' }}><option value="all">Tüm sorumlular</option><option value="mine">Bana atanan</option><option value="unassigned">Atanmayan</option>{report?.rows.filter(row => row.personId).map(row => <option key={row.key} value={row.key}>{row.name}{showBranch ? ` · ${branchName(row.branchId)}` : ''}</option>)}</select>
         </div>
       </div>
+      {activeInspection && <div role="status" style={{ background: T.primaryLight, borderRadius: 9, padding: 10, marginBottom: 12, fontSize: 12.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}><span><strong>{inspectionRow?.name || 'Personel'}</strong>{showBranch && inspectionRow ? ` · ${branchName(inspectionRow.branchId)}` : ''} · {{ open: 'Açık takipler', overdue: 'Geciken takipler', today: 'Bugünkü takipler', contacted: 'Dönemde sonuç girilen takipler' }[inspection.metric]} · {rows.length} danışan{inspection.metric === 'contacted' && ` · ${report?.range.label}`}</span><button type="button" style={buttonStyle} onClick={() => { setInspection(null); setSearch('') }}>Performans filtresini kaldır</button></div>}
       <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Search size={16} color={T.textSoft} /><input aria-label="Takip için danışan ara" placeholder="İsim veya hizmet ara; yeni takip de planlayabilirsiniz" value={search} onChange={e => setSearch(e.target.value)} style={fieldStyle} /></label>
       <p style={{ fontSize: 12, color: T.textSoft, lineHeight: 1.5 }}>Planlanmamış kayıtlarda mevcut hatırlatma kuralları korunur. Arama tüm danışanları getirir; kapalı veya henüz takip beklemeyen bir kaydı da bulabilirsiniz.</p>
       <div ref={editorRef}>{selectedLead && !loadError && canManageFollowUp(selectedLead, currentUser, canEditAny, users) && <FollowUpEditor key={`${selectedLead.id}:${selection.action}`} lead={selectedLead} action={selection.action} users={users} currentUser={currentUser} canEditAny={canEditAny} onSave={onSave} onCancel={() => setSelection(null)} events={events.filter(event => event.lead_id === selectedLead.id)} />}</div>
