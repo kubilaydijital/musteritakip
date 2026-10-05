@@ -1272,8 +1272,9 @@ function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap,
 
   return (
     <div>
-      <FollowUpCenter leads={leads} leadNotes={leadNotes} users={users} currentUser={currentUser}
+      <FollowUpCenter key={isSuperAdmin ? filterBranch : currentUser.branch_id} leads={leads} leadNotes={leadNotes} users={users} currentUser={currentUser}
         canEditAny={canEditAny} canSeePhone={canSeePhone} branchName={branchName} showBranch={isSuperAdmin && filterBranch === 'all'}
+        scopeBranchIds={isSuperAdmin && filterBranch === 'all' ? activeBranches.map(branch => branch.id) : [isSuperAdmin ? filterBranch : currentUser.branch_id].filter(Boolean)}
         getLegacyReminder={lead => legacyStaleness(lead, noteCountMap[lead.id] || 0, ruleMap[`${lead.branch_id}__${lead.result}`] || null)}
         buildWhatsappUrl={buildWhatsappUrl} onOpenLead={onOpenLead} canEditLead={canEditLead}
         onSave={onSaveFollowUp} events={followUpEvents} loadError={followUpError} />
@@ -3476,7 +3477,7 @@ export function PanelApp() {
     const [b, u, l, a, t, bs, ln, rr, fu, fe] = await Promise.all([
       supabase.from('branches').select('*').order('name'),
       supabase.from('app_users').select('*'),
-      supabase.from('leads').select('*').order('date', { ascending: false }),
+      fetchFollowUpRows(supabase, 'leads'),
       supabase.from('ads_data').select('*').order('date', { ascending: false }),
       supabase.from('permission_templates').select('*'),
       supabase.from('branch_services').select('*').order('name'),
@@ -3487,7 +3488,7 @@ export function PanelApp() {
     ])
     setBranches(b.data || [])
     setUsers(u.data || [])
-    setLeads(l.data || [])
+    setLeads((l.data || []).sort((a, b) => new Date(b.date) - new Date(a.date)))
     setAdsData(a.data || [])
     setTemplates(t.data || [])
     setBranchServices(bs.data || [])
@@ -3495,7 +3496,7 @@ export function PanelApp() {
     setReminderRules(rr.data || [])
     setFollowUps(fu.data || [])
     setFollowUpEvents((fe.data || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || Number(b.id) - Number(a.id)))
-    setFollowUpError(fu.error || fe.error ? followUpWriteError(fu.error || fe.error) : '')
+    setFollowUpError(l.error || fu.error || fe.error ? (l.error ? 'Danışan kayıtları okunamadı. Bağlantıyı kontrol edip paneli yenileyin.' : followUpWriteError(fu.error || fe.error)) : '')
     if (b.data && b.data.length > 0) setAdsSelectedBranch(b.data[0].id)
     setLoaded(true)
 
