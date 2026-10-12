@@ -13,6 +13,9 @@ function time(value) {
 export function MetaDataHealth({ report, onReview, expanded = false }) {
   const [open, setOpen] = useState(expanded)
   const warn = report.needsAttention
+  // Sağlıklı Meta verisi normal çalışma durumudur; Genel Bakış ve Raporlar'da
+  // ayrıca bildirim gösterme. Bağlantı panelinde ayrıntılar görünmeye devam eder.
+  if (!warn && !expanded) return null
   return <section aria-label="Meta veri sağlığı" style={{ background: warn ? '#FFF8EA' : '#F0F8F5', border: `1px solid ${warn ? '#EAD3A5' : '#BDDDCF'}`, borderRadius: 12, padding: '12px 15px', marginBottom: 16, color: T.text, overflowWrap: 'anywhere' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <div style={{ flex: '1 1 260px' }}>
