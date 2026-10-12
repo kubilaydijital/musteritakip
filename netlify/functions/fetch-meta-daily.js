@@ -1,6 +1,6 @@
 import { createMetaSync, shiftDay, turkeyDay } from './_meta-sync.js'
 
-// Türkiye saatiyle 06:00: bugün ve önceki iki günü yeniden doğrular.
+// Türkiye saatiyle 06:00 ve 18:00: bugün ve önceki iki günü yeniden doğrular.
 // Bugünkü sonuçlar geçicidir; sonraki çekimlerde güncellenir.
 export default async () => {
   const results = { processed: 0, failed: 0, details: [] }
@@ -22,4 +22,4 @@ export default async () => {
     return Response.json({ ok: false, error: error.message, code: error.code }, { status: 500 })
   }
 }
-export const config = { schedule: '0 3 * * *' }
+export const config = { schedule: '0 3,15 * * *' }
