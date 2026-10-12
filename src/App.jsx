@@ -1398,11 +1398,13 @@ function clientListData(leads, { search = '', statusFilter = 'all', sort = 'prio
 }
 
 function ClientStatusFilters({ counts, total, selected, onSelect }) {
+  const filters = [
+    ['all', 'Tümü'], ['needs_result', 'Sonuç bekliyor'], ['upcoming', 'Yaklaşan'],
+    ['customer', 'Müşteri oldu'], ['missing_amount', 'Tutar girilmemiş'], ['no_show', 'Gelmedi'],
+  ].filter(([value]) => value !== 'missing_amount' || (counts.missing_amount || 0) > 0 || selected === 'missing_amount')
+
   return <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
-    {[
-      ['all', 'Tümü'], ['needs_result', 'Sonuç bekliyor'], ['upcoming', 'Yaklaşan'],
-      ['customer', 'Müşteri oldu'], ['missing_amount', 'Tutar girilmemiş'], ['no_show', 'Gelmedi'],
-    ].map(([value, label]) => {
+    {filters.map(([value, label]) => {
       const active = selected === value
       const config = value === 'missing_amount' ? { color: '#854F0B', bg: '#FCF3DE' } : APPOINTMENT_STATUS[value]
       const count = value === 'all' ? total : (counts[value] || 0)
