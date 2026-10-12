@@ -28,7 +28,13 @@ export function saleAmountError(result, value) {
 }
 
 export function hasMissingSaleAmount(lead) {
-  return lead?.result === CUSTOMER_RESULT && !isValidSaleAmount(lead.sale_amount)
+  // Satış tarihi geçişinden önceki kayıtlar sold_at=NULL olarak korunur. Bu
+  // eski kayıtların gerçek tutarı artık doğrulanamadığı için operasyonel eksik
+  // tutar uyarısına alınmaz. Yeni satışlara sold_at otomatik yazılır ve tutar
+  // zorunluluğunu aşan olası bir veri sorunu yine görünür kalır.
+  return lead?.result === CUSTOMER_RESULT
+    && validTimestamp(lead.sold_at)
+    && !isValidSaleAmount(lead.sale_amount)
 }
 
 function validTimestamp(value) {
