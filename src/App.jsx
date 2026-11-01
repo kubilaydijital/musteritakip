@@ -600,7 +600,9 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
     } else {
       setPhoneErr('')
     }
-    const noteError = meaningfulNoteError(editing ? form.newNote : form.note, { required: !editing })
+    // İlk kayıt açılışında henüz görüşme sonucu olmayabilir. Not bu nedenle
+    // isteğe bağlıdır; ancak kullanıcı yazarsa anlamsız/kısa içerik kabul edilmez.
+    const noteError = meaningfulNoteError(editing ? form.newNote : form.note)
     if (noteError) { setNoteErr(noteError); ok = false }
     else setNoteErr('')
     if (form.result === 'Randevu aldı' && !(form.appointmentDate && form.appointmentTime)) { setAppointmentErr('Randevu aldı seçildiğinde tarih ve saat girilmesi zorunludur.'); ok = false }
@@ -794,11 +796,11 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         </>
       ) : (
         <>
-          <textarea placeholder="Görüşme notu (zorunlu)" value={form.note} onChange={e => { set('note', e.target.value); setNoteErr(''); setSuggestedAction('') }} rows={2}
-            aria-required="true" aria-invalid={Boolean(noteErr)}
+          <textarea placeholder="İlk kayıt notu (isteğe bağlı)" value={form.note} onChange={e => { set('note', e.target.value); setNoteErr(''); setSuggestedAction('') }} rows={2}
+            aria-invalid={Boolean(noteErr)}
             style={{ width: '100%', marginBottom: 4, fontFamily: 'inherit', fontSize: 14, padding: 10, border: `1px solid ${noteErr ? '#c0392b' : T.border}`, borderRadius: 8, boxSizing: 'border-box', background: T.cardSoft, color: T.text, colorScheme: 'light' }} />
           {noteErr && <div role="alert" style={{ fontSize: 12, color: '#a32d2d', background: '#fff1f0', border: '1px solid #f2b8b5', borderRadius: 8, padding: '9px 11px', margin: '0 0 10px', lineHeight: 1.5 }}><strong>Not kaydedilemedi.</strong><br />{noteErr}</div>}
-          {!noteErr && <p style={{ fontSize: 11, color: '#888', margin: '0 0 10px' }}>En az 2 kelime ve toplam 10 harf/rakamla görüşmeyi kısaca açıklayın.</p>}
+          {!noteErr && <p style={{ fontSize: 11, color: '#888', margin: '0 0 10px' }}>İlk kayıtta not zorunlu değildir. Not yazarsanız en az 2 kelime ve 10 harf/rakamla açıklayın; randevu sonucunu daha sonra kayda ekleyebilirsiniz.</p>}
           <button type="button" disabled={!form.note.trim()} onClick={() => getSuggestedAction(form.note)} style={{
             fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.primary}`, background: 'transparent',
             color: T.primary, cursor: form.note.trim() ? 'pointer' : 'not-allowed', fontWeight: 500, marginBottom: 10, opacity: form.note.trim() ? 1 : 0.5
@@ -3518,23 +3520,15 @@ export function PanelApp() {
     const leadById = {}
     leads.forEach(l => { leadById[l.id] = l })
 
-    // Kaydın hayatı boyunca eklenen GERÇEK ilk notu (kronolojik olarak en eski) bulunuyor -
-    // sonuç kategorisi sonradan değişse bile, hariç tutulacak olan hep bu tek nottur.
-    // Önceki mantık "şu anki kategoride ilk not"u hariç tutuyordu; bu, kategori
-    // değiştikten sonra eklenen GERÇEK bir takip notunu da yanlışlıkla "kayıt açma
-    // notu" sayıp sıfırlıyordu.
-    const earliestNoteIdByLead = {}
-    leadNotes.forEach(n => {
-      const current = earliestNoteIdByLead[n.lead_id]
-      if (!current || new Date(n.created_at) < new Date(current.created_at)) {
-        earliestNoteIdByLead[n.lead_id] = n
-      }
-    })
-
     leadNotes.forEach(n => {
       const lead = leadById[n.lead_id]
       if (!lead) return
-      if (earliestNoteIdByLead[n.lead_id] && earliestNoteIdByLead[n.lead_id].id === n.id) return // gerçek ilk not, sayma
+      // Yalnızca kayıtla aynı anda oluşturulan ilk açıklama “kayıt açma notu”dur.
+      // İlk kayıt notsuz açılmışsa daha sonra eklenen ilk not gerçek görüşmedir ve
+      // takip sayacına dahil edilmelidir.
+      const noteTime = new Date(n.created_at).getTime()
+      const openedTime = new Date(lead.date).getTime()
+      if (Number.isFinite(noteTime) && Number.isFinite(openedTime) && noteTime === openedTime) return
       // result_at_time eski kayıtlarda olmayabilir (migration öncesi); o durumda güvenli tarafta kalıp say.
       if (n.result_at_time && n.result_at_time !== lead.result) return
       map[n.lead_id] = (map[n.lead_id] || 0) + 1
