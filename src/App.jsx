@@ -23,7 +23,7 @@ import {
 import {
   MessageCircle, CalendarDays, ShoppingCart, TrendingUp, Wallet,
   Home, Headphones, Users, ClipboardList, BarChart3, Megaphone, Building2,
-  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Flame, Search, X, Bell
+  ShieldCheck, Settings, Plus, ChevronDown, LogOut, Flame, Search, X, Bell, Printer
 } from 'lucide-react'
 
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
@@ -2486,7 +2486,163 @@ function ReportFunnel({ metrics }) {
   )
 }
 
-function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branchName, showBranch, metaHealth, metaBranches, adsError, onReviewMeta }) {
+function monthInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthlyReportWindow(monthValue) {
+  const match = String(monthValue || '').match(/^(\d{4})-(\d{2})$/)
+  const fallback = new Date(`${turkeyDateString()}T12:00:00`)
+  const year = match ? Number(match[1]) : fallback.getFullYear()
+  const monthIndex = match ? Number(match[2]) - 1 : fallback.getMonth()
+  const startDate = new Date(year, monthIndex, 1)
+  const endDate = new Date(year, monthIndex + 1, 1)
+  const previousStartDate = new Date(year, monthIndex - 1, 1)
+  return {
+    start: turkeyDayStart(dateInputValue(startDate)),
+    end: turkeyDayStart(dateInputValue(endDate)),
+    previousStart: turkeyDayStart(dateInputValue(previousStartDate)),
+    previousEnd: turkeyDayStart(dateInputValue(startDate)),
+    label: startDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }),
+    previousLabel: previousStartDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }),
+  }
+}
+
+function buildMonthlyReportMetrics(leads, adsData, start, end) {
+  const periodLeads = leads.filter(lead => isInReportPeriod(lead.date, start, end))
+  const periodSales = salesInPeriod(leads, start, end)
+  const periodAds = adsData.filter(ad => isInReportPeriod(ad.date, start, end))
+  const metaAds = periodAds.filter(ad => ad.channel === 'Meta (Otomatik)')
+  const messages = metaAds.reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
+  const metaSpend = metaAds.reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
+  const appointed = periodLeads.filter(lead => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(lead.result))
+  const arrived = periodLeads.filter(lead => ['Satın almadı', 'Müşteri oldu'].includes(lead.result))
+  const cohortSales = periodLeads.filter(lead => lead.result === 'Müşteri oldu')
+  const noShow = periodLeads.filter(lead => lead.result === 'Randevuya gelmedi')
+  const notBought = periodLeads.filter(lead => lead.result === 'Satın almadı')
+  const noResponse = periodLeads.filter(lead => lead.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
+  const sales = summarizeSales(periodSales)
+  const serviceRevenue = new Map()
+  periodSales.forEach(lead => {
+    const service = lead.service || 'Belirtilmemiş'
+    serviceRevenue.set(service, (serviceRevenue.get(service) || 0) + (Number(lead.sale_amount) || 0))
+  })
+  const services = [...serviceRevenue.entries()]
+    .map(([name, revenue]) => ({ name, revenue }))
+    .sort((a, b) => b.revenue - a.revenue)
+  return {
+    periodLeads, periodSales, periodAds, records: periodLeads.length,
+    messages, metaSpend, appointments: appointed.length, arrived: arrived.length,
+    cohortSales: cohortSales.length, sales: sales.count, revenue: sales.revenue,
+    avgTicket: sales.avgTicket, roas: metaSpend > 0 ? sales.metaRevenue / metaSpend : null,
+    noShow: noShow.length, notBought: notBought.length, noResponse: noResponse.length,
+    appointmentRate: messages > 0 ? Math.round((appointed.length / messages) * 100) : null,
+    salesRate: appointed.length > 0 ? Math.round((cohortSales.length / appointed.length) * 100) : null,
+    noShowRate: appointed.length > 0 ? Math.round((noShow.length / appointed.length) * 100) : 0,
+    services,
+  }
+}
+
+function reportChangeLabel(current, previous, suffix = '') {
+  const change = relativePercentChange(current, previous)
+  if (change == null) return current > 0 && previous === 0 ? 'Yeni sonuç' : 'Karşılaştırma yok'
+  if (change === 0) return 'Değişmedi'
+  return `${change > 0 ? '↑' : '↓'} %${Math.abs(change)}${suffix}`
+}
+
+function escapeReportHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  }[character]))
+}
+
+function MonthlyPerformanceReport({ leads, adsData, isMobile, canExport, scopeLabel, metaHealth, metaBranches, adsError }) {
+  const today = new Date(`${turkeyDateString()}T12:00:00`)
+  const defaultMonth = monthInputValue(new Date(today.getFullYear(), today.getMonth() - 1, 1))
+  const currentMonth = monthInputValue(today)
+  const [selectedMonth, setSelectedMonth] = useState(defaultMonth)
+  const [printError, setPrintError] = useState('')
+  const period = useMemo(() => monthlyReportWindow(selectedMonth), [selectedMonth])
+  const metrics = useMemo(() => buildMonthlyReportMetrics(leads, adsData, period.start, period.end), [leads, adsData, period])
+  const previous = useMemo(() => buildMonthlyReportMetrics(leads, adsData, period.previousStart, period.previousEnd), [leads, adsData, period])
+  const metaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: adsData, start: period.start, end: period.end, adsError })
+  const previousMetaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: adsData, start: period.previousStart, end: period.previousEnd, adsError })
+  const isCurrentMonth = selectedMonth === currentMonth
+  const maxServiceRevenue = Math.max(...metrics.services.map(service => service.revenue), 1)
+  const comparisonRows = [
+    { label: 'Ciro', current: fmtTL(metrics.revenue), previous: fmtTL(previous.revenue), change: reportChangeLabel(metrics.revenue, previous.revenue), positive: metrics.revenue >= previous.revenue },
+    { label: 'Randevu', current: metrics.appointments, previous: previous.appointments, change: reportChangeLabel(metrics.appointments, previous.appointments), positive: metrics.appointments >= previous.appointments },
+    { label: 'Satış', current: metrics.sales, previous: previous.sales, change: reportChangeLabel(metrics.sales, previous.sales), positive: metrics.sales >= previous.sales },
+    { label: 'Meta ROAS', current: metaReport.ready && metrics.roas != null ? `${metrics.roas.toFixed(1)}x` : '—', previous: previousMetaReport.ready && previous.roas != null ? `${previous.roas.toFixed(1)}x` : '—', change: metaReport.ready && previousMetaReport.ready && metrics.roas != null && previous.roas != null ? reportChangeLabel(metrics.roas, previous.roas) : 'Meta verisi eksik', positive: metrics.roas != null && previous.roas != null && metrics.roas >= previous.roas },
+  ]
+  const funnel = [
+    { label: 'Meta mesaj', value: metaReport.ready ? metrics.messages : null, color: '#7257E8' },
+    { label: 'Randevu', value: metrics.appointments, color: '#377BD1' },
+    { label: 'Geldi', value: metrics.arrived, color: '#20936F' },
+    { label: 'Müşteri oldu', value: metrics.cohortSales, color: '#B47808' },
+  ]
+  const funnelMax = Math.max(...funnel.map(item => item.value || 0), 1)
+
+  function printReport() {
+    setPrintError('')
+    const reportWindow = window.open('', '_blank', 'width=980,height=760')
+    if (!reportWindow) {
+      setPrintError('Rapor penceresi açılamadı. Tarayıcıdaki açılır pencere engelini kaldırıp tekrar deneyin.')
+      return
+    }
+    reportWindow.opener = null
+    const metricCards = [
+      ['Toplam ciro', fmtTL(metrics.revenue), reportChangeLabel(metrics.revenue, previous.revenue)],
+      ['Ortalama satış', fmtTL(metrics.avgTicket), `${metrics.sales} satış`],
+      ['Meta ROAS', metaReport.ready && metrics.roas != null ? `${metrics.roas.toFixed(1)}x` : '—', metaReport.ready ? `${fmtTL(metrics.metaSpend)} harcama` : 'Meta verisi eksik'],
+      ['Randevu', metrics.appointments, metaReport.ready && metrics.appointmentRate != null ? `Mesajdan %${metrics.appointmentRate}` : `${metrics.records} kayıt`],
+    ].map(([label, value, detail]) => `<div class="metric"><span>${escapeReportHtml(label)}</span><strong>${escapeReportHtml(value)}</strong><small>${escapeReportHtml(detail)}</small></div>`).join('')
+    const comparisonHtml = comparisonRows.map(row => `<tr><td>${escapeReportHtml(row.label)}</td><td>${escapeReportHtml(row.current)}</td><td>${escapeReportHtml(row.previous)}</td><td class="${row.positive ? 'good' : 'warn'}">${escapeReportHtml(row.change)}</td></tr>`).join('')
+    const funnelHtml = funnel.map(item => `<div class="bar-row"><div><span>${escapeReportHtml(item.label)}</span><b>${item.value == null ? '—' : escapeReportHtml(item.value)}</b></div><i><em style="width:${item.value == null ? 0 : Math.max(3, (item.value / funnelMax) * 100)}%;background:${item.color}"></em></i></div>`).join('')
+    const serviceHtml = metrics.services.length
+      ? metrics.services.slice(0, 6).map(service => `<div class="bar-row"><div><span>${escapeReportHtml(service.name)}</span><b>${escapeReportHtml(fmtTL(service.revenue))}</b></div><i><em style="width:${Math.max(3, (service.revenue / maxServiceRevenue) * 100)}%;background:#D4537E"></em></i></div>`).join('')
+      : '<p class="empty">Bu ay için hizmet bazında satış verisi yok.</p>'
+    reportWindow.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeReportHtml(scopeLabel)} - ${escapeReportHtml(period.label)} performans raporu</title><style>
+      @page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0;color:#17233A;font-family:Inter,Arial,sans-serif;background:#fff}header{padding:22px 24px;border-radius:18px;background:linear-gradient(135deg,#182640,#29385A);color:#fff}header small{display:block;opacity:.72;font-weight:700;letter-spacing:.08em;text-transform:uppercase}header h1{margin:8px 0 4px;font-size:26px}header p{margin:0;opacity:.78}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.metric{border:1px solid #E3E6EC;border-radius:13px;padding:13px;background:#FBFBFD}.metric span,.metric small{display:block;color:#6A758A;font-size:10px;font-weight:700}.metric strong{display:block;margin:7px 0 5px;font-size:20px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.box{border:1px solid #E3E6EC;border-radius:14px;padding:15px;break-inside:avoid}.box h2{margin:0 0 3px;font-size:15px}.box>p{margin:0 0 13px;color:#6A758A;font-size:10px}.bar-row{margin:0 0 12px}.bar-row>div{display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:5px}.bar-row i{display:block;height:7px;border-radius:99px;background:#EDF0F5;overflow:hidden}.bar-row em{display:block;height:100%;border-radius:99px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #ECEEF2}th{color:#6A758A;font-size:9px;text-transform:uppercase}.good{color:#16765D;font-weight:800}.warn{color:#B04A45;font-weight:800}.losses{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.loss{padding:10px;border-radius:10px;background:#FFF4F1}.loss b{display:block;font-size:18px;color:#B04A45}.loss span{font-size:9px;color:#6A758A}.note{margin-top:12px;padding:11px 13px;border-radius:12px;background:#F2F0FF;color:#5646A9;font-size:10px;line-height:1.45}.empty{font-size:11px;color:#6A758A}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}@media(max-width:700px){.metrics,.grid{grid-template-columns:1fr 1fr}}
+    </style></head><body><header><small>Müşteri Takip · Aylık Performans</small><h1>${escapeReportHtml(scopeLabel)}</h1><p>${escapeReportHtml(period.label)}${isCurrentMonth ? ' · Devam eden ay, sonuçlar geçicidir' : ''}</p></header><section class="metrics">${metricCards}</section><section class="grid"><article class="box"><h2>Satış hunisi</h2><p>Mesajdan satışa ilerleme</p>${funnelHtml}</article><article class="box"><h2>Önceki ay karşılaştırması</h2><p>${escapeReportHtml(period.previousLabel)} ile karşılaştırma</p><table><thead><tr><th>Gösterge</th><th>Bu ay</th><th>Önceki</th><th>Değişim</th></tr></thead><tbody>${comparisonHtml}</tbody></table></article><article class="box"><h2>Hizmete göre ciro</h2><p>Satış tarihine göre en güçlü hizmetler</p>${serviceHtml}</article><article class="box"><h2>Kayıp analizi</h2><p>Seçili ayda açılan kayıtların güncel sonucu</p><div class="losses"><div class="loss"><b>${metrics.noShow}</b><span>Randevuya gelmedi</span></div><div class="loss"><b>${metrics.notBought}</b><span>Geldi, satın almadı</span></div><div class="loss"><b>${metrics.noResponse}</b><span>Cevap alınamadı</span></div></div><div class="note">Satış ve ciro satış tarihine; huni ve kayıp analizi kayıt açılış tarihine göre hazırlanır. Meta göstergeleri yalnızca dönem verisi doğrulandığında gösterilir.</div></article></section></body></html>`)
+    reportWindow.document.close()
+    reportWindow.focus()
+    window.setTimeout(() => reportWindow.print(), 250)
+  }
+
+  return (
+    <section style={{ ...cardStyle, padding: isMobile ? '1rem' : '1.25rem', marginBottom: 18, borderColor: '#DCD6FF', background: 'linear-gradient(135deg, #FFFFFF 0%, #FAF9FF 100%)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-start', flexDirection: isMobile ? 'column' : 'row', gap: 14, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+          <span style={{ width: 39, height: 39, borderRadius: 12, background: T.primaryLight, color: T.primary, display: 'grid', placeItems: 'center', flex: '0 0 auto' }}><BarChart3 size={19} /></span>
+          <div><h2 style={{ fontSize: 17, color: T.text, margin: '0 0 4px', fontWeight: 800 }}>Aylık Performans Raporu</h2><p style={{ color: T.textSoft, fontSize: 12.5, margin: 0 }}>Ayı seçin; grafikli raporu inceleyin veya PDF olarak kaydedin.</p></div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input aria-label="Rapor ayı" type="month" max={currentMonth} value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} style={{ ...inputStyle, padding: '8px 10px', fontSize: 12.5 }} />
+          {canExport && <button type="button" onClick={printReport} style={{ border: 'none', background: T.primary, color: '#fff', borderRadius: 10, padding: '9px 13px', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}><Printer size={15} /> PDF / yazdır</button>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 13 }}><strong style={{ color: T.text, fontSize: 13 }}>{scopeLabel}</strong><span style={{ color: T.textFaint }}>·</span><span style={{ color: T.textSoft, fontSize: 12.5 }}>{period.label}</span><span style={{ padding: '4px 8px', borderRadius: 999, background: isCurrentMonth ? '#FFF4E1' : '#EAF7F2', color: isCurrentMonth ? '#9A6500' : T.green, fontSize: 10.5, fontWeight: 800 }}>{isCurrentMonth ? 'Devam eden ay' : 'Tamamlanmış ay'}</span></div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 9, marginBottom: 14 }}>
+        {[
+          ['Ciro', fmtTL(metrics.revenue), reportChangeLabel(metrics.revenue, previous.revenue)],
+          ['Ortalama satış', fmtTL(metrics.avgTicket), `${metrics.sales} satış`],
+          ['Meta ROAS', metaReport.ready && metrics.roas != null ? `${metrics.roas.toFixed(1)}x` : '—', metaReport.ready ? `${fmtTL(metrics.metaSpend)} harcama` : 'Meta verisi eksik'],
+          ['Randevu', metrics.appointments, metaReport.ready && metrics.appointmentRate != null ? `Mesajdan %${metrics.appointmentRate}` : `${metrics.records} kayıt`],
+        ].map(([label, value, detail]) => <div key={label} style={{ border: `1px solid ${T.border}`, background: '#fff', borderRadius: 11, padding: '11px 12px', minWidth: 0 }}><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 750 }}>{label}</div><div style={{ color: T.text, fontSize: 19, fontWeight: 850, margin: '5px 0 3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div><div style={{ color: T.textSoft, fontSize: 10.5 }}>{detail}</div></div>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 13 }}>
+        <div style={{ border: `1px solid ${T.border}`, background: '#fff', borderRadius: 12, padding: 13 }}><div style={{ fontSize: 12.5, color: T.text, fontWeight: 800, marginBottom: 11 }}>Satış hunisi</div>{funnel.map(item => <div key={item.label} style={{ marginBottom: 9 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}><span style={{ color: T.textSoft }}>{item.label}</span><strong style={{ color: T.text }}>{item.value == null ? '—' : item.value}</strong></div><div style={{ height: 6, background: '#EDF0F5', borderRadius: 999, overflow: 'hidden' }}><div style={{ height: '100%', width: `${item.value == null ? 0 : Math.max(3, (item.value / funnelMax) * 100)}%`, background: item.color, borderRadius: 999 }} /></div></div>)}</div>
+        <div style={{ border: `1px solid ${T.border}`, background: '#fff', borderRadius: 12, padding: 13 }}><div style={{ fontSize: 12.5, color: T.text, fontWeight: 800, marginBottom: 8 }}>Önceki aya göre</div>{comparisonRows.map(row => <div key={row.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${T.border}`, fontSize: 11.5 }}><span style={{ color: T.textSoft }}>{row.label}</span><strong style={{ color: T.text }}>{row.current}</strong><span style={{ color: row.positive ? T.green : '#B84C48', fontWeight: 800, minWidth: 76, textAlign: 'right' }}>{row.change}</span></div>)}</div>
+      </div>
+      {metrics.services.length > 0 && <div style={{ marginTop: 13, border: `1px solid ${T.border}`, background: '#fff', borderRadius: 12, padding: 13 }}><div style={{ fontSize: 12.5, color: T.text, fontWeight: 800, marginBottom: 10 }}>Hizmete göre ciro</div>{metrics.services.slice(0, 5).map(service => <div key={service.name} style={{ marginBottom: 9 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: T.textSoft, fontSize: 11, marginBottom: 4 }}><span>{service.name}</span><strong style={{ color: T.text }}>{fmtTL(service.revenue)}</strong></div><div style={{ height: 6, background: '#EDF0F5', borderRadius: 999, overflow: 'hidden' }}><div style={{ width: `${Math.max(3, (service.revenue / maxServiceRevenue) * 100)}%`, height: '100%', background: '#D4537E', borderRadius: 999 }} /></div></div>)}</div>}
+      {printError && <p role="alert" style={{ color: '#B42318', fontSize: 12, margin: '12px 0 0' }}>{printError}</p>}
+      {!canExport && <p style={{ color: T.textFaint, fontSize: 11.5, margin: '12px 0 0' }}>PDF kaydetme yetkisi için dışa aktarma izni gerekir.</p>}
+    </section>
+  )
+}
+
+function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branchName, showBranch, reportScopeLabel = 'Seçili şube', metaHealth, metaBranches, adsError, onReviewMeta }) {
   const now = new Date(`${turkeyDateString()}T12:00:00`)
   const [range, setRange] = useState('this_month')
   const [customStart, setCustomStart] = useState(() => dateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
@@ -2571,6 +2727,17 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
         </div>
         {canExport && <ExportButtons rows={leadsToExportRows(exportLeads, branchName, showBranch)} baseFilename={`rapor-${turkeyDateString()}`} sheetName="Rapor" />}
       </div>
+
+      <MonthlyPerformanceReport
+        leads={leads}
+        adsData={adsData}
+        isMobile={isMobile}
+        canExport={canExport}
+        scopeLabel={reportScopeLabel}
+        metaHealth={metaHealth}
+        metaBranches={metaBranches}
+        adsError={adsError}
+      />
 
       <div style={{ ...cardStyle, padding: '12px', marginBottom: 16, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         {[
@@ -4351,6 +4518,7 @@ export function PanelApp() {
             canExport={isSuperAdmin || perms.can_export_data}
             branchName={branchName}
             showBranch={isSuperAdmin && filterBranch === 'all'}
+            reportScopeLabel={isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
             metaHealth={metaHealth} metaBranches={metaBranches} adsError={adsError}
             onReviewMeta={perms.can_enter_ads_data ? () => setActiveTab('ads') : undefined}
           />
