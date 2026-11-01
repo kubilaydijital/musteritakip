@@ -478,6 +478,29 @@ function TrialExpired({ onLogout, trialEndsAt, businessName }) {
 
 const emptyForm = { name: '', phone: '+90', channel: 'Instagram', service: '', note: '', newNote: '', result: 'Randevu aldı', saleAmount: '', saleDate: '', appointmentDate: '', appointmentTime: '' }
 
+function newProcessFormFromLead(lead) {
+  if (!lead) return { ...emptyForm }
+  return {
+    ...emptyForm,
+    name: lead.name || '',
+    phone: lead.phone || '+90',
+    channel: lead.channel || 'Instagram',
+    service: lead.service || '',
+  }
+}
+
+function leadFormInitialState(editing, newProcessFrom) {
+  if (!editing) return newProcessFormFromLead(newProcessFrom)
+  return {
+    ...editing,
+    newNote: '',
+    saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '',
+    saleDate: reportingDayKey(editing.sold_at) || '',
+    appointmentDate: toLocalDateValue(editing.appointment_at),
+    appointmentTime: toLocalTimeValue(editing.appointment_at),
+  }
+}
+
 function toLocalDateValue(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -514,9 +537,10 @@ function NoteHistory({ notes }) {
   )
 }
 
-function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, onCancelEdit, onSaved, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile, notesForLead, existingLeads = [], onFoundExisting }) {
-  const [formState, setForm] = useState(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', saleDate: reportingDayKey(editing.sold_at) || '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
+function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, newProcessFrom, onStartNewProcess, onCancelEdit, onSaved, services, targetBranchId, targetBranchName, isSuperAdmin, isMobile, notesForLead, existingLeads = [], onFoundExisting }) {
+  const [formState, setForm] = useState(() => leadFormInitialState(editing, newProcessFrom))
   const form = { ...formState, service: leadServiceSelection(services, formState.service, Boolean(editing)) }
+  const formRef = useRef(null)
   const [saved, setSaved] = useState(false)
   const [phoneErr, setPhoneErr] = useState('')
   const [noteErr, setNoteErr] = useState('')
@@ -529,20 +553,20 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [suggestedAction, setSuggestedAction] = useState('')
   const [duplicateNotice, setDuplicateNotice] = useState('')
-  const suppressNoticeReset = useRef(false)
+  const [duplicateCandidate, setDuplicateCandidate] = useState(null)
+  const approvedDuplicateKey = useRef('')
 
   useEffect(() => {
-    setForm(editing ? { ...editing, newNote: '', saleAmount: editing.sale_amount != null ? Number(editing.sale_amount).toLocaleString('tr-TR') : '', saleDate: reportingDayKey(editing.sold_at) || '', appointmentDate: toLocalDateValue(editing.appointment_at), appointmentTime: toLocalTimeValue(editing.appointment_at) } : emptyForm)
+    setForm(leadFormInitialState(editing, newProcessFrom))
     setPhoneErr(''); setNoteErr(''); setAppointmentErr(''); setSaleAmountErr(''); setConfirmingDelete(false)
     setSaleDateErr(''); setSaveErr('')
     setSuggestedAction('')
-    if (suppressNoticeReset.current) {
-      // Bu geçiş bir çift-kayıt tespiti sonucu oldu (onFoundExisting) — uyarıyı silme.
-      suppressNoticeReset.current = false
-    } else {
-      setDuplicateNotice('')
-    }
-  }, [editing])
+    setDuplicateNotice('')
+    setDuplicateCandidate(null)
+    approvedDuplicateKey.current = newProcessFrom?.phone
+      ? `${newProcessFrom.branch_id}|${String(newProcessFrom.phone).trim()}`
+      : ''
+  }, [editing, newProcessFrom])
 
   const serviceOptions = leadServiceOptions(services, form.service)
 
@@ -596,23 +620,23 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
 
     const cleanPhone = phoneIsEffectivelyEmpty ? '' : phoneTrimmed
 
-    // Aynı şubede, ismi VE telefonu birebir aynı olan bir kayıt varsa
-    // yeni kayıt açmak yerine mevcut danışanı bulup ekrana getiriyoruz.
+    // Aynı şubede aynı telefonla kayıt varsa kullanıcı karar verir: mevcut
+    // süreci açabilir veya eski tarihleri değiştirmeden yeni bir süreç başlatabilir.
     if (!editing && cleanPhone) {
-      const normalizedName = form.name.trim().toLocaleLowerCase('tr')
       const duplicate = existingLeads.find(l =>
         l.branch_id === targetBranchId &&
-        (l.phone || '').trim() === cleanPhone &&
-        (l.name || '').trim().toLocaleLowerCase('tr') === normalizedName
+        (l.phone || '').trim() === cleanPhone
       )
-      if (duplicate) {
-        suppressNoticeReset.current = true
-        setDuplicateNotice(`"${duplicate.name}" bu isim ve telefon numarasıyla zaten kayıtlı. Yeni kayıt açmak yerine mevcut danışan açıldı, yeni görüşmeyi oraya not olarak ekleyebilirsiniz.`)
-        onFoundExisting && onFoundExisting(duplicate)
+      const duplicateKey = `${targetBranchId}|${cleanPhone}`
+      if (duplicate && approvedDuplicateKey.current !== duplicateKey) {
+        const processCount = existingLeads.filter(l => l.branch_id === targetBranchId && (l.phone || '').trim() === cleanPhone).length
+        setDuplicateCandidate(duplicate)
+        setDuplicateNotice(`Bu telefon numarasıyla ${processCount} eski süreç bulundu. Eski kayıtları ve tarihlerini koruyarak yeni bir süreç başlatabilir veya en son kaydı açabilirsiniz.`)
         return
       }
     }
     setDuplicateNotice('')
+    setDuplicateCandidate(null)
 
     setSubmitting(true)
     setSaveErr('')
@@ -638,6 +662,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         })
       }
       setForm(emptyForm)
+      approvedDuplicateKey.current = ''
       setSaved(true)
       onSaved?.()
       setTimeout(() => setSaved(false), 2000)
@@ -649,11 +674,19 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   }
 
   return (
-    <form onSubmit={submit} style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem' }}>
+    <form ref={formRef} onSubmit={submit} style={{ background: T.card, border: '1px solid #e2e2e2', borderRadius: 12, padding: '1.25rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>{editing ? 'Kaydı düzenle' : 'Yeni görüşme kaydı'}</p>
-        {editing && <button type="button" onClick={onCancelEdit} style={{ fontSize: 12 }}>Vazgeç</button>}
+        <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>{editing ? 'Kaydı düzenle' : newProcessFrom ? 'Yeni süreç başlat' : 'Yeni görüşme kaydı'}</p>
+        {editing && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onStartNewProcess && <button type="button" onClick={() => onStartNewProcess(editing)} style={{ fontSize: 12, border: `1px solid ${T.primary}`, color: T.primary, background: '#fff', borderRadius: 7, padding: '6px 9px', cursor: 'pointer', fontWeight: 700 }}>Yeni süreç başlat</button>}
+          <button type="button" onClick={onCancelEdit} style={{ fontSize: 12 }}>Vazgeç</button>
+        </div>}
       </div>
+      {newProcessFrom && (
+        <div role="status" style={{ fontSize: 12.5, color: '#315C49', background: '#EEF8F3', border: '1px solid #B9DEC9', borderRadius: 8, padding: '10px 12px', marginBottom: 12, lineHeight: 1.55 }}>
+          <strong>{newProcessFrom.name}</strong> için yeni süreç açıyorsunuz. Önceki kayıt, not, randevu ve satış tarihleri değişmeyecek. Yeni kaydın açılış tarihi bugün olacak; aşağıdaki randevu ve satış tarihleri yalnızca bu sürece ait olacak.
+        </div>
+      )}
       {isSuperAdmin && !editing && (
         <p style={{ fontSize: 12, color: '#1a6b3a', background: '#eaf3ec', padding: '6px 10px', borderRadius: 6, margin: '0 0 12px' }}>
           Bu kayıt <strong>{targetBranchName || 'seçili şube'}</strong> şubesine eklenecek. Farklı bir şubeye eklemek için yukarıdaki şube seçiciden değiştirin.
@@ -781,7 +814,20 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
       )}
       {duplicateNotice && (
         <div style={{ background: '#fff7e6', border: '1px solid #e6a817', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: '#7a5400', lineHeight: 1.5 }}>
-          ⚠️ {duplicateNotice}
+          <div>⚠️ {duplicateNotice}</div>
+          {duplicateCandidate && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 9 }}>
+            <button type="button" onClick={() => {
+              setDuplicateNotice('')
+              setDuplicateCandidate(null)
+              onFoundExisting?.(duplicateCandidate)
+            }} style={{ border: '1px solid #C79432', color: '#7a5400', background: '#fff', borderRadius: 7, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Mevcut kaydı aç</button>
+            <button type="button" onClick={() => {
+              approvedDuplicateKey.current = `${targetBranchId}|${String(form.phone || '').trim()}`
+              setDuplicateNotice('')
+              setDuplicateCandidate(null)
+              formRef.current?.requestSubmit()
+            }} style={{ border: 'none', color: '#fff', background: T.primary, borderRadius: 7, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Yeni süreç başlat</button>
+          </div>}
         </div>
       )}
       {saveErr && <div role="alert" style={{ fontSize: 12, color: '#a32d2d', background: '#fff1f0', border: '1px solid #f2b8b5', borderRadius: 8, padding: '9px 11px', marginBottom: 10 }}>{saveErr}</div>}
@@ -3424,6 +3470,7 @@ export function PanelApp() {
   const [branchServices, setBranchServices] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [editingLead, setEditingLead] = useState(null)
+  const [newProcessFrom, setNewProcessFrom] = useState(null)
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
   const [clientStatusFilter, setClientStatusFilter] = useState('all')
@@ -3886,7 +3933,7 @@ export function PanelApp() {
   const relevantBranchId = isSuperAdmin && filterBranch !== 'all' ? filterBranch : currentUser.branch_id
   const currentBranchServices = branchServices.filter(s => s.branch_id === relevantBranchId)
   const activeBranches = branches.filter(b => b.active !== false)
-  const leadFormBranchId = resolveLeadFormBranchId({ editingLead, isSuperAdmin, filterBranch, currentUserBranchId: currentUser.branch_id, activeBranches })
+  const leadFormBranchId = resolveLeadFormBranchId({ editingLead: editingLead || newProcessFrom, isSuperAdmin, filterBranch, currentUserBranchId: currentUser.branch_id, activeBranches })
   const leadFormServices = branchServices.filter(service => service.branch_id === leadFormBranchId)
 
   const scopedLeads = isSuperAdmin ? (filterBranch === 'all' ? leads : leads.filter(l => l.branch_id === filterBranch)) : leads.filter(l => l.branch_id === currentUser.branch_id)
@@ -4078,7 +4125,7 @@ export function PanelApp() {
         <SidebarNav items={visibleNavItems} activeTab={activeTab} onSelect={setActiveTab} currentUser={currentUser}
           isSuperAdmin={isSuperAdmin} canSeeOwnDataOnly={canSeeOwnDataOnly} branchLabel={branchLabel} onLogout={logoutAndClear} onQuickAction={(key) => {
             setActiveTab(key)
-            if (key === 'clients') { setEditingLead(null); setIsLeadFormOpen(true) }
+            if (key === 'clients') { setEditingLead(null); setNewProcessFrom(null); setIsLeadFormOpen(true) }
           }} trialDaysLeft={trialDaysLeft} onShowAnnouncements={() => setShowProductUpdates(true)} hasUnreadAnnouncements={hasUnreadAnnouncements} />
       )}
 
@@ -4195,7 +4242,7 @@ export function PanelApp() {
             branchName={branchName}
             onSaveRule={saveReminderRule}
             canSeePhone={perms.can_see_phone}
-            onOpenLead={(lead) => { setEditingLead(lead); setIsLeadFormOpen(true); setActiveTab('clients') }}
+            onOpenLead={(lead) => { setNewProcessFrom(null); setEditingLead(lead); setIsLeadFormOpen(true); setActiveTab('clients') }}
             users={users} currentUser={currentUser} canEditAny={perms.can_edit_any_lead} canEditLead={canEditLead} canSeeRevenue={perms.can_see_revenue}
             followUpEvents={followUpEvents} onSaveFollowUp={saveFollowUp} followUpError={followUpError}
           />
@@ -4212,8 +4259,8 @@ export function PanelApp() {
               </div>
               {perms.can_add_lead && (
                 <button type="button" onClick={() => {
-                  if (isLeadFormOpen || editingLead) { setEditingLead(null); setIsLeadFormOpen(false) }
-                  else setIsLeadFormOpen(true)
+                  if (isLeadFormOpen || editingLead) { setEditingLead(null); setNewProcessFrom(null); setIsLeadFormOpen(false) }
+                  else { setNewProcessFrom(null); setIsLeadFormOpen(true) }
                 }} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 14px', border: 'none', borderRadius: 10,
                   background: T.primary, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 9px 18px rgba(111,97,217,.22)',
@@ -4226,16 +4273,17 @@ export function PanelApp() {
 
             {perms.can_add_lead && (isLeadFormOpen || editingLead) && (
               <div style={{ marginBottom: 18 }}>
-                <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead}
-                  onCancelEdit={() => { setEditingLead(null); setIsLeadFormOpen(false) }}
-                  onSaved={() => { setEditingLead(null); setIsLeadFormOpen(false) }}
+                <LeadForm onAdd={addLead} onUpdate={updateLead} onDelete={deleteLead} canDelete={canDeleteLead()} currentUser={currentUser} editing={editingLead} newProcessFrom={newProcessFrom}
+                  onStartNewProcess={(lead) => { setNewProcessFrom(lead); setEditingLead(null); setIsLeadFormOpen(true) }}
+                  onCancelEdit={() => { setEditingLead(null); setNewProcessFrom(null); setIsLeadFormOpen(false) }}
+                  onSaved={() => { setEditingLead(null); setNewProcessFrom(null); setIsLeadFormOpen(false) }}
                   services={leadFormServices} isMobile={isMobile}
                   targetBranchId={leadFormBranchId}
                   targetBranchName={branchName(leadFormBranchId)}
                   isSuperAdmin={isSuperAdmin}
                   notesForLead={editingLead ? leadNotes.filter(n => n.lead_id === editingLead.id) : []}
                   existingLeads={visibleLeads}
-                  onFoundExisting={(lead) => { setEditingLead(lead); setIsLeadFormOpen(true) }}
+                  onFoundExisting={(lead) => { setNewProcessFrom(null); setEditingLead(lead); setIsLeadFormOpen(true) }}
                 />
               </div>
             )}
@@ -4283,7 +4331,7 @@ export function PanelApp() {
                   )}
                   {clientRows.map(lead => (
                     <LeadRow key={lead.id} lead={lead} canSeePhone={perms.can_see_phone} canEdit={canEditLead(lead)}
-                      onEdit={(selected) => { setEditingLead(selected); setIsLeadFormOpen(true) }}
+                      onEdit={(selected) => { setNewProcessFrom(null); setEditingLead(selected); setIsLeadFormOpen(true) }}
                       showBranch={isSuperAdmin && filterBranch === 'all'} branchName={branchName(lead.branch_id)} isMobile={isMobile}
                       noteCount={noteCountByLeadId[lead.id] || 0} rule={reminderRuleMap[`${lead.branch_id}__${lead.result}`] || null} />
                   ))}
