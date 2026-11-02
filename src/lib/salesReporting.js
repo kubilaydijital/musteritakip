@@ -1,6 +1,7 @@
 import { isValidBookingDate, turkeyDateString } from './booking.js'
 
 export const CUSTOMER_RESULT = 'Müşteri oldu'
+export const META_LEAD_CHANNELS = ['Instagram', 'WhatsApp']
 
 export const MAX_SALE_AMOUNT = 999999999.99
 
@@ -56,6 +57,21 @@ export function isInReportPeriod(value, start, endExclusive) {
   return time >= start.getTime() && time < endExclusive.getTime()
 }
 
+export function isMetaLead(lead) {
+  return META_LEAD_CHANNELS.includes(lead?.channel)
+}
+
+// Randevu raporları kayıt açılış gününe değil, takvimdeki gerçek randevu
+// zamanına göre hazırlanır. Böylece önceki ay açılan bir danışanın bu ayki
+// randevusu bu aya; bu ay açılan fakat gelecek ay randevusu olan kayıt da
+// gelecek aya yazılır.
+export function appointmentsInPeriod(leads, start, endExclusive, { metaOnly = false } = {}) {
+  return leads.filter(lead => (
+    isInReportPeriod(lead.appointment_at, start, endExclusive)
+    && (!metaOnly || isMetaLead(lead))
+  ))
+}
+
 // Eski satışların gerçek tarihini tahmin etmiyoruz. Tarihi henüz doğrulanmamış
 // kayıtlar, önceki raporlardaki kayıt tarihiyle ve açık bir uyarıyla hesaplanır.
 export function effectiveSaleAt(lead) {
@@ -71,8 +87,8 @@ export function salesInPeriod(leads, start, endExclusive) {
 export function summarizeSales(sales) {
   const withAmount = sales.filter(lead => Number.isFinite(Number(lead.sale_amount)) && Number(lead.sale_amount) > 0)
   const revenue = withAmount.reduce((sum, lead) => sum + Number(lead.sale_amount), 0)
-  const metaSales = sales.filter(lead => ['Instagram', 'WhatsApp'].includes(lead.channel))
-  const metaRevenue = withAmount.filter(lead => ['Instagram', 'WhatsApp'].includes(lead.channel))
+  const metaSales = sales.filter(isMetaLead)
+  const metaRevenue = withAmount.filter(isMetaLead)
     .reduce((sum, lead) => sum + Number(lead.sale_amount), 0)
   return {
     count: sales.length, revenue, withAmountCount: withAmount.length,
