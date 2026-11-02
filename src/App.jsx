@@ -12,7 +12,7 @@ import { followUpConversionWriteError } from './lib/followUpConversions.js'
 import { leadServiceOptions, leadServiceSelection, resolveLeadFormBranchId } from './lib/leadServices.js'
 import { turkeyDateString } from './lib/booking.js'
 import {
-  buildMessageComparison, isInReportPeriod, leadWriteError, reportingDayKey,
+  appointmentsInPeriod, buildMessageComparison, isInReportPeriod, isMetaLead, leadWriteError, reportingDayKey,
   hasMissingSaleAmount, parseSaleAmountInput, saleAmountError,
   saleDateError, salesInPeriod, savedSaleAt, summarizeSales, turkeyDayStart,
 } from './lib/salesReporting.js'
@@ -199,14 +199,14 @@ function relativePercentChange(current, previous) {
   return Math.round(((current - previous) / Math.abs(previous)) * 100)
 }
 
-function buildPeriodPerformance(leads, ads, periodSales) {
+function buildPeriodPerformance(appointmentLeads, ads, periodSales) {
   const metaAds = ads.filter(ad => ad.channel === 'Meta (Otomatik)')
   const metaMessages = metaAds.reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
   const metaSpend = metaAds.reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
-  const cohortCustomers = leads.filter(lead => lead.result === 'Müşteri oldu')
-  const customers = periodSales || cohortCustomers
-  const appointed = leads.filter(lead => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(lead.result))
-  const noShow = leads.filter(lead => lead.result === 'Randevuya gelmedi')
+  const appointed = appointmentLeads
+  const customers = periodSales || []
+  const metaAppointments = appointed.filter(isMetaLead)
+  const noShow = appointed.filter(lead => lead.result === 'Randevuya gelmedi')
   const salesSummary = summarizeSales(customers)
 
   return {
@@ -217,8 +217,8 @@ function buildPeriodPerformance(leads, ads, periodSales) {
     revenue: salesSummary.revenue,
     avgTicket: salesSummary.avgTicket,
     metaRoas: metaSpend > 0 ? salesSummary.metaRevenue / metaSpend : null,
-    appointmentRate: metaMessages > 0 ? (appointed.length / metaMessages) * 100 : null,
-    salesRate: appointed.length > 0 ? (cohortCustomers.length / appointed.length) * 100 : null,
+    appointmentRate: metaMessages > 0 ? (metaAppointments.length / metaMessages) * 100 : null,
+    salesRate: appointed.length > 0 ? (customers.length / appointed.length) * 100 : null,
     noShowRate: appointed.length > 0 ? (noShow.length / appointed.length) * 100 : null,
   }
 }
@@ -2461,14 +2461,14 @@ function ReportFunnel({ metrics }) {
     { label: 'Meta mesaj', value: metrics.messages, color: '#7C5CFC' },
     { label: 'Sistem kaydı', value: metrics.records, color: '#4D8CE3' },
     { label: 'Randevu', value: metrics.appointments, color: '#E5A536' },
-    { label: 'Müşteri oldu', value: metrics.cohortSales, color: T.green },
+    { label: 'Satış', value: metrics.sales, color: T.green },
   ]
   const maxValue = Math.max(...stages.map(stage => stage.value), 1)
 
   return (
     <div>
       <p style={{ fontSize: 14, color: T.text, margin: '0 0 4px', fontWeight: 750 }}>Satış hunisi</p>
-      <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 16px' }}>Seçili dönemde açılan kayıtların güncel sonuçları. Ciro kartları ise satış tarihine göredir.</p>
+      <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 16px' }}>Kayıt açılışı, randevu ve satış kendi gerçekleşme tarihine göre seçili döneme yazılır.</p>
       <div style={{ display: 'grid', gap: 13 }}>
         {stages.map(stage => (
           <div key={stage.label}>
@@ -2510,16 +2510,16 @@ function monthlyReportWindow(monthValue) {
 
 function buildMonthlyReportMetrics(leads, adsData, start, end) {
   const periodLeads = leads.filter(lead => isInReportPeriod(lead.date, start, end))
+  const periodAppointments = appointmentsInPeriod(leads, start, end)
+  const metaAppointments = periodAppointments.filter(isMetaLead)
   const periodSales = salesInPeriod(leads, start, end)
   const periodAds = adsData.filter(ad => isInReportPeriod(ad.date, start, end))
   const metaAds = periodAds.filter(ad => ad.channel === 'Meta (Otomatik)')
   const messages = metaAds.reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
   const metaSpend = metaAds.reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
-  const appointed = periodLeads.filter(lead => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(lead.result))
-  const arrived = periodLeads.filter(lead => ['Satın almadı', 'Müşteri oldu'].includes(lead.result))
-  const cohortSales = periodLeads.filter(lead => lead.result === 'Müşteri oldu')
-  const noShow = periodLeads.filter(lead => lead.result === 'Randevuya gelmedi')
-  const notBought = periodLeads.filter(lead => lead.result === 'Satın almadı')
+  const arrived = periodAppointments.filter(lead => ['Satın almadı', 'Müşteri oldu'].includes(lead.result))
+  const noShow = periodAppointments.filter(lead => lead.result === 'Randevuya gelmedi')
+  const notBought = periodAppointments.filter(lead => lead.result === 'Satın almadı')
   const noResponse = periodLeads.filter(lead => lead.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
   const sales = summarizeSales(periodSales)
   const serviceRevenue = new Map()
@@ -2532,13 +2532,13 @@ function buildMonthlyReportMetrics(leads, adsData, start, end) {
     .sort((a, b) => b.revenue - a.revenue)
   return {
     periodLeads, periodSales, periodAds, records: periodLeads.length,
-    messages, metaSpend, appointments: appointed.length, arrived: arrived.length,
-    cohortSales: cohortSales.length, sales: sales.count, revenue: sales.revenue,
+    messages, metaSpend, appointments: periodAppointments.length, arrived: arrived.length,
+    metaSales: sales.metaSalesCount, sales: sales.count, revenue: sales.revenue,
     avgTicket: sales.avgTicket, roas: metaSpend > 0 ? sales.metaRevenue / metaSpend : null,
     noShow: noShow.length, notBought: notBought.length, noResponse: noResponse.length,
-    appointmentRate: messages > 0 ? Math.round((appointed.length / messages) * 100) : null,
-    salesRate: appointed.length > 0 ? Math.round((cohortSales.length / appointed.length) * 100) : null,
-    noShowRate: appointed.length > 0 ? Math.round((noShow.length / appointed.length) * 100) : 0,
+    appointmentRate: messages > 0 ? Math.round((metaAppointments.length / messages) * 100) : null,
+    salesRate: messages > 0 ? Math.round((sales.metaSalesCount / messages) * 100) : null,
+    noShowRate: periodAppointments.length > 0 ? Math.round((noShow.length / periodAppointments.length) * 100) : 0,
     services,
   }
 }
@@ -2579,7 +2579,7 @@ function MonthlyPerformanceReport({ leads, adsData, isMobile, canExport, scopeLa
     { label: 'Meta mesaj', value: metaReport.ready ? metrics.messages : null, color: '#7257E8' },
     { label: 'Randevu', value: metrics.appointments, color: '#377BD1' },
     { label: 'Geldi', value: metrics.arrived, color: '#20936F' },
-    { label: 'Müşteri oldu', value: metrics.cohortSales, color: '#B47808' },
+    { label: 'Satış', value: metrics.sales, color: '#B47808' },
   ]
   const funnelMax = Math.max(...funnel.map(item => item.value || 0), 1)
 
@@ -2604,7 +2604,7 @@ function MonthlyPerformanceReport({ leads, adsData, isMobile, canExport, scopeLa
       : '<p class="empty">Bu ay için hizmet bazında satış verisi yok.</p>'
     reportWindow.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeReportHtml(scopeLabel)} - ${escapeReportHtml(period.label)} performans raporu</title><style>
       @page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0;color:#17233A;font-family:Inter,Arial,sans-serif;background:#fff}header{padding:22px 24px;border-radius:18px;background:linear-gradient(135deg,#182640,#29385A);color:#fff}header small{display:block;opacity:.72;font-weight:700;letter-spacing:.08em;text-transform:uppercase}header h1{margin:8px 0 4px;font-size:26px}header p{margin:0;opacity:.78}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.metric{border:1px solid #E3E6EC;border-radius:13px;padding:13px;background:#FBFBFD}.metric span,.metric small{display:block;color:#6A758A;font-size:10px;font-weight:700}.metric strong{display:block;margin:7px 0 5px;font-size:20px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.box{border:1px solid #E3E6EC;border-radius:14px;padding:15px;break-inside:avoid}.box h2{margin:0 0 3px;font-size:15px}.box>p{margin:0 0 13px;color:#6A758A;font-size:10px}.bar-row{margin:0 0 12px}.bar-row>div{display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:5px}.bar-row i{display:block;height:7px;border-radius:99px;background:#EDF0F5;overflow:hidden}.bar-row em{display:block;height:100%;border-radius:99px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #ECEEF2}th{color:#6A758A;font-size:9px;text-transform:uppercase}.good{color:#16765D;font-weight:800}.warn{color:#B04A45;font-weight:800}.losses{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.loss{padding:10px;border-radius:10px;background:#FFF4F1}.loss b{display:block;font-size:18px;color:#B04A45}.loss span{font-size:9px;color:#6A758A}.note{margin-top:12px;padding:11px 13px;border-radius:12px;background:#F2F0FF;color:#5646A9;font-size:10px;line-height:1.45}.empty{font-size:11px;color:#6A758A}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}@media(max-width:700px){.metrics,.grid{grid-template-columns:1fr 1fr}}
-    </style></head><body><header><small>Müşteri Takip · Aylık Performans</small><h1>${escapeReportHtml(scopeLabel)}</h1><p>${escapeReportHtml(period.label)}${isCurrentMonth ? ' · Devam eden ay, sonuçlar geçicidir' : ''}</p></header><section class="metrics">${metricCards}</section><section class="grid"><article class="box"><h2>Satış hunisi</h2><p>Mesajdan satışa ilerleme</p>${funnelHtml}</article><article class="box"><h2>Önceki ay karşılaştırması</h2><p>${escapeReportHtml(period.previousLabel)} ile karşılaştırma</p><table><thead><tr><th>Gösterge</th><th>Bu ay</th><th>Önceki</th><th>Değişim</th></tr></thead><tbody>${comparisonHtml}</tbody></table></article><article class="box"><h2>Hizmete göre ciro</h2><p>Satış tarihine göre en güçlü hizmetler</p>${serviceHtml}</article><article class="box"><h2>Kayıp analizi</h2><p>Seçili ayda açılan kayıtların güncel sonucu</p><div class="losses"><div class="loss"><b>${metrics.noShow}</b><span>Randevuya gelmedi</span></div><div class="loss"><b>${metrics.notBought}</b><span>Geldi, satın almadı</span></div><div class="loss"><b>${metrics.noResponse}</b><span>Cevap alınamadı</span></div></div><div class="note">Satış ve ciro satış tarihine; huni ve kayıp analizi kayıt açılış tarihine göre hazırlanır. Meta göstergeleri yalnızca dönem verisi doğrulandığında gösterilir.</div></article></section></body></html>`)
+    </style></head><body><header><small>Müşteri Takip · Aylık Performans</small><h1>${escapeReportHtml(scopeLabel)}</h1><p>${escapeReportHtml(period.label)}${isCurrentMonth ? ' · Devam eden ay, sonuçlar geçicidir' : ''}</p></header><section class="metrics">${metricCards}</section><section class="grid"><article class="box"><h2>Satış hunisi</h2><p>Her adım kendi gerçekleşme tarihine göre</p>${funnelHtml}</article><article class="box"><h2>Önceki ay karşılaştırması</h2><p>${escapeReportHtml(period.previousLabel)} ile karşılaştırma</p><table><thead><tr><th>Gösterge</th><th>Bu ay</th><th>Önceki</th><th>Değişim</th></tr></thead><tbody>${comparisonHtml}</tbody></table></article><article class="box"><h2>Hizmete göre ciro</h2><p>Satış tarihine göre en güçlü hizmetler</p>${serviceHtml}</article><article class="box"><h2>Kayıp analizi</h2><p>Randevu kayıpları randevu tarihine göre</p><div class="losses"><div class="loss"><b>${metrics.noShow}</b><span>Randevuya gelmedi</span></div><div class="loss"><b>${metrics.notBought}</b><span>Geldi, satın almadı</span></div><div class="loss"><b>${metrics.noResponse}</b><span>Cevap alınamadı</span></div></div><div class="note">Sistem kaydı ve cevapsız sonuç kayıt açılış tarihine; randevu kayıpları randevu tarihine; satış ve ciro satış tarihine göre hazırlanır. Meta göstergeleri yalnızca dönem verisi doğrulandığında gösterilir.</div></article></section></body></html>`)
     reportWindow.document.close()
     reportWindow.focus()
     window.setTimeout(() => reportWindow.print(), 250)
@@ -2674,6 +2674,7 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
   }, [range, customStart, customEnd])
 
   const periodLeads = useMemo(() => leads.filter(lead => isInReportPeriod(lead.date, period.start, period.end)), [leads, period])
+  const periodAppointments = useMemo(() => appointmentsInPeriod(leads, period.start, period.end), [leads, period])
   const periodSales = useMemo(() => salesInPeriod(leads, period.start, period.end), [leads, period])
   const periodAds = useMemo(() => adsData.filter(ad => isInReportPeriod(ad.date, period.start, period.end)), [adsData, period])
   const metaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: adsData, start: period.start, end: period.end, adsError })
@@ -2688,12 +2689,10 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
     const metaAds = periodAds.filter(ad => ad.channel === 'Meta (Otomatik)')
     const messages = metaAds.reduce((sum, ad) => sum + (Number(ad.messages) || 0), 0)
     const metaSpend = metaAds.reduce((sum, ad) => sum + (Number(ad.spend) || 0), 0)
-    const appointments = periodLeads.filter(lead => lead.appointment_at || lead.result === 'Randevu aldı').length
     const summary = summarizeSales(periodSales)
-    return { spend, messages, records: periodLeads.length, appointments, sales: summary.count,
-      cohortSales: periodLeads.filter(lead => lead.result === 'Müşteri oldu').length,
+    return { spend, messages, records: periodLeads.length, appointments: periodAppointments.length, sales: summary.count,
       revenue: summary.revenue, metaSpend, roas: metaSpend > 0 ? (summary.metaRevenue / metaSpend).toFixed(1) : '—' }
-  }, [periodAds, periodLeads, periodSales])
+  }, [periodAds, periodAppointments, periodLeads, periodSales])
 
   const insights = useMemo(() => {
     const servicesByRevenue = {}
@@ -2723,7 +2722,7 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
         <div>
           <h1 style={{ fontSize: 23, fontWeight: 800, color: T.text, margin: '0 0 5px' }}>Raporlar</h1>
-          <p style={{ margin: 0, color: T.textSoft, fontSize: 13.5 }}>Satış ve ciro satış tarihine; randevu ve sistem kaydı kayıt açılış tarihine göre hesaplanır.</p>
+          <p style={{ margin: 0, color: T.textSoft, fontSize: 13.5 }}>Sistem kaydı açılış tarihine, randevu randevu tarihine, satış ve ciro satış tarihine göre hesaplanır.</p>
         </div>
         {canExport && <ExportButtons rows={leadsToExportRows(exportLeads, branchName, showBranch)} baseFilename={`rapor-${turkeyDateString()}`} sheetName="Rapor" />}
       </div>
@@ -3272,32 +3271,32 @@ function FunnelSection({ stats, isMobile }) {
       bg: 'linear-gradient(135deg, rgba(124,92,252,0.38), rgba(124,92,252,0.08))'
     },
     {
-      label: '2. Randevu Verildi',
+      label: '2. Meta kaynaklı randevu',
       value: stats.appointed,
       icon: <CalendarDays size={20} />,
       color: T.blue,
       bg: 'linear-gradient(135deg, rgba(59,130,246,0.36), rgba(59,130,246,0.08))'
     },
     {
-      label: '3. Satış Oldu',
-      value: stats.customers,
+      label: '3. Meta kaynaklı satış',
+      value: stats.metaSales,
       icon: <ShoppingCart size={20} />,
       color: T.orange,
       bg: 'linear-gradient(135deg, rgba(245,158,11,0.35), rgba(245,158,11,0.08))'
     },
   ]
 
-  const stageRates = [null, stats.pctAppointmentFromMeta, stats.pctSold]
+  const stageRates = [null, stats.pctAppointmentFromMeta, stats.pctMetaSalesFromMessages]
 
   return (
     <div style={{ ...cardStyle, padding: isMobile ? 14 : 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0, marginBottom: 18 }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: T.text }}>
-            Bu ayın satış hunisi
+            Bu ayın Meta satış hunisi
           </h2>
           <p style={{ fontSize: 12.5, color: T.textSoft, margin: '4px 0 0' }}>
-            Meta mesajından randevuya ve satışa uzanan bu ayki sonuçlar.
+            Mesaj günü, randevu günü ve satış günü bu ay içinde olan Meta sonuçları.
           </p>
         </div>
 
@@ -3310,7 +3309,7 @@ function FunnelSection({ stats, isMobile }) {
           fontSize: 12,
           fontWeight: 700
         }}>
-          {stats.rate == null ? 'Meta dönüşümü hesaplanamıyor' : `Meta'dan satışa dönüşüm %${stats.rate}`}
+          {stats.rate == null ? 'Meta oranı hesaplanamıyor' : `Mesaja göre Meta satış oranı %${stats.rate}`}
         </span>
       </div>
 
@@ -3359,7 +3358,7 @@ function FunnelSection({ stats, isMobile }) {
                 <div style={{ minHeight: 27, marginTop: 8 }}>
                   {stageRates[i] != null && (
                     <span style={{ display: 'inline-flex', padding: '4px 7px', borderRadius: 999, fontSize: 10.5, fontWeight: 750, color: s.color, background: 'rgba(255,255,255,.72)', whiteSpace: 'nowrap' }}>
-                      Dönüşüm %{stageRates[i]}
+                      Mesaja oran %{stageRates[i]}
                     </span>
                   )}
                 </div>
@@ -3387,19 +3386,20 @@ function FunnelSection({ stats, isMobile }) {
 
 function LossAnalysis({ stats }) {
   const items = [
-    { text: 'Randevu verildi, gelmedi', count: stats.noShowCount, rate: stats.pctNoShow },
-    { text: 'Geldi, satın almadı', count: stats.notBoughtCount, rate: stats.pctNotBought },
-    { text: 'Cevap alınamadı', count: stats.noResponseCount, rate: stats.pctNoResponse },
+    { text: 'Randevu verildi, gelmedi', basis: 'Bu ayki randevuların', count: stats.noShowCount, rate: stats.pctNoShow },
+    { text: 'Geldi, satın almadı', basis: 'Bu ay gelenlerin', count: stats.notBoughtCount, rate: stats.pctNotBought },
+    { text: 'Cevap alınamadı', basis: 'Bu ay açılan kayıtların', count: stats.noResponseCount, rate: stats.pctNoResponse },
   ]
   return (
     <div style={{ ...cardStyle, padding: '1.25rem' }}>
-      <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 16px', color: T.text }}>Kayıp Analizi</h2>
+      <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px', color: T.text }}>Bu ayın kayıp analizi</h2>
+      <p style={{ fontSize: 11.5, lineHeight: 1.45, color: T.textSoft, margin: '0 0 10px' }}>Gelmeme ve satın almama randevu tarihine; cevapsız kayıtlar açılış tarihine göre.</p>
       {items.map((it, i) => (
         <div key={it.text} style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 0',
+          display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 12, alignItems: 'center', padding: '13px 0',
           borderBottom: i < items.length - 1 ? `1px solid ${T.border}` : 'none', fontSize: 13.5
         }}>
-          <span style={{ color: T.text }}>{it.text}</span>
+          <span style={{ color: T.text }}><span style={{ display: 'block' }}>{it.text}</span><small style={{ color: T.textFaint }}>{it.basis}</small></span>
           <span style={{ color: T.textSoft }}>{it.count} kişi</span>
           <span style={{ color: T.red, fontWeight: 700 }}>%{it.rate}</span>
         </div>
@@ -4117,10 +4117,8 @@ export function PanelApp() {
   }
   function branchName(id) { return (branches.find(b => b.id === id) || {}).name || '—' }
 
-  // Genel Bakışın ilk adımı Meta'nın bu ay bildirdiği gerçek reklam mesajlarıdır.
-  // Sonraki adımlar aynı ay sisteme işlenen randevu ve satış sonuçlarıdır;
-  // böylece reklamdan gelen tüm mesajlar, henüz kayda dönüşmemiş olanlar dahil,
-  // satış hunisinde görünür.
+  // Genel Bakışta her olay kendi gerçek iş gününe yazılır: Meta mesajı reklam
+  // gününe, randevu appointment_at alanına, satış sold_at alanına göre.
   const now = new Date(`${turkeyDateString()}T12:00:00`)
   const currentPeriodStart = turkeyDayStart(dateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
   const currentPeriodEnd = turkeyDayStart(dateInputValue(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)))
@@ -4133,6 +4131,8 @@ export function PanelApp() {
   // önceki ayın aynı gün sayısıyla karşılaştırılır.
   const monthlyLeads = scopedLeads.filter(lead => isInDateWindow(lead.date, currentPeriodStart, currentPeriodEnd))
   const previousPeriodLeads = scopedLeads.filter(lead => isInDateWindow(lead.date, previousPeriodStart, previousPeriodEnd))
+  const monthlyAppointments = appointmentsInPeriod(scopedLeads, currentPeriodStart, currentPeriodEnd)
+  const previousPeriodAppointments = appointmentsInPeriod(scopedLeads, previousPeriodStart, previousPeriodEnd)
   const currentPeriodAds = scopedAds.filter(ad => isInDateWindow(ad.date, currentPeriodStart, currentPeriodEnd))
   const previousPeriodAds = scopedAds.filter(ad => isInDateWindow(ad.date, previousPeriodStart, previousPeriodEnd))
   const monthlySales = salesInPeriod(scopedLeads, currentPeriodStart, currentPeriodEnd)
@@ -4141,11 +4141,12 @@ export function PanelApp() {
   const metaBranches = isSuperAdmin && filterBranch === 'all' ? branches : branches.filter(b => b.id === relevantBranchId)
   const currentMetaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: scopedAds, start: currentPeriodStart, end: currentPeriodEnd, adsError })
   const previousMetaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: scopedAds, start: previousPeriodStart, end: previousPeriodEnd, adsError })
-  const currentPerformance = maskMetaPerformance(buildPeriodPerformance(monthlyLeads, currentPeriodAds, monthlySales), currentMetaReport)
-  const previousPerformance = maskMetaPerformance(buildPeriodPerformance(previousPeriodLeads, previousPeriodAds, previousPeriodSales), previousMetaReport)
+  const currentPerformance = maskMetaPerformance(buildPeriodPerformance(monthlyAppointments, currentPeriodAds, monthlySales), currentMetaReport)
+  const previousPerformance = maskMetaPerformance(buildPeriodPerformance(previousPeriodAppointments, previousPeriodAds, previousPeriodSales), previousMetaReport)
   const metaMessages = currentMetaReport.ready ? currentPerformance.metaMessages : null
   const metaSpend = currentPerformance.metaSpend
-  const customers = monthlyLeads.filter(l => l.result === 'Müşteri oldu')
+  const monthlyMetaAppointments = monthlyAppointments.filter(isMetaLead)
+  const monthlyMetaSales = monthlySales.filter(isMetaLead)
   const { revenue, avgTicket, metaRevenue } = monthlySalesSummary
   const followUpWaiting = visibleLeads.reduce((count, lead) => {
     const reminder = staleness(
@@ -4155,29 +4156,28 @@ export function PanelApp() {
     )
     return count + (reminder && reminder.level !== 'cold' ? 1 : 0)
   }, 0)
-  const noShow = monthlyLeads.filter(l => l.result === 'Randevuya gelmedi')
-  const notBought = monthlyLeads.filter(l => l.result === 'Satın almadı')
+  const noShow = monthlyAppointments.filter(l => l.result === 'Randevuya gelmedi')
+  const notBought = monthlyAppointments.filter(l => l.result === 'Satın almadı')
   const noResponse = monthlyLeads.filter(l => l.result === 'Cevap yazıldı, müşteriden dönüş gelmedi')
-  const appointed = monthlyLeads.filter(l => ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Müşteri oldu'].includes(l.result))
-  const arrived = monthlyLeads.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
+  const arrived = monthlyAppointments.filter(l => ['Satın almadı', 'Müşteri oldu'].includes(l.result))
   const stats = {
     total: monthlyLeads.length,
     metaMessages,
-    customers: customers.length,
+    metaSales: monthlyMetaSales.length,
     ig: monthlyLeads.filter(l => l.channel === 'Instagram').length,
     wa: monthlyLeads.filter(l => l.channel === 'WhatsApp').length,
     organik: monthlyLeads.filter(l => l.channel === 'Organik').length,
-    rate: metaMessages ? Math.round((customers.length / metaMessages) * 100) : null,
+    rate: metaMessages ? Math.round((monthlyMetaSales.length / metaMessages) * 100) : null,
     revenue, avgTicket, withAmountCount: monthlySalesSummary.withAmountCount,
     metaRoas: currentMetaReport.ready && metaSpend > 0 ? (metaRevenue / metaSpend).toFixed(1) : '—',
     followUpWaiting,
-    appointed: appointed.length, arrived: arrived.length,
+    appointed: monthlyMetaAppointments.length, arrived: arrived.length,
     noShowCount: noShow.length, notBoughtCount: notBought.length, noResponseCount: noResponse.length,
-    pctAppointmentFromMeta: metaMessages ? Math.round((appointed.length / metaMessages) * 100) : null,
-    pctAppointed: monthlyLeads.length ? Math.round((appointed.length / monthlyLeads.length) * 100) : 0,
-    pctArrived: appointed.length ? Math.round((arrived.length / appointed.length) * 100) : 0,
-    pctSold: appointed.length ? Math.round((customers.length / appointed.length) * 100) : 0,
-    pctNoShow: appointed.length ? Math.round((noShow.length / appointed.length) * 100) : 0,
+    pctAppointmentFromMeta: metaMessages ? Math.round((monthlyMetaAppointments.length / metaMessages) * 100) : null,
+    pctMetaSalesFromMessages: metaMessages ? Math.round((monthlyMetaSales.length / metaMessages) * 100) : null,
+    pctAppointed: monthlyLeads.length ? Math.round((monthlyAppointments.length / monthlyLeads.length) * 100) : 0,
+    pctArrived: monthlyAppointments.length ? Math.round((arrived.length / monthlyAppointments.length) * 100) : 0,
+    pctNoShow: monthlyAppointments.length ? Math.round((noShow.length / monthlyAppointments.length) * 100) : 0,
     pctNotBought: arrived.length ? Math.round((notBought.length / arrived.length) * 100) : 0,
     pctNoResponse: monthlyLeads.length ? Math.round((noResponse.length / monthlyLeads.length) * 100) : 0,
   }
@@ -4202,7 +4202,7 @@ export function PanelApp() {
   const noShowRateChange = Number.isFinite(currentPerformance.noShowRate) && Number.isFinite(previousPerformance.noShowRate)
     ? Math.round(currentPerformance.noShowRate - previousPerformance.noShowRate)
     : null
-  const hasPreviousPerformance = previousPeriodLeads.length > 0 || previousPeriodSales.length > 0 || previousPeriodAds.length > 0
+  const hasPreviousPerformance = previousPeriodLeads.length > 0 || previousPeriodAppointments.length > 0 || previousPeriodSales.length > 0 || previousPeriodAds.length > 0
   const movementCandidates = [
     { label: 'Randevu sayısı', delta: appointmentChange },
     { label: 'Satış sayısı', delta: customerChange },
@@ -4309,7 +4309,7 @@ export function PanelApp() {
             <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Genel Bakış</h1>
             <p style={{ fontSize: 13.5, color: T.textSoft, margin: '0 0 20px' }}>
               {isSuperAdmin && filterBranch === 'all' ? 'Tüm şubeler (toplu rapor)' : branchName(isSuperAdmin ? filterBranch : currentUser.branch_id)}
-              {' · '}{now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })} · Ciro satış tarihine, huni kayıt açılış tarihine göre
+              {' · '}{now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })} · Randevu ve satış kendi gerçekleşme tarihine göre
             </p>
             <MetaDataHealth report={currentMetaReport} onReview={perms.can_enter_ads_data ? () => setActiveTab('ads') : undefined} />
             <StaleAlerts leads={visibleLeads} canSeePhone={perms.can_see_phone} currentUserName={currentUser.full_name || currentUser.email} isStaff={canSeeOwnDataOnly} noteCountMap={noteCountByLeadId} ruleMap={reminderRuleMap} onViewAll={() => setActiveTab('opportunities')} />
