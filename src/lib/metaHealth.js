@@ -72,3 +72,28 @@ export function metaPeriodHealth({ health = EMPTY_META_HEALTH, branches = [], ad
 export function maskMetaPerformance(performance, report) {
   return report.ready ? performance : { ...performance, metaRoas: null, appointmentRate: null }
 }
+
+export function metaMessageBreakdown({ health = EMPTY_META_HEALTH, branches = [], start, end }) {
+  const since = reportingDayKey(start)
+  const until = reportingDayKey(new Date(new Date(end).getTime() - 1))
+  const branchIds = new Set(branches.map(branch => branch.id))
+  const result = { dm: 0, profile: 0, other: 0, unclassified: 0, total: 0, classified: 0 }
+  if (!since || !until || since > until || branchIds.size === 0) return result
+  for (const row of health.days || []) {
+    const day = reportingDayKey(row.date)
+    if (!branchIds.has(row.branch_id) || !day || day < since || day > until) continue
+    const total = Math.max(0, Number(row.messages) || 0)
+    const source = row.message_breakdown && typeof row.message_breakdown === 'object' ? row.message_breakdown : {}
+    const dm = Math.max(0, Number(source.dm) || 0)
+    const profile = Math.max(0, Number(source.profile) || 0)
+    const other = Math.max(0, Number(source.other) || 0)
+    const classified = Math.min(total, dm + profile + other)
+    result.dm += dm
+    result.profile += profile
+    result.other += other
+    result.unclassified += Math.max(0, total - classified)
+    result.total += total
+    result.classified += classified
+  }
+  return result
+}
