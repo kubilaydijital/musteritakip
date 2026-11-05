@@ -36,6 +36,16 @@ function metric(value, integer = false) {
   if (!Number.isFinite(n) || n < 0 || (integer && !Number.isSafeInteger(n))) throw new MetaSyncError('INVALID_DATA')
   return n
 }
+const MESSAGE_ACTION = 'onsite_conversion.messaging_conversation_started_7d'
+const PROFILE_VISIT_ACTION = /(?:instagram.*profile.*visit|profile.*visit)/i
+function messageBreakdown() { return { dm: 0, profile: 0, other: 0 } }
+function campaignMessageCategory(row) {
+  const actions = row.actions || []
+  const name = String(row.campaign_name || '').toLocaleLowerCase('tr-TR')
+  if (actions.some(action => PROFILE_VISIT_ACTION.test(String(action?.action_type || ''))) || /\bprofil(?:e)?\b/.test(name)) return 'profile'
+  if (/\b(dm|mesaj|message|whatsapp)\b/.test(name)) return 'dm'
+  return 'other'
+}
 async function jsonResponse(response, fallback) {
   let data
   try { data = await response.json() } catch { throw new MetaSyncError(fallback) }
@@ -52,26 +62,40 @@ export async function collectMetaDays({ accountId, token, since, until, fetchImp
   const account = await jsonResponse(await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${accountId}?fields=currency,timezone_name`, options), 'META_FAILED')
   if (account.currency !== 'TRY' || account.timezone_name !== 'Europe/Istanbul') throw new MetaSyncError('ACCOUNT_SETTINGS')
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${accountId}/insights`)
-  url.searchParams.set('fields', 'spend,impressions,actions,date_start,date_stop')
+  // Kampanya seviyesinde çekiyoruz: hesap toplamı değişmeden DM ve profil
+  // reklamlarından başlayan konuşmalar ayrı ayrı raporlanabilir.
+  url.searchParams.set('fields', 'campaign_id,campaign_name,spend,impressions,actions,date_start,date_stop')
+  url.searchParams.set('level', 'campaign')
   url.searchParams.set('time_range', JSON.stringify({ since, until }))
   url.searchParams.set('time_increment', '1')
-  url.searchParams.set('limit', '100')
-  const byDay = new Map(), cursors = new Set()
+  url.searchParams.set('limit', '500')
+  const byDay = new Map(), seenCampaignDays = new Set(), cursors = new Set()
   for (let page = 0; page < 20; page++) {
     const result = await jsonResponse(await fetchImpl(url.toString(), options), 'META_FAILED')
     if (!Array.isArray(result?.data)) throw new MetaSyncError('INVALID_DATA')
     for (const row of result.data) {
       if (!row || typeof row !== 'object' || Array.isArray(row)) throw new MetaSyncError('INVALID_DATA')
-      if (!validDay(row.date_start) || row.date_start < since || row.date_start > until || row.date_stop !== row.date_start || byDay.has(row.date_start)) throw new MetaSyncError('INVALID_DATA')
+      if (!validDay(row.date_start) || row.date_start < since || row.date_start > until || row.date_stop !== row.date_start
+        || typeof row.campaign_id !== 'string' || !/^[0-9]+$/.test(row.campaign_id)
+        || typeof row.campaign_name !== 'string' || !row.campaign_name.trim() || row.campaign_name.length > 500) throw new MetaSyncError('INVALID_DATA')
+      const campaignDay = `${row.date_start}:${row.campaign_id}`
+      if (seenCampaignDays.has(campaignDay)) throw new MetaSyncError('INVALID_DATA')
+      seenCampaignDays.add(campaignDay)
       if (row.actions !== undefined && !Array.isArray(row.actions)) throw new MetaSyncError('INVALID_DATA')
-      const actions = (row.actions || []).filter(a => a?.action_type === 'onsite_conversion.messaging_conversation_started_7d')
+      const actions = (row.actions || []).filter(a => a?.action_type === MESSAGE_ACTION)
       if (actions.length > 1) throw new MetaSyncError('INVALID_DATA')
-      byDay.set(row.date_start, { date: row.date_start, spend: metric(row.spend), impressions: metric(row.impressions, true), messages: actions.length ? metric(actions[0].value, true) : 0 })
+      const messages = actions.length ? metric(actions[0].value, true) : 0
+      const current = byDay.get(row.date_start) || { date: row.date_start, spend: 0, impressions: 0, messages: 0, message_breakdown: messageBreakdown() }
+      current.spend += metric(row.spend)
+      current.impressions += metric(row.impressions, true)
+      current.messages += messages
+      if (messages > 0) current.message_breakdown[campaignMessageCategory(row)] += messages
+      byDay.set(row.date_start, current)
     }
     if (!result.paging?.next) {
       const days = []
       // Yalnızca TAM başarılı yanıtın atladığı günleri sıfırla tamamla.
-      for (let day = since; day <= until; day = shiftDay(day, 1)) days.push(byDay.get(day) || { date: day, spend: 0, impressions: 0, messages: 0 })
+      for (let day = since; day <= until; day = shiftDay(day, 1)) days.push(byDay.get(day) || { date: day, spend: 0, impressions: 0, messages: 0, message_breakdown: messageBreakdown() })
       return days
     }
     const after = result.paging?.cursors?.after
