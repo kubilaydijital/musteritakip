@@ -6,7 +6,7 @@ import { ExportButtons } from './panel/ExportButtons'
 import { leadsToExportRows } from './panel/exportRows'
 import { FollowUpCenter } from './panel/FollowUpCenter.jsx'
 import { MetaDataHealth } from './panel/MetaDataHealth.jsx'
-import { EMPTY_META_HEALTH, fetchMetaHealth, fetchMetaRows, maskMetaPerformance, metaPeriodHealth } from './lib/metaHealth.js'
+import { EMPTY_META_HEALTH, fetchMetaHealth, fetchMetaRows, maskMetaPerformance, metaMessageBreakdown, metaPeriodHealth } from './lib/metaHealth.js'
 import { activeFollowUpReminder, canManageFollowUp, fetchFollowUpRows, followUpWriteError } from './lib/followUps.js'
 import { followUpConversionWriteError } from './lib/followUpConversions.js'
 import { leadServiceOptions, leadServiceSelection, resolveLeadFormBranchId } from './lib/leadServices.js'
@@ -2456,6 +2456,42 @@ function ReportMetricCard({ icon, label, value, detail, color }) {
   )
 }
 
+function MetaMessageBreakdownRows({ breakdown, ready = true }) {
+  const rows = [
+    { key: 'dm', label: 'DM kampanyası', value: breakdown?.dm || 0, color: '#7257E8' },
+    { key: 'profile', label: 'Profil ziyareti reklamı', value: breakdown?.profile || 0, color: '#2F7FD1' },
+    { key: 'other', label: 'Diğer Meta kampanyaları', value: breakdown?.other || 0, color: '#7A8497' },
+    { key: 'unclassified', label: 'Ayrıştırılmamış eski veri', value: breakdown?.unclassified || 0, color: '#B47808' },
+  ].filter(row => ['dm', 'profile'].includes(row.key) || row.value > 0)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: 8 }}>
+      {rows.map(row => (
+        <div key={row.key} style={{ borderLeft: `3px solid ${row.color}`, background: '#F8F9FC', borderRadius: 8, padding: '9px 10px', minWidth: 0 }}>
+          <div style={{ color: T.textSoft, fontSize: 10.5, fontWeight: 700, lineHeight: 1.25 }}>{row.label}</div>
+          <div style={{ color: row.color, fontSize: 18, fontWeight: 850, marginTop: 3 }}>{ready ? row.value : '—'}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function MetaMessageBreakdownCard({ breakdown, ready, provisional }) {
+  return (
+    <div style={{ ...cardStyle, padding: '13px 15px', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+        <div>
+          <p style={{ color: T.text, fontSize: 13.5, fontWeight: 800, margin: '0 0 3px' }}>Meta mesaj dağılımı</p>
+          <p style={{ color: T.textSoft, fontSize: 11.5, margin: 0 }}>Toplam mesaj değişmez; hangi reklam türünün konuşma başlattığı gösterilir.</p>
+        </div>
+        <span style={{ color: T.primary, fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{ready ? `${breakdown.total} toplam` : 'Veri doğrulanmadı'}</span>
+      </div>
+      <MetaMessageBreakdownRows breakdown={breakdown} ready={ready} />
+      {ready && breakdown.unclassified > 0 && <p style={{ color: '#8B651C', background: '#FFF8EA', borderRadius: 8, padding: '8px 10px', fontSize: 11, margin: '9px 0 0' }}>Ayrıştırılmamış sayı, güncellemeden önce çekilmiş günlere aittir. İlgili tarih aralığını yeniden çektiğinizde DM ve profil kırılımına taşınır.</p>}
+      {ready && provisional && <p style={{ color: T.textFaint, fontSize: 10.5, margin: '8px 0 0' }}>Bugünkü sonuçlar gün içinde değişebilir.</p>}
+    </div>
+  )
+}
+
 function ReportFunnel({ metrics }) {
   const stages = [
     { label: 'Meta mesaj', value: metrics.messages, color: '#7C5CFC' },
@@ -2678,6 +2714,7 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
   const periodSales = useMemo(() => salesInPeriod(leads, period.start, period.end), [leads, period])
   const periodAds = useMemo(() => adsData.filter(ad => isInReportPeriod(ad.date, period.start, period.end)), [adsData, period])
   const metaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: adsData, start: period.start, end: period.end, adsError })
+  const campaignMessages = useMemo(() => metaMessageBreakdown({ health: metaHealth, branches: metaBranches, start: period.start, end: period.end }), [metaHealth, metaBranches, period])
   const messageAudit = useMemo(() => buildMessageComparison(periodAds, periodLeads), [periodAds, periodLeads])
   const exportLeads = useMemo(() => {
     const includedIds = new Set([...periodLeads, ...periodSales].map(lead => lead.id))
@@ -2761,6 +2798,7 @@ function ReportsDashboard({ leads, adsData, services, isMobile, canExport, branc
         <ReportMetricCard icon={<TrendingUp size={15} />} label="Ciro" value={fmtTL(metrics.revenue)} detail="Satış tarihine göre" color="#2F7FD1" />
         <ReportMetricCard icon={<Megaphone size={15} />} label="Meta ROAS" value={!metaReport.ready || metrics.roas === '—' ? '—' : `${metrics.roas}x`} detail={!metaReport.ready ? 'Meta verisi eksik' : metrics.metaSpend === 0 ? 'Harcama yok; ROAS yok' : metaReport.provisional ? 'Bugün geçici' : 'Meta ciro / Meta harcama'} color="#A66B17" />
       </div>
+      <MetaMessageBreakdownCard breakdown={campaignMessages} ready={metaReport.ready} provisional={metaReport.provisional} />
 
       <SalesDateNotice sales={periodSales} />
 
@@ -3481,7 +3519,7 @@ function MonthlyTrendChart({ leads }) {
   return <div style={{ position: 'relative', width: '100%', height: 176 }}><canvas ref={ref} /></div>
 }
 
-function AdsPerformanceTable({ adsData, leads, isMobile, metaReady = false, canSeeRevenue = false }) {
+function AdsPerformanceTable({ adsData, leads, isMobile, metaReady = false, canSeeRevenue = false, messageBreakdown = null }) {
   const rows = useMemo(() => {
     // Kartın başlığındaki “Bu Ay” ifadesi gerçek bir takvim ayını anlatır.
     // Geçmiş reklam ve danışan kayıtlarını silmeden, yalnızca bu hesaptan hariç tutuyoruz.
@@ -3539,6 +3577,12 @@ function AdsPerformanceTable({ adsData, leads, isMobile, metaReady = false, canS
             <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>MESAJ</div><div style={{ color: T.text, fontWeight: 800, fontSize: isMobile ? 16 : 18, marginTop: 3 }}>{r.channel === 'Meta (Otomatik)' && !metaReady ? '—' : r.messages}</div></div>
             <div><div style={{ color: T.textFaint, fontSize: 10.5, fontWeight: 700 }}>META SATIŞ</div><div style={{ color: r.sales > 0 ? T.green : T.text, fontWeight: 800, fontSize: isMobile ? 16 : 18, marginTop: 3 }}>{r.sales}</div></div>
           </div>
+          {r.channel === 'Meta (Otomatik)' && messageBreakdown && (
+            <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 12, paddingTop: 12 }}>
+              <MetaMessageBreakdownRows breakdown={messageBreakdown} ready={metaReady} />
+              {metaReady && messageBreakdown.unclassified > 0 && <p style={{ color: '#8B651C', fontSize: 10.5, margin: '8px 0 0' }}>{messageBreakdown.unclassified} mesaj eski çekim olduğu için henüz kampanya türüne ayrılmadı.</p>}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -4141,6 +4185,7 @@ export function PanelApp() {
   const metaBranches = isSuperAdmin && filterBranch === 'all' ? branches : branches.filter(b => b.id === relevantBranchId)
   const currentMetaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: scopedAds, start: currentPeriodStart, end: currentPeriodEnd, adsError })
   const previousMetaReport = metaPeriodHealth({ health: metaHealth, branches: metaBranches, ads: scopedAds, start: previousPeriodStart, end: previousPeriodEnd, adsError })
+  const currentCampaignMessages = metaMessageBreakdown({ health: metaHealth, branches: metaBranches, start: currentPeriodStart, end: currentPeriodEnd })
   const currentPerformance = maskMetaPerformance(buildPeriodPerformance(monthlyAppointments, currentPeriodAds, monthlySales), currentMetaReport)
   const previousPerformance = maskMetaPerformance(buildPeriodPerformance(previousPeriodAppointments, previousPeriodAds, previousPeriodSales), previousMetaReport)
   const metaMessages = currentMetaReport.ready ? currentPerformance.metaMessages : null
@@ -4351,7 +4396,7 @@ export function PanelApp() {
                 <div style={{ ...cardStyle, padding: '1.1rem' }}>
                   <p style={{ fontSize: 14.5, color: T.text, margin: '0 0 4px', fontWeight: 800 }}>Meta reklam özeti</p>
                   <p style={{ fontSize: 12, color: T.textSoft, margin: '0 0 12px' }}>Bu ayın harcama, mesaj, Meta kaynaklı satış ve ROAS sonucu.</p>
-                  <AdsPerformanceTable adsData={scopedAds} leads={monthlySales} isMobile={isMobile} metaReady={currentMetaReport.ready} canSeeRevenue={perms.can_see_revenue} />
+                  <AdsPerformanceTable adsData={scopedAds} leads={monthlySales} isMobile={isMobile} metaReady={currentMetaReport.ready} canSeeRevenue={perms.can_see_revenue} messageBreakdown={currentCampaignMessages} />
                 </div>
               )}
             </div>
