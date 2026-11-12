@@ -29,7 +29,9 @@ import {
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
 
 const CHANNELS = ['Instagram', 'WhatsApp', 'Telefon', 'Google Ads', 'Facebook Ads', 'TikTok', 'Online Randevu', 'Organik', 'Kağıt Not']
-const WAITING_APPOINTMENT_RESULT = 'Randevu bekliyor'
+const WAITING_APPOINTMENT_RESULT = 'Randevu alınamadı'
+const LEGACY_WAITING_APPOINTMENT_RESULT = 'Randevu bekliyor'
+const isWaitingAppointmentResult = result => result === WAITING_APPOINTMENT_RESULT || result === LEGACY_WAITING_APPOINTMENT_RESULT
 const RESULTS = [WAITING_APPOINTMENT_RESULT, 'Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
 const OPEN_RESULTS = []
 const RESULT_COLOR = { [WAITING_APPOINTMENT_RESULT]: '#A87412', 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D', 'Satın almadı': '#854F0B', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#6B6B6B', 'Müşteri oldu': '#3B6D11' }
@@ -91,6 +93,10 @@ function buildLocalLeadAction({ note, result, service }) {
     return 'Hizmet sonrasında memnuniyetini kontrol etmek için uygun bir takip tarihi belirleyin. Görüşme sonucunu yeni bir notla kaydedin.'
   }
 
+  if (isWaitingAppointmentResult(result)) {
+    return 'Telefon numarası alındı ancak randevu henüz netleşmedi. Ertesi gün kısa bir takip yapın; iki uygun gün/saat seçeneği sunup sonucu aynı kayıtta güncelleyin.'
+  }
+
   if (includesAny(['eş', 'aile', 'izin', 'partner'])) {
     return 'Karar sürecini zorlamadan anlayışla yaklaşın; isterse birlikte değerlendirebilmeleri için kısa ve net bilgi paylaşmayı teklif edin. 3–4 gün sonrası için takip tarihi belirleyin.'
   }
@@ -120,7 +126,6 @@ function buildLocalLeadAction({ note, result, service }) {
   }
 
   const actionsByResult = {
-    [WAITING_APPOINTMENT_RESULT]: 'Telefon numarası alındı ancak randevu henüz netleşmedi. Ertesi gün kısa bir takip yapın; iki uygun gün/saat seçeneği sunup sonucu aynı kayıtta güncelleyin.',
     'Randevu aldı': 'Randevudan bir gün önce kısa bir teyit mesajı gönderin. Saat, konum ve hazırlık bilgilerini yalnızca gerekli olduğu ölçüde hatırlatın.',
     'Randevuya gelmedi': 'Önce gelememe nedenini yargılamadan sorun. Uygunsa iki yeni tarih seçeneği sunun ve sonucu yeni bir notla kaydedin.',
     'Satın almadı': 'Satın almama nedenini açık uçlu bir soruyla netleştirin. İtiraza uygun bilgi verdikten sonra tekrar aranacağı tarihi belirleyin.',
@@ -162,8 +167,9 @@ function staleness(lead, noteCount = 0, rule = null) {
   return activeFollowUpReminder(lead, legacyStaleness(lead, noteCount, rule))
 }
 function legacyStaleness(lead, noteCount = 0, rule = null) {
-  const schedule = rule ? [rule.day_1, rule.day_2, rule.day_3] : DEFAULT_REMINDER_SCHEDULE[lead.result]
-  const coldAfter = rule ? rule.cold_after : DEFAULT_COLD_AFTER[lead.result]
+  const reminderResult = isWaitingAppointmentResult(lead.result) ? WAITING_APPOINTMENT_RESULT : lead.result
+  const schedule = rule ? [rule.day_1, rule.day_2, rule.day_3] : DEFAULT_REMINDER_SCHEDULE[reminderResult]
+  const coldAfter = rule ? rule.cold_after : DEFAULT_COLD_AFTER[reminderResult]
   if (!schedule || lead.result === 'Müşteri oldu') return null // Müşteri oldu -> takip yok
 
   let anchorDate
@@ -180,7 +186,7 @@ function legacyStaleness(lead, noteCount = 0, rule = null) {
 
   // Numarası alınan fakat randevusu netleşmeyen kayıt ertesi takvim günü
   // Takip Merkezi'ne düşer; kayıt saatinin üzerinden tam 24 saat geçmesi beklenmez.
-  const d = lead.result === WAITING_APPOINTMENT_RESULT ? turkeyCalendarDaysSince(anchorDate) : daysSince(anchorDate)
+  const d = isWaitingAppointmentResult(lead.result) ? turkeyCalendarDaysSince(anchorDate) : daysSince(anchorDate)
   if (d < 0) return null // randevu henüz geçmedi
 
   if (coldAfter != null && d >= coldAfter) return { level: 'cold', days: d }
@@ -724,8 +730,8 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         <select value={form.result} onChange={e => {
           const result = e.target.value
           setForm(previous => ({ ...previous, result,
-            appointmentDate: result === WAITING_APPOINTMENT_RESULT ? '' : previous.appointmentDate,
-            appointmentTime: result === WAITING_APPOINTMENT_RESULT ? '' : previous.appointmentTime,
+            appointmentDate: isWaitingAppointmentResult(result) ? '' : previous.appointmentDate,
+            appointmentTime: isWaitingAppointmentResult(result) ? '' : previous.appointmentTime,
             saleDate: result === 'Müşteri oldu'
               ? previous.saleDate || (editing?.result === 'Müşteri oldu' && !editing.sold_at ? '' : turkeyDateString())
               : previous.saleDate,
@@ -735,14 +741,14 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
           setSuggestedAction('')
           if (e.target.value !== 'Müşteri oldu') setSaleAmountErr('')
         }} style={inputStyle}>
-          {RESULTS.map(r => <option key={r} value={r}>{r === WAITING_APPOINTMENT_RESULT ? 'Randevu bekliyor — numarası alındı' : r}</option>)}
+          {RESULTS.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
       </div>
       <select value={form.service} onChange={e => { set('service', e.target.value); setSuggestedAction('') }} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {serviceOptions.length === 0 && <option value="">Hizmet listesi tanımlanmamış</option>}
         {serviceOptions.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
       </select>
-      {form.result === WAITING_APPOINTMENT_RESULT ? (
+      {isWaitingAppointmentResult(form.result) ? (
         <div role="status" style={{ fontSize: 12.5, color: '#854F0B', background: '#FCF3DE', border: '1px solid #EED5A6', borderRadius: 8, padding: '10px 12px', marginBottom: 10, lineHeight: 1.5 }}>
           <strong>Telefon numarası kaydedilecek; randevu henüz oluşmayacak.</strong><br />
           Kayıt yarın Takip Merkezi'ne düşer. Randevu netleştiğinde bu danışanı açıp durumu “Randevu aldı” olarak güncelleyin; tarih ve saat alanları o zaman açılır.
@@ -1051,7 +1057,7 @@ const APPOINTMENT_STATUS = {
 }
 
 function getAppointmentStatus(lead) {
-  if (lead.result === WAITING_APPOINTMENT_RESULT) return 'waiting_appointment'
+  if (isWaitingAppointmentResult(lead.result)) return 'waiting_appointment'
   if (lead.result === 'Müşteri oldu') return 'customer'
   if (lead.result === 'Randevuya gelmedi') return 'no_show'
   if (lead.result === 'Satın almadı') return 'not_bought'
@@ -1314,7 +1320,7 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMa
 }
 
 const REMINDER_RULE_LABELS = {
-  [WAITING_APPOINTMENT_RESULT]: { title: 'Randevu Bekliyor', color: '#D99A22' },
+  [WAITING_APPOINTMENT_RESULT]: { title: 'Randevu Alınamadı', color: '#D99A22' },
   'Randevuya gelmedi': { title: 'Randevuya Gelmedi', color: '#E24B4A' },
   'Cevap yazıldı, müşteriden dönüş gelmedi': { title: 'Cevap Yazıldı, Dönüş Gelmedi', color: '#9CA3AF' },
   'Satın almadı': { title: 'Satın Almadı', color: '#EF9F27' },
@@ -1440,7 +1446,7 @@ function normalizeWhatsappPhone(phone) {
 }
 
 function buildWhatsappUrl(lead) {
-  const template = WHATSAPP_TEMPLATES[lead.result]
+  const template = WHATSAPP_TEMPLATES[lead.result] || (isWaitingAppointmentResult(lead.result) ? WHATSAPP_TEMPLATES[WAITING_APPOINTMENT_RESULT] : null)
   const phone = normalizeWhatsappPhone(lead.phone)
   if (!template || !phone) return null
   const message = template(lead.name, lead.service)
@@ -2342,7 +2348,7 @@ function ChartLegend({ items }) {
 function ResultBarChart({ leads }) {
   const ref = useRef(null)
   const chartRef = useRef(null)
-  const counts = useMemo(() => { const c = {}; RESULTS.forEach(r => c[r] = 0); leads.forEach(l => { if (c[l.result] !== undefined) c[l.result]++ }); return c }, [leads])
+  const counts = useMemo(() => { const c = {}; RESULTS.forEach(r => c[r] = 0); leads.forEach(l => { const result = isWaitingAppointmentResult(l.result) ? WAITING_APPOINTMENT_RESULT : l.result; if (c[result] !== undefined) c[result]++ }); return c }, [leads])
   useEffect(() => {
     if (chartRef.current) chartRef.current.destroy()
     chartRef.current = new Chart(ref.current, {
