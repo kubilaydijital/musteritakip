@@ -29,10 +29,11 @@ import {
 Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip)
 
 const CHANNELS = ['Instagram', 'WhatsApp', 'Telefon', 'Google Ads', 'Facebook Ads', 'TikTok', 'Online Randevu', 'Organik', 'Kağıt Not']
-const RESULTS = ['Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
+const WAITING_APPOINTMENT_RESULT = 'Randevu bekliyor'
+const RESULTS = [WAITING_APPOINTMENT_RESULT, 'Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
 const OPEN_RESULTS = []
-const RESULT_COLOR = { 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D', 'Satın almadı': '#854F0B', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#6B6B6B', 'Müşteri oldu': '#3B6D11' }
-const RESULT_HEX = { 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A', 'Satın almadı': '#EF9F27', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#9CA3AF', 'Müşteri oldu': '#639922' }
+const RESULT_COLOR = { [WAITING_APPOINTMENT_RESULT]: '#A87412', 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D', 'Satın almadı': '#854F0B', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#6B6B6B', 'Müşteri oldu': '#3B6D11' }
+const RESULT_HEX = { [WAITING_APPOINTMENT_RESULT]: '#D99A22', 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A', 'Satın almadı': '#EF9F27', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#9CA3AF', 'Müşteri oldu': '#639922' }
 const CHANNEL_HEX = { 'Instagram': '#D4537E', 'WhatsApp': '#1D9E75', 'Telefon': '#3B82F6', 'Google Ads': '#EF9F27', 'Facebook Ads': '#4267B2', 'TikTok': '#25F4EE', 'Online Randevu': '#9B59B6', 'Organik': '#7F77DD', 'Kağıt Not': '#64748B' }
 const SERVICE_COLOR_PALETTE = ['#D4537E', '#378ADD', '#1D9E75', '#EF9F27', '#7F77DD', '#E24B4A', '#639922', '#854F0B']
 const LATEST_ANNOUNCEMENT_ID = '2026-09-28-notes-performance-pulse'
@@ -119,6 +120,7 @@ function buildLocalLeadAction({ note, result, service }) {
   }
 
   const actionsByResult = {
+    [WAITING_APPOINTMENT_RESULT]: 'Telefon numarası alındı ancak randevu henüz netleşmedi. Ertesi gün kısa bir takip yapın; iki uygun gün/saat seçeneği sunup sonucu aynı kayıtta güncelleyin.',
     'Randevu aldı': 'Randevudan bir gün önce kısa bir teyit mesajı gönderin. Saat, konum ve hazırlık bilgilerini yalnızca gerekli olduğu ölçüde hatırlatın.',
     'Randevuya gelmedi': 'Önce gelememe nedenini yargılamadan sorun. Uygunsa iki yeni tarih seçeneği sunun ve sonucu yeni bir notla kaydedin.',
     'Satın almadı': 'Satın almama nedenini açık uçlu bir soruyla netleştirin. İtiraza uygun bilgi verdikten sonra tekrar aranacağı tarihi belirleyin.',
@@ -129,17 +131,25 @@ function buildLocalLeadAction({ note, result, service }) {
 }
 // Her sonuç kategorisi için varsayılan (şubeye özel kural bulunamazsa kullanılan) eşikler.
 const DEFAULT_REMINDER_SCHEDULE = {
+  [WAITING_APPOINTMENT_RESULT]: [1, 4, 10],
   'Randevu aldı': [1, 1, 1],
   'Randevuya gelmedi': [1, 4, 10],
   'Cevap yazıldı, müşteriden dönüş gelmedi': [1, 3, 7],
   'Satın almadı': [2, 7, 18],
 }
 const DEFAULT_COLD_AFTER = {
+  [WAITING_APPOINTMENT_RESULT]: 20,
   'Randevu aldı': 1, 'Randevuya gelmedi': 30, 'Cevap yazıldı, müşteriden dönüş gelmedi': 20, 'Satın almadı': 35,
 }
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
 function daysSince(dateStr) { return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000) }
+function turkeyCalendarDaysSince(dateStr) {
+  const anchorDay = turkeyDateString(new Date(dateStr))
+  const today = turkeyDateString()
+  const difference = new Date(`${today}T00:00:00Z`) - new Date(`${anchorDay}T00:00:00Z`)
+  return Number.isFinite(difference) ? Math.floor(difference / 86400000) : Number.NaN
+}
 function lastTouch(lead) { return lead.last_note_at || lead.edited_at || lead.date }
 
 // rule: { day_1, day_2, day_3, cold_after } — o şubeye ve sonuç kategorisine özel,
@@ -168,7 +178,9 @@ function legacyStaleness(lead, noteCount = 0, rule = null) {
     anchorDate = lastTouch(lead)
   }
 
-  const d = daysSince(anchorDate)
+  // Numarası alınan fakat randevusu netleşmeyen kayıt ertesi takvim günü
+  // Takip Merkezi'ne düşer; kayıt saatinin üzerinden tam 24 saat geçmesi beklenmez.
+  const d = lead.result === WAITING_APPOINTMENT_RESULT ? turkeyCalendarDaysSince(anchorDate) : daysSince(anchorDate)
   if (d < 0) return null // randevu henüz geçmedi
 
   if (coldAfter != null && d >= coldAfter) return { level: 'cold', days: d }
@@ -712,41 +724,51 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
         <select value={form.result} onChange={e => {
           const result = e.target.value
           setForm(previous => ({ ...previous, result,
+            appointmentDate: result === WAITING_APPOINTMENT_RESULT ? '' : previous.appointmentDate,
+            appointmentTime: result === WAITING_APPOINTMENT_RESULT ? '' : previous.appointmentTime,
             saleDate: result === 'Müşteri oldu'
               ? previous.saleDate || (editing?.result === 'Müşteri oldu' && !editing.sold_at ? '' : turkeyDateString())
               : previous.saleDate,
           }))
+          setAppointmentErr('')
           setSaleDateErr('')
           setSuggestedAction('')
           if (e.target.value !== 'Müşteri oldu') setSaleAmountErr('')
         }} style={inputStyle}>
-          {RESULTS.map(r => <option key={r} value={r}>{r}</option>)}
+          {RESULTS.map(r => <option key={r} value={r}>{r === WAITING_APPOINTMENT_RESULT ? 'Randevu bekliyor — numarası alındı' : r}</option>)}
         </select>
       </div>
       <select value={form.service} onChange={e => { set('service', e.target.value); setSuggestedAction('') }} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
         {serviceOptions.length === 0 && <option value="">Hizmet listesi tanımlanmamış</option>}
         {serviceOptions.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
       </select>
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <input type="date" value={form.appointmentDate} onChange={e => {
-            const val = e.target.value
-            set('appointmentDate', val)
-            if (val && form.appointmentTime) setAppointmentErr('')
-          }} style={inputStyle} />
-          <input type="time" value={form.appointmentTime} onChange={e => {
-            const val = e.target.value
-            set('appointmentTime', val)
-            if (form.appointmentDate && val) setAppointmentErr('')
-          }} style={inputStyle} />
+      {form.result === WAITING_APPOINTMENT_RESULT ? (
+        <div role="status" style={{ fontSize: 12.5, color: '#854F0B', background: '#FCF3DE', border: '1px solid #EED5A6', borderRadius: 8, padding: '10px 12px', marginBottom: 10, lineHeight: 1.5 }}>
+          <strong>Telefon numarası kaydedilecek; randevu henüz oluşmayacak.</strong><br />
+          Kayıt yarın Takip Merkezi'ne düşer. Randevu netleştiğinde bu danışanı açıp durumu “Randevu aldı” olarak güncelleyin; tarih ve saat alanları o zaman açılır.
         </div>
-        <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>
-          {form.result === 'Randevu aldı'
-            ? 'Randevu tarihi ve saati zorunludur.'
-            : 'Randevu/görüşme tarihi — varsa girin, takvimde görünür. Kayıt açılış tarihini değiştirmez. Ciro için aşağıdaki satış tarihi kullanılır.'}
-        </p>
-        {appointmentErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{appointmentErr}</p>}
-      </div>
+      ) : (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <input type="date" value={form.appointmentDate} onChange={e => {
+              const val = e.target.value
+              set('appointmentDate', val)
+              if (val && form.appointmentTime) setAppointmentErr('')
+            }} style={inputStyle} />
+            <input type="time" value={form.appointmentTime} onChange={e => {
+              const val = e.target.value
+              set('appointmentTime', val)
+              if (form.appointmentDate && val) setAppointmentErr('')
+            }} style={inputStyle} />
+          </div>
+          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>
+            {form.result === 'Randevu aldı'
+              ? 'Randevu tarihi ve saati zorunludur.'
+              : 'Randevu/görüşme tarihi — varsa girin, takvimde görünür. Kayıt açılış tarihini değiştirmez. Ciro için aşağıdaki satış tarihi kullanılır.'}
+          </p>
+          {appointmentErr && <p style={{ fontSize: 12, color: '#c0392b', margin: '4px 0 0' }}>{appointmentErr}</p>}
+        </div>
+      )}
       {form.result === 'Müşteri oldu' && (
         <div style={{ marginBottom: 10 }}>
           {hasMissingSaleAmount(editing) && <div role="status" style={{ fontSize: 12, color: '#854F0B', background: '#FCF3DE', border: '1px solid #EED5A6', borderRadius: 8, padding: '9px 11px', marginBottom: 9, lineHeight: 1.5 }}>Bu satışın tutarı eksik veya geçersiz. Kaydı güncellemek için gerçek satış tutarını girin. Sistem eski kaydı silmez veya tutar tahmin etmez.</div>}
@@ -1019,6 +1041,7 @@ function dateKey(d) {
 // Yeni bir veritabanı alanı gerektirmez; gelecek randevular ve sonuç bekleyen geçmiş
 // randevular otomatik ayrışır.
 const APPOINTMENT_STATUS = {
+  waiting_appointment: { label: 'Randevu bekliyor', shortLabel: 'Randevu bekliyor', color: '#A87412', bg: '#FCF3DE' },
   upcoming: { label: 'Yaklaşan', shortLabel: 'Yaklaşan', color: '#6F61D9', bg: '#EEECFF' },
   needs_result: { label: 'Sonuç girilmeli', shortLabel: 'Sonuç bekliyor', color: '#A87412', bg: '#FCF3DE' },
   customer: { label: 'Müşteri oldu', shortLabel: 'Müşteri oldu', color: '#147561', bg: '#E8F4EF' },
@@ -1028,6 +1051,7 @@ const APPOINTMENT_STATUS = {
 }
 
 function getAppointmentStatus(lead) {
+  if (lead.result === WAITING_APPOINTMENT_RESULT) return 'waiting_appointment'
   if (lead.result === 'Müşteri oldu') return 'customer'
   if (lead.result === 'Randevuya gelmedi') return 'no_show'
   if (lead.result === 'Satın almadı') return 'not_bought'
@@ -1290,12 +1314,13 @@ function StaleAlerts({ leads, canSeePhone, currentUserName, isStaff, noteCountMa
 }
 
 const REMINDER_RULE_LABELS = {
+  [WAITING_APPOINTMENT_RESULT]: { title: 'Randevu Bekliyor', color: '#D99A22' },
   'Randevuya gelmedi': { title: 'Randevuya Gelmedi', color: '#E24B4A' },
   'Cevap yazıldı, müşteriden dönüş gelmedi': { title: 'Cevap Yazıldı, Dönüş Gelmedi', color: '#9CA3AF' },
   'Satın almadı': { title: 'Satın Almadı', color: '#EF9F27' },
   'Randevu aldı': { title: 'Randevu Aldı (hatırlatma)', color: '#1D9E75' },
 }
-const REMINDER_RULE_ORDER = ['Randevuya gelmedi', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Satın almadı', 'Randevu aldı']
+const REMINDER_RULE_ORDER = [WAITING_APPOINTMENT_RESULT, 'Randevuya gelmedi', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Satın almadı', 'Randevu aldı']
 
 function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap, canEditRules, isSuperAdmin, filterBranch, activeBranches, branchName, onSaveRule, canSeePhone, canSeeRevenue, onOpenLead, users, currentUser, canEditAny, canEditLead, followUpEvents, onSaveFollowUp, followUpError }) {
   const [ruleBranchId, setRuleBranchId] = useState(
@@ -1392,6 +1417,8 @@ function OpportunitiesTab({ leads, leadNotes = [], noteCountMap, rules, ruleMap,
 
 // "Müşteri oldu" durumu kasıtlı olarak yok - zaten takip gerektirmeyen, sonuçlanmış bir durum.
 const WHATSAPP_TEMPLATES = {
+  [WAITING_APPOINTMENT_RESULT]: (name, service) =>
+    `Merhaba ${name}, ${service ? `${service} hakkında ` : ''}görüşmüştük. Size uygun randevuyu birlikte netleştirebiliriz; hangi gün ve saat sizin için daha uygun?`,
   'Randevu aldı': (name, service) =>
     `Merhaba ${name}! 🌟 ${service ? `${service} için ` : ''}randevunuza çok az kaldı, sizi ağırlamak için sabırsızlanıyoruz. Yol tarifine ihtiyacınız var mı?`,
   'Randevuya gelmedi': (name) =>
@@ -1437,7 +1464,7 @@ function clientListData(leads, { search = '', statusFilter = 'all', sort = 'prio
       .some(value => String(value || '').toLocaleLowerCase('tr').includes(normalizedSearch))
   }).sort((a, b) => {
     if (sort === 'newest') return new Date(b.date) - new Date(a.date)
-    const priority = { needs_result: 0, upcoming: 1, no_show: 2, not_bought: 3, awaiting_reply: 4, customer: 5 }
+    const priority = { waiting_appointment: 0, needs_result: 1, upcoming: 2, no_show: 3, not_bought: 4, awaiting_reply: 5, customer: 6 }
     const rank = priority[getAppointmentStatus(a)] - priority[getAppointmentStatus(b)]
     if (rank !== 0) return rank
     return new Date(b.appointment_at || b.date) - new Date(a.appointment_at || a.date)
@@ -1447,7 +1474,7 @@ function clientListData(leads, { search = '', statusFilter = 'all', sort = 'prio
 
 function ClientStatusFilters({ counts, total, selected, onSelect }) {
   const filters = [
-    ['all', 'Tümü'], ['needs_result', 'Sonuç bekliyor'], ['upcoming', 'Yaklaşan'],
+    ['all', 'Tümü'], ['waiting_appointment', 'Randevu bekliyor'], ['needs_result', 'Sonuç bekliyor'], ['upcoming', 'Yaklaşan'],
     ['customer', 'Müşteri oldu'], ['missing_amount', 'Tutar girilmemiş'], ['no_show', 'Gelmedi'],
   ].filter(([value]) => value !== 'missing_amount' || (counts.missing_amount || 0) > 0 || selected === 'missing_amount')
 
@@ -1499,6 +1526,9 @@ function LeadRow({ lead, canSeePhone, canEdit, onEdit, showBranch, branchName, i
   } else if (lead.followup?.next_followup_at) {
     nextStep = `Takip · ${new Date(lead.followup.next_followup_at).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
     nextStepColor = followUp?.level === 'critical' ? T.red : T.primary
+  } else if (status === 'waiting_appointment') {
+    nextStep = 'Randevu için takip et'
+    nextStepColor = T.orange
   } else if (status === 'needs_result') {
     nextStep = hasAppointment ? `Sonucu güncelle · ${appointment.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}` : 'Sonucu güncelle'
     nextStepColor = T.orange
