@@ -1041,7 +1041,7 @@ function dateKey(d) {
 // Yeni bir veritabanı alanı gerektirmez; gelecek randevular ve sonuç bekleyen geçmiş
 // randevular otomatik ayrışır.
 const APPOINTMENT_STATUS = {
-  waiting_appointment: { label: 'Randevu bekliyor', shortLabel: 'Randevu bekliyor', color: '#A87412', bg: '#FCF3DE' },
+  waiting_appointment: { label: 'Randevu alınamadı', shortLabel: 'Randevu alınamadı', color: '#A87412', bg: '#FCF3DE' },
   upcoming: { label: 'Yaklaşan', shortLabel: 'Yaklaşan', color: '#6F61D9', bg: '#EEECFF' },
   needs_result: { label: 'Sonuç girilmeli', shortLabel: 'Sonuç bekliyor', color: '#A87412', bg: '#FCF3DE' },
   customer: { label: 'Müşteri oldu', shortLabel: 'Müşteri oldu', color: '#147561', bg: '#E8F4EF' },
@@ -1474,7 +1474,7 @@ function clientListData(leads, { search = '', statusFilter = 'all', sort = 'prio
 
 function ClientStatusFilters({ counts, total, selected, onSelect }) {
   const filters = [
-    ['all', 'Tümü'], ['waiting_appointment', 'Randevu bekliyor'], ['needs_result', 'Sonuç bekliyor'], ['upcoming', 'Yaklaşan'],
+    ['all', 'Tümü'], ['waiting_appointment', 'Randevu alınamadı'], ['needs_result', 'Sonuç bekliyor'], ['upcoming', 'Yaklaşan'],
     ['customer', 'Müşteri oldu'], ['missing_amount', 'Tutar girilmemiş'], ['no_show', 'Gelmedi'],
   ].filter(([value]) => value !== 'missing_amount' || (counts.missing_amount || 0) > 0 || selected === 'missing_amount')
 
