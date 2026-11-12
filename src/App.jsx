@@ -31,8 +31,9 @@ Chart.register(BarController, BarElement, DoughnutController, ArcElement, LineCo
 const CHANNELS = ['Instagram', 'WhatsApp', 'Telefon', 'Google Ads', 'Facebook Ads', 'TikTok', 'Online Randevu', 'Organik', 'Kağıt Not']
 const WAITING_APPOINTMENT_RESULT = 'Randevu alınamadı'
 const LEGACY_WAITING_APPOINTMENT_RESULT = 'Randevu bekliyor'
+const LEGACY_AWAITING_REPLY_RESULT = 'Cevap yazıldı, müşteriden dönüş gelmedi'
 const isWaitingAppointmentResult = result => result === WAITING_APPOINTMENT_RESULT || result === LEGACY_WAITING_APPOINTMENT_RESULT
-const RESULTS = [WAITING_APPOINTMENT_RESULT, 'Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', 'Cevap yazıldı, müşteriden dönüş gelmedi', 'Müşteri oldu']
+const RESULTS = [WAITING_APPOINTMENT_RESULT, 'Randevu aldı', 'Randevuya gelmedi', 'Satın almadı', LEGACY_AWAITING_REPLY_RESULT, 'Müşteri oldu']
 const OPEN_RESULTS = []
 const RESULT_COLOR = { [WAITING_APPOINTMENT_RESULT]: '#A87412', 'Randevu aldı': '#0F6E56', 'Randevuya gelmedi': '#A32D2D', 'Satın almadı': '#854F0B', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#6B6B6B', 'Müşteri oldu': '#3B6D11' }
 const RESULT_HEX = { [WAITING_APPOINTMENT_RESULT]: '#D99A22', 'Randevu aldı': '#1D9E75', 'Randevuya gelmedi': '#E24B4A', 'Satın almadı': '#EF9F27', 'Cevap yazıldı, müşteriden dönüş gelmedi': '#9CA3AF', 'Müşteri oldu': '#639922' }
@@ -587,6 +588,9 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
   }, [editing, newProcessFrom])
 
   const serviceOptions = leadServiceOptions(services, form.service)
+  // Bu eski sonuç yeni kayıt akışından kaldırıldı. Geçmiş veriyi bozmamak için
+  // yalnızca o sonuçla kaydedilmiş mevcut bir kayıt düzenlenirken gösterilir.
+  const resultOptions = RESULTS.filter(result => result !== LEGACY_AWAITING_REPLY_RESULT || editing?.result === LEGACY_AWAITING_REPLY_RESULT)
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -741,7 +745,7 @@ function LeadForm({ onAdd, onUpdate, onDelete, canDelete, currentUser, editing, 
           setSuggestedAction('')
           if (e.target.value !== 'Müşteri oldu') setSaleAmountErr('')
         }} style={inputStyle}>
-          {RESULTS.map(r => <option key={r} value={r}>{r}</option>)}
+          {resultOptions.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
       </div>
       <select value={form.service} onChange={e => { set('service', e.target.value); setSuggestedAction('') }} style={{ ...inputStyle, width: '100%', marginBottom: 10 }}>
