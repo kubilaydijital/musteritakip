@@ -1485,7 +1485,7 @@ function clientListData(leads, { search = '', statusFilter = 'all', sort = 'prio
 function ClientStatusFilters({ counts, total, selected, onSelect }) {
   const filters = [
     ['all', 'Tümü'], ['waiting_appointment', 'Randevu alınamadı'], ['needs_result', 'Sonuç bekliyor'], ['upcoming', 'Yaklaşan'],
-    ['customer', 'Müşteri oldu'], ['missing_amount', 'Tutar girilmemiş'], ['no_show', 'Gelmedi'],
+    ['customer', 'Müşteri oldu'], ['missing_amount', 'Tutar girilmemiş'], ['no_show', 'Gelmedi'], ['not_bought', 'Satın almadı'],
   ].filter(([value]) => value !== 'missing_amount' || (counts.missing_amount || 0) > 0 || selected === 'missing_amount')
 
   return <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
